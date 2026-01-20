@@ -1,11 +1,11 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import { useChromaDB } from '../../providers/ChromaDBProvider'
+import { usePinecone } from '../../providers/PineconeProvider'
 import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import DocumentsTable from './DocumentsTable'
 import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filters'
-import { TypedMetadataRecord, TypedMetadataField, typedMetadataToChromaFormat, validateMetadataValue } from '../../types/metadata'
+import { TypedMetadataRecord, TypedMetadataField, typedMetadataToPineconeFormat, validateMetadataValue } from '../../types/metadata'
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
 import { FilterRow } from '../filters/FilterRow'
 
@@ -64,7 +64,7 @@ export default function DocumentsView({
   onExposeDraftHandler,
   onIsFirstDocumentChange,
 }: DocumentsViewProps) {
-  const { currentProfile } = useChromaDB()
+  const { currentProfile } = usePinecone()
   const [filterRows, setFilterRows] = useState<FilterRowType[]>([createDefaultFilterRow()])
   const [nResults, setNResults] = useState(10)
 
@@ -385,7 +385,7 @@ export default function DocumentsView({
         return
       }
 
-      // Document text is required (ChromaDB needs either document or embeddings)
+      // Document text is required (Pinecone needs content to generate embeddings)
       const documentText = draft.document?.trim()
       if (!documentText) {
         setDraftError(`Document ${i + 1}: Document text is required`)
@@ -409,7 +409,7 @@ export default function DocumentsView({
       if (draftDocuments.length === 1) {
         // Single document - use single create mutation
         const draft = draftDocuments[0]
-        const metadata = typedMetadataToChromaFormat(draft.metadata)
+        const metadata = typedMetadataToPineconeFormat(draft.metadata)
         await createMutation.mutateAsync({
           id: draft.id,
           text: draft.document.trim(),
@@ -421,7 +421,7 @@ export default function DocumentsView({
         const vectorsToCreate = draftDocuments.map(draft => ({
           id: draft.id,
           text: draft.document.trim(),
-          metadata: typedMetadataToChromaFormat(draft.metadata),
+          metadata: typedMetadataToPineconeFormat(draft.metadata),
         }))
         await createBatchMutation.mutateAsync({
           vectors: vectorsToCreate,

@@ -274,12 +274,3 @@ export function useDeleteIndexMutation(profileId: string) {
   })
 }
 
-// Legacy aliases for backwards compatibility during migration
-export const chromaQueryKeys = pineconeQueryKeys
-export const useCollectionsQuery = useIndexesQuery
-export const useRefreshCollectionsMutation = useRefreshIndexesMutation
-export const useDocumentsQuery = useVectorsQuery
-export const useUpdateDocumentMutation = useUpdateVectorMutation
-export const useCreateDocumentMutation = useCreateVectorMutation
-export const useDeleteDocumentsMutation = useDeleteVectorsMutation
-export const useCreateDocumentsBatchMutation = useBatchImportMutation

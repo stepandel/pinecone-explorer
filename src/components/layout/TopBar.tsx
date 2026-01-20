@@ -1,9 +1,9 @@
-import { useChromaDB } from '../../providers/ChromaDBProvider'
+import { usePinecone } from '../../providers/PineconeProvider'
 import { usePanel } from '../../context/PanelContext'
 import { PanelLeft, PanelRight, PanelLeftDashed, PanelRightDashed, Power } from 'lucide-react'
 
 export function TopBar() {
-  const { currentProfile } = useChromaDB()
+  const { currentProfile } = usePinecone()
   const {
     leftPanelOpen,
     setLeftPanelOpen,

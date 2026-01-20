@@ -362,34 +362,28 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
       label: 'Help',
       submenu: [
         {
-          label: 'Chroma Documentation',
+          label: 'Pinecone Documentation',
           click: async () => {
-            await shell.openExternal('https://docs.trychroma.com/')
+            await shell.openExternal('https://docs.pinecone.io/')
           },
         },
         {
-          label: 'Chroma Website',
+          label: 'Pinecone Website',
           click: async () => {
-            await shell.openExternal('https://www.trychroma.com/')
+            await shell.openExternal('https://www.pinecone.io/')
           },
         },
         { type: 'separator' },
         {
-          label: 'Chroma Explorer Website',
-          click: async () => {
-            await shell.openExternal('https://chroma-explorer.com/')
-          },
-        },
-        {
           label: 'Report an Issue...',
           click: async () => {
-            await shell.openExternal('https://github.com/stepandel/chroma-explorer/issues')
+            await shell.openExternal('https://github.com/your-repo/pinecone-explorer/issues')
           },
         },
         {
           label: 'Propose a Feature...',
           click: async () => {
-            await shell.openExternal('https://github.com/stepandel/chroma-explorer/issues')
+            await shell.openExternal('https://github.com/your-repo/pinecone-explorer/issues')
           },
         },
         { type: 'separator' },

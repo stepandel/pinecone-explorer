@@ -19,12 +19,12 @@ import path from 'path'
  *
  * Keychain access persists across app updates because:
  * - macOS ties access to bundle ID + code signing identity
- * - As long as appId stays 'com.chromaexplorer.app' and same cert is used, no re-prompts
+ * - As long as appId stays 'com.pineconeexplorer.app' and same cert is used, no re-prompts
  */
 
 const KEY_FILE_NAME = 'encryption-key.enc'
 const KEY_LENGTH = 32 // 256 bits
-const FALLBACK_KEY_PREFIX = 'chroma-explorer-fallback-v2'
+const FALLBACK_KEY_PREFIX = 'pinecone-explorer-fallback-v2'
 
 let cachedKey: string | null = null
 let keychainAccessDenied = false
@@ -46,7 +46,7 @@ function generateRandomKey(): string {
 function getDeterministicFallbackKey(): string {
   // Use app path + bundle ID to create a machine-specific but deterministic key
   const appPath = app.getAppPath()
-  const bundleId = 'com.chromaexplorer.app'
+  const bundleId = 'com.pineconeexplorer.app'
   const seed = `${FALLBACK_KEY_PREFIX}:${appPath}:${bundleId}`
   return createHash('sha256').update(seed).digest('hex')
 }

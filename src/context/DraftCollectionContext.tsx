@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { useChromaDB } from '../providers/ChromaDBProvider'
+import { usePinecone } from '../providers/PineconeProvider'
 import { useCreateIndexMutation } from '../hooks/usePineconeQueries'
 import { useCollection } from './CollectionContext'
 
@@ -59,7 +59,7 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
   const [isCreating, setIsCreating] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
-  const { currentProfile } = useChromaDB()
+  const { currentProfile } = usePinecone()
   const { setActiveCollection } = useCollection()
   const createMutation = useCreateIndexMutation(currentProfile?.id || '')
 

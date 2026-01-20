@@ -10,7 +10,7 @@
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
 
-    <!-- Network access for ChromaDB connections -->
+    <!-- Network access for Pinecone API connections -->
     <key>com.apple.security.network.client</key>
     <true/>
 </dict>

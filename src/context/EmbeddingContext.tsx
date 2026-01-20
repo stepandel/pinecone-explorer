@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { useChromaDB } from '../providers/ChromaDBProvider'
+import { usePinecone } from '../providers/PineconeProvider'
 import { useCollection } from './CollectionContext'
 
 interface EmbeddingContextType {
@@ -23,7 +23,7 @@ interface EmbeddingContextType {
 const EmbeddingContext = createContext<EmbeddingContextType | undefined>(undefined)
 
 export function EmbeddingProvider({ children }: { children: ReactNode }) {
-  const { currentProfile } = useChromaDB()
+  const { currentProfile } = usePinecone()
   const { activeCollection } = useCollection()
 
   const [clientOverride, setClientOverride] = useState<EmbeddingConfig | null>(null)

@@ -1,5 +1,5 @@
-appId: com.chromaexplorer.app
-productName: Chroma Explorer
+appId: com.pineconeexplorer.app
+productName: Pinecone Explorer
 copyright: Copyright © 2025
 
 directories:
@@ -12,7 +12,7 @@ files:
   - "!**/*.map"
 
 mac:
-  artifactName: "Chroma-Explorer-${version}-${arch}-mac.${ext}"
+  artifactName: "Pinecone-Explorer-${version}-${arch}-mac.${ext}"
   category: public.app-category.developer-tools
   target:
     - target: dmg
@@ -29,7 +29,7 @@ mac:
   notarize: true
 
 dmg:
-  artifactName: "Chroma-Explorer-${version}-${arch}.${ext}"
+  artifactName: "Pinecone-Explorer-${version}-${arch}.${ext}"
   sign: false
   contents:
     - x: 130
@@ -50,5 +50,5 @@ dmg:
 
 publish:
   provider: github
-  owner: stepandel
-  repo: chroma-explorer
+  owner: your-username
+  repo: pinecone-explorer

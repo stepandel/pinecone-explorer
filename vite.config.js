@@ -12,11 +12,11 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['chromadb']
+    exclude: []
   },
   build: {
     commonjsOptions: {
-      include: [/chromadb/, /node_modules/]
+      include: [/node_modules/]
     }
   },
   esbuild: {
@@ -31,7 +31,6 @@ export default defineConfig({
           build: {
             rollupOptions: {
               external: [
-                '@chroma-core/default-embed',
                 'onnxruntime-node',
                 'sharp',
               ],

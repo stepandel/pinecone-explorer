@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { usePanel } from '../../context/PanelContext'
-import { useChromaDB } from '../../providers/ChromaDBProvider'
+import { usePinecone } from '../../providers/PineconeProvider'
 import { CollectionPanel } from '../collections/CollectionPanel'
 import { CollectionConfigView } from '../collections/CollectionConfigView'
 import DocumentsView from '../documents/DocumentsView'
@@ -18,7 +18,7 @@ interface DocumentRecord {
 export function MainContent() {
   const { activeCollection } = useCollection()
   const { draftCollection } = useDraftCollection()
-  const { currentProfile } = useChromaDB()
+  const { currentProfile } = usePinecone()
   const {
     leftPanelOpen,
     leftPanelWidth,

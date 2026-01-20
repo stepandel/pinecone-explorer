@@ -10,23 +10,17 @@ interface PineconeContextValue {
   connect: (profile: ConnectionProfile) => Promise<void>
   disconnect: () => void
 
-  // Indexes (formerly Collections)
+  // Indexes
   indexes: any[]
   indexesLoading: boolean
   indexesError: string | null
   refreshIndexes: () => Promise<void>
 
-  // Vectors (formerly Documents)
+  // Vectors
   queryVectors: (params: QueryVectorsParams) => Promise<QueryResult>
 
   // Cache management
   invalidateCache: () => void
-
-  // Legacy aliases
-  collections: any[]
-  collectionsLoading: boolean
-  collectionsError: string | null
-  refreshCollections: () => Promise<void>
 }
 
 const PineconeContext = createContext<PineconeContextValue | null>(null)
@@ -37,7 +31,7 @@ interface PineconeProviderProps {
   children: ReactNode
 }
 
-export function ChromaDBProvider({ profile, windowId, children }: PineconeProviderProps) {
+export function PineconeProvider({ profile, windowId, children }: PineconeProviderProps) {
   const [currentProfile, setCurrentProfile] = useState<ConnectionProfile | null>(profile)
   const [isConnected, setIsConnected] = useState(false)
   const queryClient = useQueryClient()
@@ -114,11 +108,8 @@ export function ChromaDBProvider({ profile, windowId, children }: PineconeProvid
       }
     }
     window.addEventListener('pinecone:refresh', handleRefresh)
-    // Also listen for legacy event name
-    window.addEventListener('chroma:refresh', handleRefresh)
     return () => {
       window.removeEventListener('pinecone:refresh', handleRefresh)
-      window.removeEventListener('chroma:refresh', handleRefresh)
     }
   }, [currentProfile, queryClient])
 
@@ -133,11 +124,6 @@ export function ChromaDBProvider({ profile, windowId, children }: PineconeProvid
     refreshIndexes,
     queryVectors,
     invalidateCache,
-    // Legacy aliases
-    collections: indexes,
-    collectionsLoading: indexesLoading,
-    collectionsError: indexesError ? (indexesError as Error).message : null,
-    refreshCollections: refreshIndexes,
   }
 
   return (
@@ -147,14 +133,10 @@ export function ChromaDBProvider({ profile, windowId, children }: PineconeProvid
   )
 }
 
-export function useChromaDB() {
+export function usePinecone() {
   const context = useContext(PineconeContext)
   if (!context) {
-    throw new Error('useChromaDB must be used within a ChromaDBProvider (PineconeProvider)')
+    throw new Error('usePinecone must be used within a PineconeProvider')
   }
   return context
 }
-
-// Alias for migration
-export const usePinecone = useChromaDB
-export const PineconeProvider = ChromaDBProvider

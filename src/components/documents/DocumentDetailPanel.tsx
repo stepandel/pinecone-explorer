@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, X, ChevronDown } from 'lucide-react'
 import EmbeddingCell from './EmbeddingCell'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
-import { useUpdateDocumentMutation } from '../../hooks/useChromaQueries'
+import { useUpdateVectorMutation } from '../../hooks/usePineconeQueries'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import { TypedMetadataRecord, TypedMetadataField, MetadataValueType, validateMetadataValue } from '../../types/metadata'
 
@@ -44,7 +44,7 @@ export default function DocumentDetailPanel({
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false)
 
   // Update mutation
-  const updateMutation = useUpdateDocumentMutation(profileId, collectionName)
+  const updateMutation = useUpdateVectorMutation(profileId, collectionName)
 
   // Ref for embedding textarea
   const embeddingTextareaRef = useRef<HTMLTextAreaElement>(null)

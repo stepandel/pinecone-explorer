@@ -11,7 +11,6 @@ export type EmbeddingFunctionType =
   | 'huggingface-server'
   | 'cloudflare-worker-ai'
   | 'morph'
-  | 'chroma-cloud-qwen'
   | 'sentence-transformer'
 
 export interface EmbeddingFunctionConfig {
@@ -292,16 +291,6 @@ export const EMBEDDING_FUNCTIONS: EmbeddingFunctionConfig[] = [
     modelName: 'Xenova/all-mpnet-base-v2',
     dimensions: 768,
     group: 'Local',
-  },
-
-  // Chroma Cloud
-  {
-    id: 'chroma-cloud-qwen',
-    label: 'Chroma Cloud Qwen',
-    type: 'chroma-cloud-qwen',
-    modelName: 'qwen-embedding',
-    dimensions: null,
-    group: 'Chroma Cloud',
   },
 
   // Cloudflare Workers AI

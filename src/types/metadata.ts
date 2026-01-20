@@ -1,4 +1,4 @@
-// Metadata value types supported by ChromaDB
+// Metadata value types supported by Pinecone
 export type MetadataValueType = 'string' | 'number' | 'boolean'
 
 // A metadata field with explicit type information
@@ -35,8 +35,8 @@ export function validateMetadataValue(value: string, type: MetadataValueType): s
   }
 }
 
-// Convert typed metadata to ChromaDB format (actual typed values)
-export function typedMetadataToChromaFormat(
+// Convert typed metadata to Pinecone format (actual typed values)
+export function typedMetadataToPineconeFormat(
   metadata: TypedMetadataRecord | Record<string, unknown>
 ): Record<string, string | number | boolean> | undefined {
   const entries = Object.entries(metadata).filter(([_, field]) => {

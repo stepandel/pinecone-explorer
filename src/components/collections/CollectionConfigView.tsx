@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
-import { useChromaDB } from '../../providers/ChromaDBProvider'
+import { usePinecone } from '../../providers/PineconeProvider'
 import { useCollection } from '../../context/CollectionContext'
 import { CopyProgressDialog } from './CopyProgressDialog'
 
@@ -26,7 +26,7 @@ interface CloneProgress {
 
 export function CollectionConfigView() {
   const { draftCollection, updateDraft, cancelCreation, saveDraft, isCreating, validationErrors, isCopyMode } = useDraftCollection()
-  const { currentProfile, refreshIndexes } = useChromaDB()
+  const { currentProfile, refreshIndexes } = usePinecone()
   const { setActiveCollection } = useCollection()
 
   // Cloud and region selection

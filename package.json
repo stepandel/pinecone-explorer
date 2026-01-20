@@ -25,8 +25,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "stepandel",
-      "repo": "chroma-explorer"
+      "owner": "your-username",
+      "repo": "pinecone-explorer"
     }
   },
   "scripts": {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
-import { useChromaDB } from '../../providers/ChromaDBProvider'
+import { usePinecone } from '../../providers/PineconeProvider'
 import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { useClipboard } from '../../context/ClipboardContext'
@@ -13,7 +13,7 @@ const inputClassName = "w-full h-6 text-[11px] py-0 px-1.5 pr-5 rounded-md bg-bl
 const inputStyle = { boxShadow: 'inset 0 0.5px 1px 0 rgb(0 0 0 / 0.04)' }
 
 export function CollectionPanel() {
-  const { indexes, indexesLoading, indexesError, refreshIndexes, currentProfile } = useChromaDB()
+  const { indexes, indexesLoading, indexesError, refreshIndexes, currentProfile } = usePinecone()
   const { activeCollection, setActiveCollection } = useCollection()
   const { draftCollection, startCreation, startCopyFromCollection, updateDraft, cancelCreation } = useDraftCollection()
   const { clipboard, copyCollection, hasCopiedCollection } = useClipboard()

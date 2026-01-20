@@ -66,7 +66,7 @@ function getStore(): Store<SettingsSchema> {
   if (!store) {
     try {
       store = new Store<SettingsSchema>({
-        name: 'chroma-settings-v2',
+        name: 'pinecone-settings',
         defaults: {
           apiKeys: {},
           theme: 'system',
@@ -83,7 +83,7 @@ function getStore(): Store<SettingsSchema> {
 
       // If decryption failed, the encryption key changed (e.g., keychain denied after previous allow)
       // Clear the corrupted store and start fresh
-      const storePath = path.join(app.getPath('userData'), 'chroma-settings-v2.json')
+      const storePath = path.join(app.getPath('userData'), 'pinecone-settings.json')
       if (existsSync(storePath)) {
         console.warn('[SettingsStore] Removing corrupted store file to start fresh')
         try {
@@ -96,7 +96,7 @@ function getStore(): Store<SettingsSchema> {
 
       // Create a fresh store
       store = new Store<SettingsSchema>({
-        name: 'chroma-settings-v2',
+        name: 'pinecone-settings',
         defaults: {
           apiKeys: {},
           theme: 'system',

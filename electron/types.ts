@@ -79,7 +79,7 @@ export interface IndexStats {
 }
 
 /**
- * Vector record (equivalent to DocumentRecord in ChromaDB)
+ * Vector record for Pinecone
  */
 export interface VectorRecord {
   id: string
