@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
 import { DocumentFilters, MetadataFilter, MetadataOperator } from '../types/filters'
-import { SearchDocumentsParams } from '../../electron/types'
 
 export interface UseDocumentFiltersReturn {
   filters: DocumentFilters
@@ -10,7 +9,7 @@ export interface UseDocumentFiltersReturn {
   removeMetadataFilter: (id: string) => void
   clearAllFilters: () => void
   hasActiveFilters: boolean
-  buildSearchParams: (collectionName: string) => SearchDocumentsParams
+  buildSearchParams: (indexName: string, namespace?: string) => QueryVectorsParams
 }
 
 const initialFilters: DocumentFilters = {
@@ -23,11 +22,11 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
-function inferValueType(value: string): any {
+function inferValueType(value: string): unknown {
   return inferSingleValue(value)
 }
 
-function inferSingleValue(value: string): any {
+function inferSingleValue(value: string): unknown {
   // Check for boolean
   if (value === 'true') return true
   if (value === 'false') return false
@@ -41,7 +40,7 @@ function inferSingleValue(value: string): any {
   return value
 }
 
-function buildWhereClause(metadataFilters: MetadataFilter[]): Record<string, any> | undefined {
+function buildFilterClause(metadataFilters: MetadataFilter[]): Record<string, unknown> | undefined {
   if (metadataFilters.length === 0) return undefined
 
   if (metadataFilters.length === 1) {
@@ -105,21 +104,24 @@ export function useDocumentFilters(): UseDocumentFiltersReturn {
     return filters.queryText.trim() !== '' || filters.metadataFilters.length > 0
   }, [filters])
 
-  const buildSearchParams = (collectionName: string): SearchDocumentsParams => {
-    const params: SearchDocumentsParams = {
-      collectionName,
+  const buildSearchParams = (indexName: string, namespace?: string): QueryVectorsParams => {
+    const params: QueryVectorsParams = {
+      indexName,
+      namespace,
+      includeValues: true,
+      includeMetadata: true,
     }
 
     // Add query text if present
     if (filters.queryText.trim() !== '') {
       params.queryText = filters.queryText.trim()
-      params.nResults = filters.nResults
+      params.topK = filters.nResults
     }
 
     // Add metadata filter if present
-    const whereClause = buildWhereClause(filters.metadataFilters)
-    if (whereClause) {
-      params.metadataFilter = whereClause
+    const filterClause = buildFilterClause(filters.metadataFilters)
+    if (filterClause) {
+      params.filter = filterClause
     }
 
     return params

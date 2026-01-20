@@ -2,22 +2,34 @@ import 'dotenv/config'
 import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
 
 // Set app name before anything else (affects menu bar, about dialog, etc.)
-app.name = 'Chroma Explorer'
+app.name = 'Pinecone Explorer'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromaDBConnectionPool } from './chromadb-service'
+import { pineconeConnectionPool } from './pinecone-service'
 import { connectionStore } from './connection-store'
 import { settingsStore, ApiKeys, Theme } from './settings-store'
 import { windowManager } from './window-manager'
 import { createApplicationMenu, updateThemeMenu } from './menu'
-import { ConnectionProfile, SearchDocumentsParams, UpdateDocumentParams, CreateDocumentParams, DeleteDocumentsParams, CreateDocumentsBatchParams, CreateCollectionParams, CopyCollectionParams } from './types'
+import {
+  ConnectionProfile,
+  QueryVectorsParams,
+  CreateVectorParams,
+  UpdateVectorParams,
+  DeleteVectorsParams,
+  BatchImportParams,
+  CreateIndexParams,
+  CloneIndexParams,
+  ListVectorsParams,
+  FetchVectorsParams,
+  EmbeddingConfig,
+} from './types'
 import { initAutoUpdater, checkForUpdates } from './auto-updater'
 
 // Inject stored API keys into process.env at startup
 settingsStore.injectIntoProcessEnv()
 
-// Track active copy operations per profile for cancellation
-const activeCopyOperations: Map<string, AbortController> = new Map()
+// Track active clone operations per profile for cancellation
+const activeCloneOperations: Map<string, AbortController> = new Map()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -26,209 +38,268 @@ process.env.VITE_PUBLIC = app.isPackaged
   ? process.env.DIST
   : path.join(process.env.DIST, '../public')
 
-// Set up IPC handlers
-ipcMain.handle('chromadb:connect', async (_event, profileId: string, profile: ConnectionProfile) => {
+// ============================================================================
+// Pinecone IPC Handlers
+// ============================================================================
+
+ipcMain.handle('pinecone:connect', async (_event, profileId: string, profile: ConnectionProfile) => {
   try {
-    await chromaDBConnectionPool.connect(profileId, profile)
+    await pineconeConnectionPool.connect(profileId, profile)
     return { success: true }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to connect to ChromaDB'
+    const message = error instanceof Error ? error.message : 'Failed to connect to Pinecone'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:listCollections', async (_event, profileId: string) => {
+ipcMain.handle('pinecone:disconnect', async (_event, profileId: string) => {
   try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
-    if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
-    }
-    const collections = await service.listCollections()
-    return { success: true, data: collections }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch collections'
-    return { success: false, error: message }
-  }
-})
-
-ipcMain.handle('chromadb:getDocuments', async (_event, profileId: string, collectionName: string) => {
-  try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
-    if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
-    }
-    const documents = await service.getCollectionDocuments(collectionName)
-    return { success: true, data: documents }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch documents'
-    return { success: false, error: message }
-  }
-})
-
-ipcMain.handle('chromadb:searchDocuments', async (_event, profileId: string, params: SearchDocumentsParams) => {
-  try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
-    if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
-    }
-    // Check for user embedding override
-    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.collectionName)
-    const documents = await service.searchDocuments(params, embeddingOverride)
-    return { success: true, data: documents }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to search documents'
-    return { success: false, error: message }
-  }
-})
-
-ipcMain.handle('chromadb:updateDocument', async (_event, profileId: string, params: UpdateDocumentParams) => {
-  try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
-    if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
-    }
-    // Check for user embedding override (needed for regeneration)
-    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.collectionName)
-    await service.updateDocument(params, embeddingOverride)
+    pineconeConnectionPool.disconnect(profileId)
     return { success: true }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update document'
+    const message = error instanceof Error ? error.message : 'Failed to disconnect'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:createDocument', async (_event, profileId: string, params: CreateDocumentParams) => {
+ipcMain.handle('pinecone:listIndexes', async (_event, profileId: string) => {
   try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
+    const service = pineconeConnectionPool.getConnection(profileId)
     if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
+      return { success: false, error: 'Not connected to Pinecone' }
     }
-    // Check for user embedding override (needed for embedding generation)
-    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.collectionName)
-    await service.createDocument(params, embeddingOverride)
-    return { success: true }
+    const indexes = await service.listIndexes()
+    return { success: true, data: indexes }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create document'
+    const message = error instanceof Error ? error.message : 'Failed to fetch indexes'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:deleteDocuments', async (_event, profileId: string, params: DeleteDocumentsParams) => {
+ipcMain.handle('pinecone:getIndexStats', async (_event, profileId: string, indexName: string) => {
   try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
+    const service = pineconeConnectionPool.getConnection(profileId)
     if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
+      return { success: false, error: 'Not connected to Pinecone' }
     }
-    await service.deleteDocuments(params)
-    return { success: true }
+    const stats = await service.getIndexStats(indexName)
+    return { success: true, data: stats }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to delete documents'
+    const message = error instanceof Error ? error.message : 'Failed to fetch index stats'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:createDocumentsBatch', async (_event, profileId: string, params: CreateDocumentsBatchParams) => {
+ipcMain.handle('pinecone:listVectors', async (_event, profileId: string, params: ListVectorsParams) => {
   try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
+    const service = pineconeConnectionPool.getConnection(profileId)
     if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
+      return { success: false, error: 'Not connected to Pinecone' }
     }
-    // Check for user embedding override
-    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.collectionName)
-    const result = await service.createDocumentsBatch(params, embeddingOverride)
+    const result = await service.listVectors(params)
     return { success: true, data: result }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create documents'
+    const message = error instanceof Error ? error.message : 'Failed to list vectors'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:createCollection', async (_event, profileId: string, params: CreateCollectionParams) => {
+ipcMain.handle('pinecone:fetchVectors', async (_event, profileId: string, params: FetchVectorsParams) => {
   try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
+    const service = pineconeConnectionPool.getConnection(profileId)
     if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
+      return { success: false, error: 'Not connected to Pinecone' }
     }
-    const collection = await service.createCollection(params)
-    return { success: true, data: collection }
+    const vectors = await service.fetchVectors(params)
+    return { success: true, data: vectors }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create collection'
+    const message = error instanceof Error ? error.message : 'Failed to fetch vectors'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:deleteCollection', async (_event, profileId: string, collectionName: string) => {
+ipcMain.handle('pinecone:getAllVectors', async (_event, profileId: string, indexName: string, namespace?: string, limit?: number) => {
   try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
+    const service = pineconeConnectionPool.getConnection(profileId)
     if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
+      return { success: false, error: 'Not connected to Pinecone' }
     }
-    await service.deleteCollection(collectionName)
+    const vectors = await service.getAllVectors(indexName, namespace, limit)
+    return { success: true, data: vectors }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch vectors'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:queryVectors', async (_event, profileId: string, params: QueryVectorsParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    // Check for user embedding override
+    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
+    const result = await service.queryVectors(params, embeddingOverride || undefined)
+    return { success: true, data: result }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to query vectors'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:createVector', async (_event, profileId: string, params: CreateVectorParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    // Check for user embedding override (needed for embedding generation)
+    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
+    await service.createVector(params, embeddingOverride || undefined)
     return { success: true }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to delete collection'
+    const message = error instanceof Error ? error.message : 'Failed to create vector'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:copyCollection', async (event, profileId: string, params: CopyCollectionParams) => {
+ipcMain.handle('pinecone:updateVector', async (_event, profileId: string, params: UpdateVectorParams) => {
   try {
-    const service = chromaDBConnectionPool.getConnection(profileId)
+    const service = pineconeConnectionPool.getConnection(profileId)
     if (!service) {
-      return { success: false, error: 'Not connected to ChromaDB' }
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    // Check for user embedding override (needed for regeneration)
+    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
+    await service.updateVector(params, embeddingOverride || undefined)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update vector'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:deleteVectors', async (_event, profileId: string, params: DeleteVectorsParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    await service.deleteVectors(params)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete vectors'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:batchImport', async (_event, profileId: string, params: BatchImportParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    // Check for user embedding override
+    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
+    const result = await service.batchImport(params, embeddingOverride || undefined)
+    return { success: true, data: result }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to import vectors'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:createIndex', async (_event, profileId: string, params: CreateIndexParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    await service.createIndex(params)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create index'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:deleteIndex', async (_event, profileId: string, indexName: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    await service.deleteIndex(indexName)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete index'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:cloneIndex', async (event, profileId: string, params: CloneIndexParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
     }
 
-    // Create abort controller for this copy operation
+    // Create abort controller for this clone operation
     const abortController = new AbortController()
-    activeCopyOperations.set(profileId, abortController)
+    activeCloneOperations.set(profileId, abortController)
 
     // Check for user embedding override
-    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.sourceCollectionName)
+    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.sourceIndexName)
 
     // Progress callback sends updates to renderer
     const onProgress = (progress: any) => {
-      event.sender.send('chromadb:copyProgress', progress)
+      event.sender.send('pinecone:cloneProgress', progress)
     }
 
-    const result = await service.copyCollection(params, embeddingOverride, onProgress, abortController.signal)
+    const result = await service.cloneIndex(params, embeddingOverride, onProgress, abortController.signal)
 
     // Clean up abort controller
-    activeCopyOperations.delete(profileId)
+    activeCloneOperations.delete(profileId)
 
     return { success: result.success, data: result, error: result.error }
   } catch (error) {
-    activeCopyOperations.delete(profileId)
-    const message = error instanceof Error ? error.message : 'Failed to copy collection'
+    activeCloneOperations.delete(profileId)
+    const message = error instanceof Error ? error.message : 'Failed to clone index'
     return { success: false, error: message }
   }
 })
 
-ipcMain.handle('chromadb:cancelCopy', async (_event, profileId: string) => {
-  const controller = activeCopyOperations.get(profileId)
+ipcMain.handle('pinecone:cancelClone', async (_event, profileId: string) => {
+  const controller = activeCloneOperations.get(profileId)
   if (controller) {
     controller.abort()
-    activeCopyOperations.delete(profileId)
+    activeCloneOperations.delete(profileId)
     return { success: true }
   }
-  return { success: false, error: 'No active copy operation' }
+  return { success: false, error: 'No active clone operation' }
 })
 
-// Context menu IPC handlers
-ipcMain.on('context-menu:show-collection', (event, collectionName: string, options?: { hasCopiedCollection?: boolean }) => {
+// ============================================================================
+// Context Menu IPC Handlers
+// ============================================================================
+
+// Index context menu (replacing collection menu)
+ipcMain.on('context-menu:show-index', (event, indexName: string, options?: { hasCopiedIndex?: boolean }) => {
   const template: MenuItemConstructorOptions[] = [
     {
-      label: 'Copy Collection',
-      click: () => event.sender.send('context-menu:action', { action: 'copy', collectionName })
+      label: 'Copy Index',
+      click: () => event.sender.send('context-menu:action', { action: 'copy', indexName })
     },
     {
-      label: 'Paste Collection',
-      enabled: options?.hasCopiedCollection ?? false,
-      click: () => event.sender.send('context-menu:action', { action: 'paste', collectionName })
+      label: 'Paste Index',
+      enabled: options?.hasCopiedIndex ?? false,
+      click: () => event.sender.send('context-menu:action', { action: 'paste', indexName })
     },
     { type: 'separator' },
     {
-      label: 'Delete Collection',
-      click: () => event.sender.send('context-menu:action', { action: 'delete', collectionName })
+      label: 'Delete Index',
+      click: () => event.sender.send('context-menu:action', { action: 'delete', indexName })
     }
   ]
   const menu = Menu.buildFromTemplate(template)
@@ -238,12 +309,12 @@ ipcMain.on('context-menu:show-collection', (event, collectionName: string, optio
   }
 })
 
-ipcMain.on('context-menu:show-collection-panel', (event, options?: { hasCopiedCollection?: boolean }) => {
+ipcMain.on('context-menu:show-index-panel', (event, options?: { hasCopiedIndex?: boolean }) => {
   const template: MenuItemConstructorOptions[] = [
     {
-      label: 'Paste Collection',
-      enabled: options?.hasCopiedCollection ?? false,
-      click: () => event.sender.send('context-menu:action', { action: 'paste', collectionName: '' })
+      label: 'Paste Index',
+      enabled: options?.hasCopiedIndex ?? false,
+      click: () => event.sender.send('context-menu:action', { action: 'paste', indexName: '' })
     }
   ]
   const menu = Menu.buildFromTemplate(template)
@@ -253,22 +324,22 @@ ipcMain.on('context-menu:show-collection-panel', (event, options?: { hasCopiedCo
   }
 })
 
-// Document context menu handlers
-ipcMain.on('context-menu:show-document', (event, documentId: string, options?: { hasCopiedDocuments?: boolean }) => {
+// Vector context menu (replacing document menu)
+ipcMain.on('context-menu:show-vector', (event, vectorId: string, options?: { hasCopiedVectors?: boolean }) => {
   const template: MenuItemConstructorOptions[] = [
     {
       label: 'Copy',
-      click: () => event.sender.send('context-menu:document-action', { action: 'copy', documentId })
+      click: () => event.sender.send('context-menu:vector-action', { action: 'copy', vectorId })
     },
     {
       label: 'Paste',
-      enabled: options?.hasCopiedDocuments ?? false,
-      click: () => event.sender.send('context-menu:document-action', { action: 'paste', documentId })
+      enabled: options?.hasCopiedVectors ?? false,
+      click: () => event.sender.send('context-menu:vector-action', { action: 'paste', vectorId })
     },
     { type: 'separator' },
     {
       label: 'Delete',
-      click: () => event.sender.send('context-menu:document-action', { action: 'delete', documentId })
+      click: () => event.sender.send('context-menu:vector-action', { action: 'delete', vectorId })
     }
   ]
   const menu = Menu.buildFromTemplate(template)
@@ -278,12 +349,12 @@ ipcMain.on('context-menu:show-document', (event, documentId: string, options?: {
   }
 })
 
-ipcMain.on('context-menu:show-documents-panel', (event, options?: { hasCopiedDocuments?: boolean }) => {
+ipcMain.on('context-menu:show-vectors-panel', (event, options?: { hasCopiedVectors?: boolean }) => {
   const template: MenuItemConstructorOptions[] = [
     {
       label: 'Paste',
-      enabled: options?.hasCopiedDocuments ?? false,
-      click: () => event.sender.send('context-menu:document-action', { action: 'paste' })
+      enabled: options?.hasCopiedVectors ?? false,
+      click: () => event.sender.send('context-menu:vector-action', { action: 'paste' })
     }
   ]
   const menu = Menu.buildFromTemplate(template)
@@ -317,7 +388,10 @@ ipcMain.on('context-menu:show-profile', (event, profileId: string) => {
   }
 })
 
-// Profile management IPC handlers
+// ============================================================================
+// Profile Management IPC Handlers
+// ============================================================================
+
 ipcMain.handle('profiles:getAll', async () => {
   try {
     const profiles = connectionStore.getProfiles()
@@ -368,9 +442,9 @@ ipcMain.handle('profiles:setLastActive', async (_event, id: string | null) => {
   }
 })
 
-ipcMain.handle('profiles:getEmbeddingOverride', async (_event, profileId: string, collectionName: string) => {
+ipcMain.handle('profiles:getEmbeddingOverride', async (_event, profileId: string, indexName: string) => {
   try {
-    const override = connectionStore.getEmbeddingOverride(profileId, collectionName)
+    const override = connectionStore.getEmbeddingOverride(profileId, indexName)
     return { success: true, data: override }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get embedding override'
@@ -378,9 +452,9 @@ ipcMain.handle('profiles:getEmbeddingOverride', async (_event, profileId: string
   }
 })
 
-ipcMain.handle('profiles:setEmbeddingOverride', async (_event, profileId: string, collectionName: string, override: any) => {
+ipcMain.handle('profiles:setEmbeddingOverride', async (_event, profileId: string, indexName: string, override: EmbeddingConfig) => {
   try {
-    connectionStore.setEmbeddingOverride(profileId, collectionName, override)
+    connectionStore.setEmbeddingOverride(profileId, indexName, override)
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to set embedding override'
@@ -388,9 +462,9 @@ ipcMain.handle('profiles:setEmbeddingOverride', async (_event, profileId: string
   }
 })
 
-ipcMain.handle('profiles:clearEmbeddingOverride', async (_event, profileId: string, collectionName: string) => {
+ipcMain.handle('profiles:clearEmbeddingOverride', async (_event, profileId: string, indexName: string) => {
   try {
-    connectionStore.clearEmbeddingOverride(profileId, collectionName)
+    connectionStore.clearEmbeddingOverride(profileId, indexName)
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to clear embedding override'
@@ -398,7 +472,10 @@ ipcMain.handle('profiles:clearEmbeddingOverride', async (_event, profileId: stri
   }
 })
 
-// Window management IPC handlers
+// ============================================================================
+// Window Management IPC Handlers
+// ============================================================================
+
 ipcMain.handle('window:create-connection', async (_event, profile: ConnectionProfile) => {
   try {
     const { window: win, windowId } = windowManager.createConnectionWindow(profile)
@@ -490,7 +567,10 @@ ipcMain.handle('window:get-profile', async (_event, profileId: string) => {
   }
 })
 
-// Settings IPC handlers
+// ============================================================================
+// Settings IPC Handlers
+// ============================================================================
+
 ipcMain.handle('settings:getApiKeys', async () => {
   try {
     const apiKeys = settingsStore.getApiKeys()
@@ -550,7 +630,10 @@ ipcMain.handle('settings:openWindow', async () => {
   }
 })
 
-// Shell IPC handlers
+// ============================================================================
+// Shell IPC Handlers
+// ============================================================================
+
 ipcMain.handle('shell:openExternal', async (_event, url: string) => {
   try {
     await shell.openExternal(url)
@@ -560,6 +643,10 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     return { success: false, error: message }
   }
 })
+
+// ============================================================================
+// App Lifecycle
+// ============================================================================
 
 app.whenReady().then(() => {
   // Create application menu

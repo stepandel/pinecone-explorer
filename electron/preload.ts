@@ -1,130 +1,162 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
   ConnectionProfile,
-  CollectionInfo,
-  DocumentRecord,
-  SearchDocumentsParams,
-  UpdateDocumentParams,
-  CreateDocumentParams,
-  DeleteDocumentsParams,
-  CreateDocumentsBatchParams,
-  CreateCollectionParams,
-  CopyCollectionParams,
-  CopyCollectionResult,
-  CopyProgress,
-  EmbeddingFunctionOverride,
+  IndexInfo,
+  IndexStats,
+  VectorRecord,
+  QueryVectorsParams,
+  QueryResult,
+  CreateVectorParams,
+  UpdateVectorParams,
+  DeleteVectorsParams,
+  BatchImportParams,
+  BatchImportResult,
+  CreateIndexParams,
+  CloneIndexParams,
+  CloneProgress,
+  CloneResult,
+  ListVectorsParams,
+  ListVectorsResult,
+  FetchVectorsParams,
+  EmbeddingConfig,
 } from './types'
 
 console.log('Preload script is running!')
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  chromadb: {
+  pinecone: {
     connect: async (profileId: string, profile: ConnectionProfile): Promise<void> => {
-      const result = await ipcRenderer.invoke('chromadb:connect', profileId, profile)
+      const result = await ipcRenderer.invoke('pinecone:connect', profileId, profile)
       if (!result.success) {
         throw new Error(result.error)
       }
     },
-    listCollections: async (profileId: string): Promise<CollectionInfo[]> => {
-      const result = await ipcRenderer.invoke('chromadb:listCollections', profileId)
+    disconnect: async (profileId: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:disconnect', profileId)
       if (!result.success) {
         throw new Error(result.error)
       }
-      return result.data
     },
-    getDocuments: async (profileId: string, collectionName: string): Promise<DocumentRecord[]> => {
-      const result = await ipcRenderer.invoke('chromadb:getDocuments', profileId, collectionName)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result.data
-    },
-    searchDocuments: async (profileId: string, params: SearchDocumentsParams): Promise<DocumentRecord[]> => {
-      const result = await ipcRenderer.invoke('chromadb:searchDocuments', profileId, params)
+    listIndexes: async (profileId: string): Promise<IndexInfo[]> => {
+      const result = await ipcRenderer.invoke('pinecone:listIndexes', profileId)
       if (!result.success) {
         throw new Error(result.error)
       }
       return result.data
     },
-    updateDocument: async (profileId: string, params: UpdateDocumentParams): Promise<void> => {
-      const result = await ipcRenderer.invoke('chromadb:updateDocument', profileId, params)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-    },
-    createDocument: async (profileId: string, params: CreateDocumentParams): Promise<void> => {
-      const result = await ipcRenderer.invoke('chromadb:createDocument', profileId, params)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-    },
-    deleteDocuments: async (profileId: string, params: DeleteDocumentsParams): Promise<void> => {
-      const result = await ipcRenderer.invoke('chromadb:deleteDocuments', profileId, params)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-    },
-    createDocumentsBatch: async (profileId: string, params: CreateDocumentsBatchParams): Promise<{ createdIds: string[]; errors: string[] }> => {
-      const result = await ipcRenderer.invoke('chromadb:createDocumentsBatch', profileId, params)
+    getIndexStats: async (profileId: string, indexName: string): Promise<IndexStats> => {
+      const result = await ipcRenderer.invoke('pinecone:getIndexStats', profileId, indexName)
       if (!result.success) {
         throw new Error(result.error)
       }
       return result.data
     },
-    createCollection: async (profileId: string, params: CreateCollectionParams): Promise<CollectionInfo> => {
-      const result = await ipcRenderer.invoke('chromadb:createCollection', profileId, params)
+    listVectors: async (profileId: string, params: ListVectorsParams): Promise<ListVectorsResult> => {
+      const result = await ipcRenderer.invoke('pinecone:listVectors', profileId, params)
       if (!result.success) {
         throw new Error(result.error)
       }
       return result.data
     },
-    deleteCollection: async (profileId: string, collectionName: string): Promise<void> => {
-      const result = await ipcRenderer.invoke('chromadb:deleteCollection', profileId, collectionName)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-    },
-    copyCollection: async (profileId: string, params: CopyCollectionParams): Promise<CopyCollectionResult> => {
-      const result = await ipcRenderer.invoke('chromadb:copyCollection', profileId, params)
+    fetchVectors: async (profileId: string, params: FetchVectorsParams): Promise<VectorRecord[]> => {
+      const result = await ipcRenderer.invoke('pinecone:fetchVectors', profileId, params)
       if (!result.success) {
         throw new Error(result.error)
       }
       return result.data
     },
-    onCopyProgress: (callback: (progress: CopyProgress) => void): (() => void) => {
-      const handler = (_event: any, progress: CopyProgress) => callback(progress)
-      ipcRenderer.on('chromadb:copyProgress', handler)
-      return () => ipcRenderer.removeListener('chromadb:copyProgress', handler)
+    getAllVectors: async (profileId: string, indexName: string, namespace?: string, limit?: number): Promise<VectorRecord[]> => {
+      const result = await ipcRenderer.invoke('pinecone:getAllVectors', profileId, indexName, namespace, limit)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
     },
-    cancelCopy: async (profileId: string): Promise<void> => {
-      const result = await ipcRenderer.invoke('chromadb:cancelCopy', profileId)
+    queryVectors: async (profileId: string, params: QueryVectorsParams): Promise<QueryResult> => {
+      const result = await ipcRenderer.invoke('pinecone:queryVectors', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    createVector: async (profileId: string, params: CreateVectorParams): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:createVector', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    updateVector: async (profileId: string, params: UpdateVectorParams): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:updateVector', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    deleteVectors: async (profileId: string, params: DeleteVectorsParams): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:deleteVectors', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    batchImport: async (profileId: string, params: BatchImportParams): Promise<BatchImportResult> => {
+      const result = await ipcRenderer.invoke('pinecone:batchImport', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    createIndex: async (profileId: string, params: CreateIndexParams): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:createIndex', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    deleteIndex: async (profileId: string, indexName: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:deleteIndex', profileId, indexName)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    cloneIndex: async (profileId: string, params: CloneIndexParams): Promise<CloneResult> => {
+      const result = await ipcRenderer.invoke('pinecone:cloneIndex', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    onCloneProgress: (callback: (progress: CloneProgress) => void): (() => void) => {
+      const handler = (_event: any, progress: CloneProgress) => callback(progress)
+      ipcRenderer.on('pinecone:cloneProgress', handler)
+      return () => ipcRenderer.removeListener('pinecone:cloneProgress', handler)
+    },
+    cancelClone: async (profileId: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:cancelClone', profileId)
       if (!result.success) {
         throw new Error(result.error)
       }
     },
   },
   contextMenu: {
-    showCollectionMenu: (collectionName: string, options?: { hasCopiedCollection?: boolean }): void => {
-      ipcRenderer.send('context-menu:show-collection', collectionName, options)
+    showIndexMenu: (indexName: string, options?: { hasCopiedIndex?: boolean }): void => {
+      ipcRenderer.send('context-menu:show-index', indexName, options)
     },
-    showCollectionPanelMenu: (options?: { hasCopiedCollection?: boolean }): void => {
-      ipcRenderer.send('context-menu:show-collection-panel', options)
+    showIndexPanelMenu: (options?: { hasCopiedIndex?: boolean }): void => {
+      ipcRenderer.send('context-menu:show-index-panel', options)
     },
-    onAction: (callback: (action: { action: string; collectionName: string }) => void): (() => void) => {
-      const handler = (_event: any, data: { action: string; collectionName: string }) => callback(data)
+    onAction: (callback: (action: { action: string; indexName?: string }) => void): (() => void) => {
+      const handler = (_event: any, data: { action: string; indexName?: string }) => callback(data)
       ipcRenderer.on('context-menu:action', handler)
       return () => ipcRenderer.removeListener('context-menu:action', handler)
     },
-    showDocumentMenu: (documentId: string, options?: { hasCopiedDocuments?: boolean }): void => {
-      ipcRenderer.send('context-menu:show-document', documentId, options)
+    showVectorMenu: (vectorId: string, options?: { hasCopiedVectors?: boolean }): void => {
+      ipcRenderer.send('context-menu:show-vector', vectorId, options)
     },
-    showDocumentsPanelMenu: (options?: { hasCopiedDocuments?: boolean }): void => {
-      ipcRenderer.send('context-menu:show-documents-panel', options)
+    showVectorsPanelMenu: (options?: { hasCopiedVectors?: boolean }): void => {
+      ipcRenderer.send('context-menu:show-vectors-panel', options)
     },
-    onDocumentAction: (callback: (action: { action: string; documentId?: string }) => void): (() => void) => {
-      const handler = (_event: any, data: { action: string; documentId?: string }) => callback(data)
-      ipcRenderer.on('context-menu:document-action', handler)
-      return () => ipcRenderer.removeListener('context-menu:document-action', handler)
+    onVectorAction: (callback: (action: { action: string; vectorId?: string }) => void): (() => void) => {
+      const handler = (_event: any, data: { action: string; vectorId?: string }) => callback(data)
+      ipcRenderer.on('context-menu:vector-action', handler)
+      return () => ipcRenderer.removeListener('context-menu:vector-action', handler)
     },
     showProfileMenu: (profileId: string): void => {
       ipcRenderer.send('context-menu:show-profile', profileId)
@@ -168,21 +200,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw new Error(result.error)
       }
     },
-    getEmbeddingOverride: async (profileId: string, collectionName: string): Promise<EmbeddingFunctionOverride | null> => {
-      const result = await ipcRenderer.invoke('profiles:getEmbeddingOverride', profileId, collectionName)
+    getEmbeddingOverride: async (profileId: string, indexName: string): Promise<EmbeddingConfig | null> => {
+      const result = await ipcRenderer.invoke('profiles:getEmbeddingOverride', profileId, indexName)
       if (!result.success) {
         throw new Error(result.error)
       }
       return result.data
     },
-    setEmbeddingOverride: async (profileId: string, collectionName: string, override: EmbeddingFunctionOverride): Promise<void> => {
-      const result = await ipcRenderer.invoke('profiles:setEmbeddingOverride', profileId, collectionName, override)
+    setEmbeddingOverride: async (profileId: string, indexName: string, override: EmbeddingConfig): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:setEmbeddingOverride', profileId, indexName, override)
       if (!result.success) {
         throw new Error(result.error)
       }
     },
-    clearEmbeddingOverride: async (profileId: string, collectionName: string): Promise<void> => {
-      const result = await ipcRenderer.invoke('profiles:clearEmbeddingOverride', profileId, collectionName)
+    clearEmbeddingOverride: async (profileId: string, indexName: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:clearEmbeddingOverride', profileId, indexName)
       if (!result.success) {
         throw new Error(result.error)
       }
@@ -296,67 +328,67 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   menu: {
-    // Collection menu events
-    onNewCollection: (callback: () => void): (() => void) => {
+    // Index menu events (replacing collection events)
+    onNewIndex: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:new-collection', handler)
-      return () => ipcRenderer.removeListener('menu:new-collection', handler)
+      ipcRenderer.on('menu:new-index', handler)
+      return () => ipcRenderer.removeListener('menu:new-index', handler)
     },
-    onDuplicateCollection: (callback: () => void): (() => void) => {
+    onDuplicateIndex: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:duplicate-collection', handler)
-      return () => ipcRenderer.removeListener('menu:duplicate-collection', handler)
+      ipcRenderer.on('menu:duplicate-index', handler)
+      return () => ipcRenderer.removeListener('menu:duplicate-index', handler)
     },
-    onRenameCollection: (callback: () => void): (() => void) => {
+    onRenameIndex: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:rename-collection', handler)
-      return () => ipcRenderer.removeListener('menu:rename-collection', handler)
+      ipcRenderer.on('menu:rename-index', handler)
+      return () => ipcRenderer.removeListener('menu:rename-index', handler)
     },
-    onDeleteCollection: (callback: () => void): (() => void) => {
+    onDeleteIndex: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:delete-collection', handler)
-      return () => ipcRenderer.removeListener('menu:delete-collection', handler)
+      ipcRenderer.on('menu:delete-index', handler)
+      return () => ipcRenderer.removeListener('menu:delete-index', handler)
     },
-    onCopyCollection: (callback: () => void): (() => void) => {
+    onCopyIndex: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:copy-collection', handler)
-      return () => ipcRenderer.removeListener('menu:copy-collection', handler)
+      ipcRenderer.on('menu:copy-index', handler)
+      return () => ipcRenderer.removeListener('menu:copy-index', handler)
     },
-    onPasteCollection: (callback: () => void): (() => void) => {
+    onPasteIndex: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:paste-collection', handler)
-      return () => ipcRenderer.removeListener('menu:paste-collection', handler)
+      ipcRenderer.on('menu:paste-index', handler)
+      return () => ipcRenderer.removeListener('menu:paste-index', handler)
     },
-    // Document menu events
-    onNewDocument: (callback: () => void): (() => void) => {
+    // Vector menu events (replacing document events)
+    onNewVector: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:new-document', handler)
-      return () => ipcRenderer.removeListener('menu:new-document', handler)
+      ipcRenderer.on('menu:new-vector', handler)
+      return () => ipcRenderer.removeListener('menu:new-vector', handler)
     },
-    onEditDocument: (callback: () => void): (() => void) => {
+    onEditVector: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:edit-document', handler)
-      return () => ipcRenderer.removeListener('menu:edit-document', handler)
+      ipcRenderer.on('menu:edit-vector', handler)
+      return () => ipcRenderer.removeListener('menu:edit-vector', handler)
     },
     onDeleteSelected: (callback: () => void): (() => void) => {
       const handler = () => callback()
       ipcRenderer.on('menu:delete-selected', handler)
       return () => ipcRenderer.removeListener('menu:delete-selected', handler)
     },
-    onCopyDocuments: (callback: () => void): (() => void) => {
+    onCopyVectors: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:copy-documents', handler)
-      return () => ipcRenderer.removeListener('menu:copy-documents', handler)
+      ipcRenderer.on('menu:copy-vectors', handler)
+      return () => ipcRenderer.removeListener('menu:copy-vectors', handler)
     },
-    onPasteDocuments: (callback: () => void): (() => void) => {
+    onPasteVectors: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:paste-documents', handler)
-      return () => ipcRenderer.removeListener('menu:paste-documents', handler)
+      ipcRenderer.on('menu:paste-vectors', handler)
+      return () => ipcRenderer.removeListener('menu:paste-vectors', handler)
     },
-    onSelectAllDocuments: (callback: () => void): (() => void) => {
+    onSelectAllVectors: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('menu:select-all-documents', handler)
-      return () => ipcRenderer.removeListener('menu:select-all-documents', handler)
+      ipcRenderer.on('menu:select-all-vectors', handler)
+      return () => ipcRenderer.removeListener('menu:select-all-vectors', handler)
     },
     onConfigureEmbedding: (callback: () => void): (() => void) => {
       const handler = () => callback()
@@ -409,8 +441,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 // Auto-dispatch window event when app:refresh IPC is received
 ipcRenderer.on('app:refresh', () => {
-  console.log('Preload: app:refresh received, dispatching chroma:refresh window event')
-  window.dispatchEvent(new CustomEvent('chroma:refresh'))
+  console.log('Preload: app:refresh received, dispatching pinecone:refresh window event')
+  window.dispatchEvent(new CustomEvent('pinecone:refresh'))
 })
 
 console.log('Preload script finished, electronAPI exposed:', typeof window !== 'undefined' ? !!(window as any).electronAPI : 'window not defined')

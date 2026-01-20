@@ -31,74 +31,74 @@ export function useMenuHandlers() {
     window.dispatchEvent(new CustomEvent('menu:clear-filters'))
   }, [])
 
-  // Collection menu handlers
-  const handleNewCollection = useCallback(() => {
+  // Index menu handlers (formerly collection)
+  const handleNewIndex = useCallback(() => {
     startCreation()
   }, [startCreation])
 
-  const handleDuplicateCollection = useCallback(() => {
-    // Dispatch event for CollectionPanel to duplicate the active collection
+  const handleDuplicateIndex = useCallback(() => {
+    // Dispatch event for CollectionPanel to duplicate the active index
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:duplicate-collection'))
     }
   }, [activeCollection])
 
-  const handleRenameCollection = useCallback(() => {
+  const handleRenameIndex = useCallback(() => {
     // Dispatch event for CollectionPanel to start renaming
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:rename-collection'))
     }
   }, [activeCollection])
 
-  const handleDeleteCollection = useCallback(() => {
-    // Dispatch event for CollectionPanel to delete the active collection
+  const handleDeleteIndex = useCallback(() => {
+    // Dispatch event for CollectionPanel to delete the active index
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:delete-collection'))
     }
   }, [activeCollection])
 
-  const handleCopyCollection = useCallback(() => {
-    // Dispatch event for CollectionPanel to copy the active collection
+  const handleCopyIndex = useCallback(() => {
+    // Dispatch event for CollectionPanel to copy the active index
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:copy-collection'))
     }
   }, [activeCollection])
 
-  const handlePasteCollection = useCallback(() => {
-    // Dispatch event for CollectionPanel to paste collection
+  const handlePasteIndex = useCallback(() => {
+    // Dispatch event for CollectionPanel to paste index
     window.dispatchEvent(new CustomEvent('menu:paste-collection'))
   }, [])
 
-  // Document menu handlers
-  const handleNewDocument = useCallback(() => {
-    // Dispatch event for DocumentsView to create a new document
+  // Vector menu handlers (formerly document)
+  const handleNewVector = useCallback(() => {
+    // Dispatch event for DocumentsView to create a new vector
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:new-document'))
     }
   }, [activeCollection])
 
-  const handleEditDocument = useCallback(() => {
-    // Dispatch event for DocumentsView to edit the selected document
+  const handleEditVector = useCallback(() => {
+    // Dispatch event for DocumentsView to edit the selected vector
     window.dispatchEvent(new CustomEvent('menu:edit-document'))
   }, [])
 
   const handleDeleteSelected = useCallback(() => {
-    // Dispatch event for DocumentsView to delete selected documents
+    // Dispatch event for DocumentsView to delete selected vectors
     window.dispatchEvent(new CustomEvent('menu:delete-selected'))
   }, [])
 
-  const handleCopyDocuments = useCallback(() => {
-    // Dispatch event for DocumentsView to copy selected documents
+  const handleCopyVectors = useCallback(() => {
+    // Dispatch event for DocumentsView to copy selected vectors
     window.dispatchEvent(new CustomEvent('menu:copy-documents'))
   }, [])
 
-  const handlePasteDocuments = useCallback(() => {
-    // Dispatch event for DocumentsView to paste documents
+  const handlePasteVectors = useCallback(() => {
+    // Dispatch event for DocumentsView to paste vectors
     window.dispatchEvent(new CustomEvent('menu:paste-documents'))
   }, [])
 
-  const handleSelectAllDocuments = useCallback(() => {
-    // Dispatch event for DocumentsView to select all documents
+  const handleSelectAllVectors = useCallback(() => {
+    // Dispatch event for DocumentsView to select all vectors
     window.dispatchEvent(new CustomEvent('menu:select-all-documents'))
   }, [])
 
@@ -126,21 +126,21 @@ export function useMenuHandlers() {
     const unsubFocusSearch = window.electronAPI.menu.onFocusSearch(handleFocusSearch)
     const unsubClearFilters = window.electronAPI.menu.onClearFilters(handleClearFilters)
 
-    // Collection menu
-    const unsubNewCollection = window.electronAPI.menu.onNewCollection(handleNewCollection)
-    const unsubDuplicateCollection = window.electronAPI.menu.onDuplicateCollection(handleDuplicateCollection)
-    const unsubRenameCollection = window.electronAPI.menu.onRenameCollection(handleRenameCollection)
-    const unsubDeleteCollection = window.electronAPI.menu.onDeleteCollection(handleDeleteCollection)
-    const unsubCopyCollection = window.electronAPI.menu.onCopyCollection(handleCopyCollection)
-    const unsubPasteCollection = window.electronAPI.menu.onPasteCollection(handlePasteCollection)
+    // Index menu
+    const unsubNewIndex = window.electronAPI.menu.onNewIndex(handleNewIndex)
+    const unsubDuplicateIndex = window.electronAPI.menu.onDuplicateIndex(handleDuplicateIndex)
+    const unsubRenameIndex = window.electronAPI.menu.onRenameIndex(handleRenameIndex)
+    const unsubDeleteIndex = window.electronAPI.menu.onDeleteIndex(handleDeleteIndex)
+    const unsubCopyIndex = window.electronAPI.menu.onCopyIndex(handleCopyIndex)
+    const unsubPasteIndex = window.electronAPI.menu.onPasteIndex(handlePasteIndex)
 
-    // Document menu
-    const unsubNewDocument = window.electronAPI.menu.onNewDocument(handleNewDocument)
-    const unsubEditDocument = window.electronAPI.menu.onEditDocument(handleEditDocument)
+    // Vector menu
+    const unsubNewVector = window.electronAPI.menu.onNewVector(handleNewVector)
+    const unsubEditVector = window.electronAPI.menu.onEditVector(handleEditVector)
     const unsubDeleteSelected = window.electronAPI.menu.onDeleteSelected(handleDeleteSelected)
-    const unsubCopyDocuments = window.electronAPI.menu.onCopyDocuments(handleCopyDocuments)
-    const unsubPasteDocuments = window.electronAPI.menu.onPasteDocuments(handlePasteDocuments)
-    const unsubSelectAllDocuments = window.electronAPI.menu.onSelectAllDocuments(handleSelectAllDocuments)
+    const unsubCopyVectors = window.electronAPI.menu.onCopyVectors(handleCopyVectors)
+    const unsubPasteVectors = window.electronAPI.menu.onPasteVectors(handlePasteVectors)
+    const unsubSelectAllVectors = window.electronAPI.menu.onSelectAllVectors(handleSelectAllVectors)
     const unsubConfigureEmbedding = window.electronAPI.menu.onConfigureEmbedding(handleConfigureEmbedding)
 
     // Window menu
@@ -154,18 +154,18 @@ export function useMenuHandlers() {
       unsubToggleRight()
       unsubFocusSearch()
       unsubClearFilters()
-      unsubNewCollection()
-      unsubDuplicateCollection()
-      unsubRenameCollection()
-      unsubDeleteCollection()
-      unsubCopyCollection()
-      unsubPasteCollection()
-      unsubNewDocument()
-      unsubEditDocument()
+      unsubNewIndex()
+      unsubDuplicateIndex()
+      unsubRenameIndex()
+      unsubDeleteIndex()
+      unsubCopyIndex()
+      unsubPasteIndex()
+      unsubNewVector()
+      unsubEditVector()
       unsubDeleteSelected()
-      unsubCopyDocuments()
-      unsubPasteDocuments()
-      unsubSelectAllDocuments()
+      unsubCopyVectors()
+      unsubPasteVectors()
+      unsubSelectAllVectors()
       unsubConfigureEmbedding()
       unsubDisconnect()
       unsubShowShortcuts()
@@ -175,18 +175,18 @@ export function useMenuHandlers() {
     handleToggleRightPanel,
     handleFocusSearch,
     handleClearFilters,
-    handleNewCollection,
-    handleDuplicateCollection,
-    handleRenameCollection,
-    handleDeleteCollection,
-    handleCopyCollection,
-    handlePasteCollection,
-    handleNewDocument,
-    handleEditDocument,
+    handleNewIndex,
+    handleDuplicateIndex,
+    handleRenameIndex,
+    handleDeleteIndex,
+    handleCopyIndex,
+    handlePasteIndex,
+    handleNewVector,
+    handleEditVector,
     handleDeleteSelected,
-    handleCopyDocuments,
-    handlePasteDocuments,
-    handleSelectAllDocuments,
+    handleCopyVectors,
+    handlePasteVectors,
+    handleSelectAllVectors,
     handleConfigureEmbedding,
     handleDisconnect,
     handleShowShortcuts,

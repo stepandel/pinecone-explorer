@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { useChromaDB } from '../../providers/ChromaDBProvider'
-import { useDocumentsQuery, useCollectionsQuery, useCreateDocumentMutation, useDeleteDocumentsMutation, useCreateDocumentsBatchMutation, useUpdateDocumentMutation } from '../../hooks/useChromaQueries'
+import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import DocumentsTable from './DocumentsTable'
@@ -82,26 +82,26 @@ export default function DocumentsView({
   // Marked for deletion state (set of document IDs)
   const [markedForDeletion, setMarkedForDeletion] = useState<Set<string>>(new Set())
 
-  // Create document mutation
-  const createMutation = useCreateDocumentMutation(
+  // Create vector mutation
+  const createMutation = useCreateVectorMutation(
     currentProfile?.id || '',
     collectionName
   )
 
-  // Delete documents mutation
-  const deleteMutation = useDeleteDocumentsMutation(
+  // Delete vectors mutation
+  const deleteMutation = useDeleteVectorsMutation(
     currentProfile?.id || '',
     collectionName
   )
 
-  // Create documents batch mutation (for pasting)
-  const createBatchMutation = useCreateDocumentsBatchMutation(
+  // Batch import mutation (for pasting)
+  const createBatchMutation = useBatchImportMutation(
     currentProfile?.id || '',
     collectionName
   )
 
-  // Update document mutation (for inline editing)
-  const updateMutation = useUpdateDocumentMutation(
+  // Update vector mutation (for inline editing)
+  const updateMutation = useUpdateVectorMutation(
     currentProfile?.id || '',
     collectionName
   )
@@ -109,12 +109,12 @@ export default function DocumentsView({
   // Clipboard context
   const { clipboard, copyDocuments, hasCopiedDocuments } = useClipboard()
 
-  // Fetch collections to get the current collection's info
-  const { data: collections = [] } = useCollectionsQuery(currentProfile?.id || null)
-  const currentCollection = collections.find(c => c.name === collectionName)
+  // Fetch indexes to get the current index's info
+  const { data: indexes = [] } = useIndexesQuery(currentProfile?.id || null)
+  const currentIndex = indexes.find((c: IndexInfo) => c.name === collectionName)
 
   // Embedding function override state
-  const [embeddingOverride, setEmbeddingOverride] = useState<EmbeddingFunctionOverride | null>(null)
+  const [embeddingOverride, setEmbeddingOverride] = useState<EmbeddingConfig | null>(null)
 
   // Fetch embedding override when collection changes
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function DocumentsView({
     fetchOverride()
   }, [currentProfile?.id, collectionName])
 
-  const handleSaveOverride = useCallback(async (override: EmbeddingFunctionOverride) => {
+  const handleSaveOverride = useCallback(async (override: EmbeddingConfig) => {
     if (!currentProfile?.id) return
     await window.electronAPI.profiles.setEmbeddingOverride(
       currentProfile.id,
@@ -222,15 +222,24 @@ export default function DocumentsView({
     }
   }, [collectionName, filterRows, nResults])
 
-  // Use React Query for documents with debouncing via staleTime
+  // Use React Query for vectors with debouncing via staleTime
   const {
     data: queryData,
     isLoading: loading,
     error,
     isFetching,
-  } = useDocumentsQuery(currentProfile?.id || null, searchParams)
+  } = useVectorsQuery(currentProfile?.id || null, collectionName)
 
-  const rawDocuments = queryData?.documents ?? []
+  // Map vectors to document-like format for backwards compatibility
+  const rawDocuments: DocumentRecord[] = useMemo(() => {
+    const vectors = queryData?.vectors ?? []
+    return vectors.map((vec: VectorRecord) => ({
+      id: vec.id,
+      document: (vec.metadata?.text as string) || null,
+      metadata: vec.metadata || null,
+      embedding: vec.values || null,
+    }))
+  }, [queryData?.vectors])
   const fetchTimeMs = queryData?.fetchTimeMs ?? null
 
   // Extract ID filter value for client-side filtering
@@ -244,7 +253,7 @@ export default function DocumentsView({
     if (!idFilterValue) {
       return rawDocuments
     }
-    return rawDocuments.filter(doc =>
+    return rawDocuments.filter((doc: DocumentRecord) =>
       doc.id.toLowerCase().includes(idFilterValue)
     )
   }, [rawDocuments, idFilterValue])
@@ -252,7 +261,7 @@ export default function DocumentsView({
   // Extract unique metadata fields from documents (needed for draft creation)
   const metadataFields = useMemo(() => {
     const fields = new Set<string>()
-    documents.forEach(doc => {
+    documents.forEach((doc: DocumentRecord) => {
       if (doc.metadata) {
         Object.keys(doc.metadata).forEach(key => fields.add(key))
       }
@@ -303,7 +312,7 @@ export default function DocumentsView({
       // Infer types from existing documents
       metadataFields.forEach(key => {
         // Find the first document with this metadata key to infer type
-        const existingDoc = documents.find(d => d.metadata && key in d.metadata)
+        const existingDoc = documents.find((d: DocumentRecord) => d.metadata && key in d.metadata)
         const existingValue = existingDoc?.metadata?.[key]
         let inferredType: 'string' | 'number' | 'boolean' = 'string'
         if (typeof existingValue === 'number') inferredType = 'number'
@@ -403,19 +412,19 @@ export default function DocumentsView({
         const metadata = typedMetadataToChromaFormat(draft.metadata)
         await createMutation.mutateAsync({
           id: draft.id,
-          document: draft.document.trim(),
+          text: draft.document.trim(),
           metadata,
           generateEmbedding: true,
         })
       } else {
-        // Multiple documents - use batch create mutation
-        const docsToCreate = draftDocuments.map(draft => ({
+        // Multiple documents - use batch import mutation
+        const vectorsToCreate = draftDocuments.map(draft => ({
           id: draft.id,
-          document: draft.document.trim(),
+          text: draft.document.trim(),
           metadata: typedMetadataToChromaFormat(draft.metadata),
         }))
         await createBatchMutation.mutateAsync({
-          documents: docsToCreate,
+          vectors: vectorsToCreate,
           generateEmbeddings: true,
         })
       }
@@ -475,12 +484,18 @@ export default function DocumentsView({
   const handleCopyDocuments = useCallback(() => {
     if (selectedDocumentIds.size === 0 || !currentProfile?.id) return
     // Filter out drafts from selection and get document data
-    const draftIds = new Set(draftDocuments.map(d => d.id))
+    const draftIds = new Set(draftDocuments.map((d: DraftDocument) => d.id))
     const docsToCopy = documents.filter(
-      doc => selectedDocumentIds.has(doc.id) && !draftIds.has(doc.id)
+      (doc: DocumentRecord) => selectedDocumentIds.has(doc.id) && !draftIds.has(doc.id)
     )
     if (docsToCopy.length === 0) return
-    copyDocuments(docsToCopy, collectionName, currentProfile.id)
+    // Convert to VectorRecord format for clipboard
+    const vectorsToCopy: VectorRecord[] = docsToCopy.map((doc: DocumentRecord) => ({
+      id: doc.id,
+      values: doc.embedding || [],
+      metadata: doc.metadata || undefined,
+    }))
+    copyDocuments(vectorsToCopy, collectionName, currentProfile.id)
   }, [selectedDocumentIds, documents, draftDocuments, collectionName, currentProfile?.id, copyDocuments])
 
   // Resolve ID conflicts for pasting
@@ -508,7 +523,7 @@ export default function DocumentsView({
   // Infer metadata field types from existing documents
   const inferMetadataTypes = useCallback((): Record<string, 'string' | 'number' | 'boolean'> => {
     const types: Record<string, 'string' | 'number' | 'boolean'> = {}
-    documents.forEach(doc => {
+    documents.forEach((doc: DocumentRecord) => {
       if (doc.metadata) {
         Object.entries(doc.metadata).forEach(([key, value]) => {
           if (!(key in types)) {
@@ -528,7 +543,7 @@ export default function DocumentsView({
     if (hasDrafts) return // Don't paste if there are already drafts
 
     // Get existing document IDs (including any current drafts)
-    const existingIds = new Set(documents.map(d => d.id))
+    const existingIds = new Set<string>(documents.map((d: DocumentRecord) => d.id))
 
     // Resolve any ID conflicts
     const resolvedDocs = resolveConflictingIds(clipboard.documents, existingIds)
@@ -594,13 +609,13 @@ export default function DocumentsView({
   const handleDocumentContextMenu = useCallback((e: React.MouseEvent, documentId: string) => {
     e.preventDefault()
     e.stopPropagation()
-    window.electronAPI.contextMenu.showDocumentMenu(documentId, { hasCopiedDocuments })
+    window.electronAPI.contextMenu.showVectorMenu(documentId, { hasCopiedVectors: hasCopiedDocuments })
   }, [hasCopiedDocuments])
 
   // Context menu handler for empty space in table
   const handleTableContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    window.electronAPI.contextMenu.showDocumentsPanelMenu({ hasCopiedDocuments })
+    window.electronAPI.contextMenu.showVectorsPanelMenu({ hasCopiedVectors: hasCopiedDocuments })
   }, [hasCopiedDocuments])
 
   // Inline document update handler
@@ -609,23 +624,23 @@ export default function DocumentsView({
     updates: { document?: string; metadata?: Record<string, unknown> }
   ) => {
     await updateMutation.mutateAsync({
-      documentId,
-      document: updates.document,
+      id: documentId,
+      text: updates.document,
       metadata: updates.metadata as Record<string, string | number | boolean> | undefined,
     })
   }, [updateMutation])
 
   // Context menu action listener
   useEffect(() => {
-    const unsubscribe = window.electronAPI.contextMenu.onDocumentAction((data) => {
+    const unsubscribe = window.electronAPI.contextMenu.onVectorAction((data: { action: string; vectorId?: string }) => {
       if (data.action === 'copy') {
         handleCopyDocuments()
       } else if (data.action === 'paste') {
         handlePasteDocuments()
-      } else if (data.action === 'delete' && data.documentId) {
+      } else if (data.action === 'delete' && data.vectorId) {
         // Select and mark for deletion
-        onSingleSelect(data.documentId)
-        setMarkedForDeletion(new Set([data.documentId]))
+        onSingleSelect(data.vectorId)
+        setMarkedForDeletion(new Set([data.vectorId]))
       }
     })
     return unsubscribe
@@ -634,7 +649,7 @@ export default function DocumentsView({
   // Select all documents handler
   const handleSelectAllDocuments = useCallback(() => {
     if (documents.length > 0) {
-      const allIds = documents.map(d => d.id)
+      const allIds = documents.map((d: DocumentRecord) => d.id)
       onRangeSelect(allIds, allIds[0])
     }
   }, [documents, onRangeSelect])
@@ -811,7 +826,7 @@ export default function DocumentsView({
     }
 
     // Check existing documents
-    return documents.find(doc => doc.id === primarySelectedDocumentId) || null
+    return documents.find((doc: DocumentRecord) => doc.id === primarySelectedDocumentId) || null
   }, [primarySelectedDocumentId, draftDocuments, documents])
 
   // Check if selected document is a draft
@@ -834,10 +849,10 @@ export default function DocumentsView({
               <EmbeddingFunctionSelector
                 collectionName={collectionName}
                 currentOverride={embeddingOverride}
-                serverConfig={currentCollection?.embeddingFunction || null}
+                serverConfig={null}
                 onSave={handleSaveOverride}
                 onClear={handleClearOverride}
-                embeddingDimension={documents[0]?.embedding?.length ?? null}
+                embeddingDimension={currentIndex?.dimension ?? null}
               />
             </div>
           </div>

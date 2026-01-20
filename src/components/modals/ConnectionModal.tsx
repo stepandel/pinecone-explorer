@@ -19,9 +19,6 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
   const [profiles, setProfiles] = useState<ConnectionProfile[]>([])
   const [selectedProfileId, setSelectedProfileId] = useState<string>('')
   const [profileName, setProfileName] = useState('')
-  const [url, setUrl] = useState('http://localhost:8000')
-  const [tenant, setTenant] = useState('')
-  const [database, setDatabase] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
@@ -103,18 +100,12 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
     const profile = profiles.find(p => p.id === profileId)
     if (profile) {
       setProfileName(profile.name)
-      setUrl(profile.url)
-      setTenant(profile.tenant || '')
-      setDatabase(profile.database || '')
       setApiKey(profile.apiKey || '')
     }
   }
 
   const resetForm = () => {
     setProfileName('')
-    setUrl('http://localhost:8000')
-    setTenant('')
-    setDatabase('')
     setApiKey('')
   }
 
@@ -146,7 +137,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
     setIsConnecting(true)
 
     try {
-      await window.electronAPI.chromadb.connect(profile.id, profile)
+      await window.electronAPI.pinecone.connect(profile.id, profile)
       onConnect(profile)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect')
@@ -160,14 +151,13 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
       return 'Profile name is required'
     }
 
-    if (!url.trim()) {
-      return 'URL is required'
+    if (!apiKey.trim()) {
+      return 'API Key is required'
     }
 
-    try {
-      new URL(url)
-    } catch {
-      return 'Please enter a valid URL (e.g., http://localhost:8000)'
+    // Basic API key format validation (Pinecone keys start with pcsk_ or are UUIDs)
+    if (!apiKey.startsWith('pcsk_') && !/^[a-f0-9-]{36}$/i.test(apiKey)) {
+      // Allow any key format for flexibility
     }
 
     return null
@@ -189,23 +179,18 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
       const profile: ConnectionProfile = {
         id: selectedProfileId || crypto.randomUUID(),
         name: profileName || `Connection-${Date.now()}`,
-        url: url.trim(),
+        apiKey: apiKey.trim(),
         createdAt: Date.now(),
       }
 
-      // Add optional fields if provided
-      if (tenant.trim()) profile.tenant = tenant.trim()
-      if (database.trim()) profile.database = database.trim()
-      if (apiKey.trim()) profile.apiKey = apiKey.trim()
-
       // Test connection first before saving or proceeding
       try {
-        await window.electronAPI.chromadb.connect(profile.id, profile)
+        await window.electronAPI.pinecone.connect(profile.id, profile)
       } catch (connectionError) {
         // Connection failed - show detailed error message
         const errorMessage = connectionError instanceof Error
           ? connectionError.message
-          : 'Failed to connect to ChromaDB'
+          : 'Failed to connect to Pinecone'
 
         throw new Error(`Connection failed: ${errorMessage}`)
       }
@@ -263,52 +248,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
                     id="profileName"
                     value={profileName}
                     onChange={(e) => setProfileName(e.target.value)}
-                    placeholder="My Connection"
-                    className={inputClassName}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label htmlFor="url" className="text-[12px] text-foreground/50 w-16 text-right">URL</label>
-                  <input
-                    type="text"
-                    id="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="http://localhost:8000"
-                    required
-                    className={inputClassName}
-                  />
-                </div>
-              </div>
-
-              {/* Advanced fields */}
-              <div className="space-y-2.5 pt-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-foreground/30 w-16 text-right uppercase tracking-wider">Cloud</span>
-                  <div className="flex-1 h-px bg-foreground/10" />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label htmlFor="tenant" className="text-[12px] text-foreground/50 w-16 text-right">Tenant</label>
-                  <input
-                    type="text"
-                    id="tenant"
-                    value={tenant}
-                    onChange={(e) => setTenant(e.target.value)}
-                    placeholder="default_tenant"
-                    className={inputClassName}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <label htmlFor="database" className="text-[12px] text-foreground/50 w-16 text-right">Database</label>
-                  <input
-                    type="text"
-                    id="database"
-                    value={database}
-                    onChange={(e) => setDatabase(e.target.value)}
-                    placeholder="default_database"
+                    placeholder="My Pinecone Connection"
                     className={inputClassName}
                   />
                 </div>
@@ -320,10 +260,25 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
                     id="apiKey"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="pcsk_..."
+                    required
                     className={inputClassName}
                   />
                 </div>
+              </div>
+
+              {/* Help text */}
+              <div className="pt-2">
+                <p className="text-[11px] text-foreground/40 leading-relaxed">
+                  Get your API key from the{' '}
+                  <button
+                    type="button"
+                    onClick={() => window.electronAPI.shell.openExternal('https://app.pinecone.io/organizations/-/projects/-/keys')}
+                    className="text-primary hover:underline"
+                  >
+                    Pinecone Console
+                  </button>
+                </p>
               </div>
             </div>
 
@@ -386,7 +341,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
                       {profile.name}
                     </div>
                     <div className="text-[10px] text-foreground/30 truncate">
-                      {profile.url.replace(/^https?:\/\//, '')}
+                      {profile.apiKey ? `${profile.apiKey.substring(0, 8)}...` : 'No API key'}
                     </div>
                   </button>
                 )

@@ -4,7 +4,7 @@ import { useChromaDB } from '../../providers/ChromaDBProvider'
 import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { useClipboard } from '../../context/ClipboardContext'
-import { useDeleteCollectionMutation } from '../../hooks/useChromaQueries'
+import { useDeleteIndexMutation } from '../../hooks/usePineconeQueries'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import { Button } from '../ui/button'
 import { DeleteCollectionDialog } from './DeleteCollectionDialog'
@@ -13,7 +13,7 @@ const inputClassName = "w-full h-6 text-[11px] py-0 px-1.5 pr-5 rounded-md bg-bl
 const inputStyle = { boxShadow: 'inset 0 0.5px 1px 0 rgb(0 0 0 / 0.04)' }
 
 export function CollectionPanel() {
-  const { collections, collectionsLoading, collectionsError, refreshCollections, currentProfile } = useChromaDB()
+  const { indexes, indexesLoading, indexesError, refreshIndexes, currentProfile } = useChromaDB()
   const { activeCollection, setActiveCollection } = useCollection()
   const { draftCollection, startCreation, startCopyFromCollection, updateDraft, cancelCreation } = useDraftCollection()
   const { clipboard, copyCollection, hasCopiedCollection } = useClipboard()
@@ -22,23 +22,23 @@ export function CollectionPanel() {
   // Deletion state
   const [markedForDeletion, setMarkedForDeletion] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const deleteMutation = useDeleteCollectionMutation(currentProfile?.id || '')
+  const deleteMutation = useDeleteIndexMutation(currentProfile?.id || '')
 
-  // Get the collection info for the one marked for deletion
-  const markedCollection = markedForDeletion
-    ? collections.find(c => c.name === markedForDeletion)
+  // Get the index info for the one marked for deletion
+  const markedIndex = markedForDeletion
+    ? indexes.find(c => c.name === markedForDeletion)
     : null
 
-  const handleCollectionClick = (collectionName: string) => {
-    // Cancel creation mode if selecting existing collection
+  const handleCollectionClick = (indexName: string) => {
+    // Cancel creation mode if selecting existing index
     if (draftCollection) {
       cancelCreation()
     }
-    // Clear deletion mark if clicking on a different collection
-    if (markedForDeletion && markedForDeletion !== collectionName) {
+    // Clear deletion mark if clicking on a different index
+    if (markedForDeletion && markedForDeletion !== indexName) {
       setMarkedForDeletion(null)
     }
-    setActiveCollection(collectionName)
+    setActiveCollection(indexName)
   }
 
   const handleCreateClick = () => {
@@ -46,7 +46,7 @@ export function CollectionPanel() {
     startCreation()
   }
 
-  // Toggle deletion mark for active collection
+  // Toggle deletion mark for active index
   const handleToggleDeletion = useCallback(() => {
     if (!activeCollection || draftCollection) return
 
@@ -61,26 +61,11 @@ export function CollectionPanel() {
 
   // Commit deletion
   const handleCommitDeletion = useCallback(async () => {
-    if (!markedForDeletion || !markedCollection) return
+    if (!markedForDeletion || !markedIndex) return
 
-    // If collection has documents, show confirmation dialog
-    if (markedCollection.count > 0) {
-      setShowDeleteDialog(true)
-      return
-    }
-
-    // Empty collection - delete directly
-    try {
-      await deleteMutation.mutateAsync(markedForDeletion)
-      // Clear selection if we deleted the active collection
-      if (activeCollection === markedForDeletion) {
-        setActiveCollection(null)
-      }
-      setMarkedForDeletion(null)
-    } catch (error) {
-      console.error('Failed to delete collection:', error)
-    }
-  }, [markedForDeletion, markedCollection, deleteMutation, activeCollection, setActiveCollection])
+    // Show confirmation dialog for indexes (they may have vectors)
+    setShowDeleteDialog(true)
+  }, [markedForDeletion, markedIndex])
 
   // Handle confirmed deletion (from dialog)
   const handleConfirmedDeletion = useCallback(async () => {
@@ -88,90 +73,90 @@ export function CollectionPanel() {
 
     try {
       await deleteMutation.mutateAsync(markedForDeletion)
-      // Clear selection if we deleted the active collection
+      // Clear selection if we deleted the active index
       if (activeCollection === markedForDeletion) {
         setActiveCollection(null)
       }
       setMarkedForDeletion(null)
       setShowDeleteDialog(false)
     } catch (error) {
-      console.error('Failed to delete collection:', error)
+      console.error('Failed to delete index:', error)
     }
   }, [markedForDeletion, deleteMutation, activeCollection, setActiveCollection])
 
-  // Copy collection to clipboard
-  const handleCopyCollection = useCallback((collectionName: string) => {
+  // Copy index to clipboard
+  const handleCopyIndex = useCallback((indexName: string) => {
     if (!currentProfile) return
-    const collection = collections.find(c => c.name === collectionName)
-    if (collection) {
-      copyCollection(collection, currentProfile.id)
+    const index = indexes.find(c => c.name === indexName)
+    if (index) {
+      copyCollection(index, currentProfile.id)
     }
-  }, [collections, currentProfile, copyCollection])
+  }, [indexes, currentProfile, copyCollection])
 
-  // Paste collection (start copy mode)
-  const handlePasteCollection = useCallback(() => {
+  // Paste index (start copy mode)
+  const handlePasteIndex = useCallback(() => {
     if (!clipboard || clipboard.type !== 'collection' || draftCollection) return
     startCopyFromCollection(clipboard.collection)
   }, [clipboard, draftCollection, startCopyFromCollection])
 
-  // Context menu handler for collection item
-  const handleContextMenu = useCallback((e: React.MouseEvent, collectionName: string) => {
+  // Context menu handler for index item
+  const handleContextMenu = useCallback((e: React.MouseEvent, indexName: string) => {
     e.preventDefault()
     e.stopPropagation()
-    window.electronAPI.contextMenu.showCollectionMenu(collectionName, { hasCopiedCollection })
+    window.electronAPI.contextMenu.showIndexMenu(indexName, { hasCopiedIndex: hasCopiedCollection })
   }, [hasCopiedCollection])
 
   // Context menu handler for empty space in panel
   const handlePanelContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    window.electronAPI.contextMenu.showCollectionPanelMenu({ hasCopiedCollection })
+    window.electronAPI.contextMenu.showIndexPanelMenu({ hasCopiedIndex: hasCopiedCollection })
   }, [hasCopiedCollection])
 
   // Context menu action listener
   useEffect(() => {
     const unsubscribe = window.electronAPI.contextMenu.onAction((data) => {
       if (data.action === 'copy') {
-        handleCopyCollection(data.collectionName)
+        handleCopyIndex(data.indexName)
       } else if (data.action === 'paste') {
-        handlePasteCollection()
+        handlePasteIndex()
       } else if (data.action === 'delete') {
         // Select and mark for deletion
-        setActiveCollection(data.collectionName)
-        setMarkedForDeletion(data.collectionName)
+        setActiveCollection(data.indexName)
+        setMarkedForDeletion(data.indexName)
       }
     })
     return unsubscribe
-  }, [handleCopyCollection, handlePasteCollection, setActiveCollection])
+  }, [handleCopyIndex, handlePasteIndex, setActiveCollection])
 
   // Menu event listeners (from native app menu)
   useEffect(() => {
-    // Duplicate collection = copy + paste in one action
+    // Duplicate index = copy + paste in one action
     const handleMenuDuplicate = () => {
       if (activeCollection && currentProfile) {
-        const collection = collections.find(c => c.name === activeCollection)
-        if (collection) {
-          copyCollection(collection, currentProfile.id)
+        const index = indexes.find(c => c.name === activeCollection)
+        if (index) {
+          copyCollection(index, currentProfile.id)
           // Small delay to ensure clipboard is set
           setTimeout(() => {
-            startCopyFromCollection(collection)
+            startCopyFromCollection(index)
           }, 0)
         }
       }
     }
 
-    // Copy collection to clipboard
+    // Copy index to clipboard
     const handleMenuCopy = () => {
       if (activeCollection) {
-        handleCopyCollection(activeCollection)
+        handleCopyIndex(activeCollection)
       }
     }
 
-    // Paste collection from clipboard
+    // Paste index from clipboard
     const handleMenuPaste = () => {
-      handlePasteCollection()
+      handlePasteIndex()
     }
 
-    // Delete collection
+    // Delete index
     const handleMenuDelete = () => {
       if (activeCollection) {
         handleToggleDeletion()
@@ -190,7 +175,7 @@ export function CollectionPanel() {
       window.removeEventListener('menu:paste-collection', handleMenuPaste)
       window.removeEventListener('menu:delete-collection', handleMenuDelete)
     }
-  }, [activeCollection, collections, currentProfile, copyCollection, startCopyFromCollection, handleCopyCollection, handlePasteCollection, handleToggleDeletion])
+  }, [activeCollection, indexes, currentProfile, copyCollection, startCopyFromCollection, handleCopyIndex, handlePasteIndex, handleToggleDeletion])
 
   // Keyboard shortcuts - using centralized SHORTCUTS definitions
   useEffect(() => {
@@ -211,14 +196,14 @@ export function CollectionPanel() {
         return
       }
 
-      // Command+Z to cancel copy mode (draft collection)
+      // Command+Z to cancel copy mode (draft index)
       if (matchesShortcut(e, SHORTCUTS.UNDO) && draftCollection) {
         e.preventDefault()
         cancelCreation()
         return
       }
 
-      // Escape to cancel draft collection
+      // Escape to cancel draft index
       if (matchesShortcut(e, SHORTCUTS.CANCEL) && draftCollection) {
         e.preventDefault()
         cancelCreation()
@@ -227,17 +212,23 @@ export function CollectionPanel() {
       // Command+V to paste (start copy mode)
       if (matchesShortcut(e, SHORTCUTS.PASTE_COLLECTION) && hasCopiedCollection && !draftCollection && !isInputting) {
         e.preventDefault()
-        handlePasteCollection()
+        handlePasteIndex()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleCommitDeletion, handlePasteCollection, cancelCreation, markedForDeletion, draftCollection, hasCopiedCollection])
+  }, [handleCommitDeletion, handlePasteIndex, cancelCreation, markedForDeletion, draftCollection, hasCopiedCollection])
 
-  const filteredCollections = collections.filter(collection =>
-    collection.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredIndexes = indexes.filter(index =>
+    index.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  // Use collections/indexes interchangeably for backward compatibility
+  const collections = indexes
+  const collectionsLoading = indexesLoading
+  const collectionsError = indexesError
+  const refreshCollections = refreshIndexes
 
   return (
     <aside
@@ -256,7 +247,7 @@ export function CollectionPanel() {
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Search collections..."
+              placeholder="Search indexes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={inputClassName}
@@ -276,17 +267,17 @@ export function CollectionPanel() {
             disabled={!!draftCollection}
             className="h-6 w-6 flex-shrink-0 flex items-center justify-center rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed transition-colors translate-y-px"
             style={inputStyle}
-            title="Create new collection"
+            title="Create new index"
           >
             <Plus className="h-2 w-2" />
           </button>
         </div>
       </div>
 
-      {/* Collections List */}
+      {/* Indexes List */}
       <div className="flex-1 overflow-y-auto" onContextMenu={handlePanelContextMenu}>
         {collectionsLoading && (
-          <div className="p-4 text-sm text-muted-foreground">Loading collections...</div>
+          <div className="p-4 text-sm text-muted-foreground">Loading indexes...</div>
         )}
 
         {collectionsError && (
@@ -300,17 +291,17 @@ export function CollectionPanel() {
 
         {!collectionsLoading && !collectionsError && collections.length === 0 && (
           <div className="p-4 text-sm text-muted-foreground text-center">
-            No collections found
+            No indexes found
           </div>
         )}
 
-        {!collectionsLoading && !collectionsError && collections.length > 0 && filteredCollections.length === 0 && (
+        {!collectionsLoading && !collectionsError && collections.length > 0 && filteredIndexes.length === 0 && (
           <div className="p-4 text-sm text-muted-foreground text-center">
-            No collections match "{searchTerm}"
+            No indexes match "{searchTerm}"
           </div>
         )}
 
-        {/* Draft collection row */}
+        {/* Draft index row */}
         {draftCollection && (
           <div className="py-1 px-2">
             <div className="w-full px-3 py-1.5 bg-black/[0.08] dark:bg-white/[0.10] rounded-md">
@@ -318,7 +309,7 @@ export function CollectionPanel() {
                 type="text"
                 value={draftCollection.name}
                 onChange={(e) => updateDraft({ name: e.target.value })}
-                placeholder="Collection name..."
+                placeholder="Index name..."
                 className="w-full text-[12px] font-medium bg-transparent border-none outline-none text-sidebar-foreground placeholder:text-sidebar-foreground/40"
                 autoFocus
               />
@@ -326,11 +317,11 @@ export function CollectionPanel() {
           </div>
         )}
 
-        {!collectionsLoading && !collectionsError && filteredCollections.length > 0 && (
+        {!collectionsLoading && !collectionsError && filteredIndexes.length > 0 && (
           <div className="py-2">
-            {filteredCollections.map(collection => {
-              const isActive = collection.name === activeCollection && !draftCollection
-              const isMarkedForDeletion = collection.name === markedForDeletion
+            {filteredIndexes.map(index => {
+              const isActive = index.name === activeCollection && !draftCollection
+              const isMarkedForDeletion = index.name === markedForDeletion
 
               // Determine row styling - macOS source list style
               let bgClass = 'rounded-md mx-2'
@@ -349,13 +340,16 @@ export function CollectionPanel() {
 
               return (
                 <button
-                  key={collection.id}
-                  onClick={() => handleCollectionClick(collection.name)}
-                  onContextMenu={(e) => handleContextMenu(e, collection.name)}
+                  key={index.name}
+                  onClick={() => handleCollectionClick(index.name)}
+                  onContextMenu={(e) => handleContextMenu(e, index.name)}
                   className={`w-full px-3 py-1.5 text-left transition-colors duration-100 ${bgClass} ${hoverClass}`}
                 >
                   <div className={`text-[12px] truncate ${textClass}`}>
-                    {collection.name}
+                    {index.name}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {index.dimension}d · {index.metric}
                   </div>
                 </button>
               )
@@ -386,13 +380,13 @@ export function CollectionPanel() {
         </div>
       )}
 
-      {/* Delete confirmation dialog for non-empty collections */}
-      {markedCollection && (
+      {/* Delete confirmation dialog for indexes */}
+      {markedIndex && (
         <DeleteCollectionDialog
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
-          collectionName={markedCollection.name}
-          documentCount={markedCollection.count}
+          collectionName={markedIndex.name}
+          documentCount={0}
           onConfirm={handleConfirmedDeletion}
           isDeleting={deleteMutation.isPending}
         />

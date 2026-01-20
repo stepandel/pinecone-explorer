@@ -1,51 +1,57 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { ConnectionProfile, DocumentRecord, SearchDocumentsParams } from '../../electron/types'
-import { useCollectionsQuery, useConnectMutation, useRefreshCollectionsMutation } from '../hooks/useChromaQueries'
+import { ConnectionProfile, VectorRecord, QueryVectorsParams, QueryResult } from '../../electron/types'
+import { useIndexesQuery, useConnectMutation, useRefreshIndexesMutation } from '../hooks/usePineconeQueries'
 import { useQueryClient } from '@tanstack/react-query'
 
-interface ChromaDBContextValue {
+interface PineconeContextValue {
   // Connection state
   currentProfile: ConnectionProfile | null
   isConnected: boolean
   connect: (profile: ConnectionProfile) => Promise<void>
   disconnect: () => void
 
-  // Collections
+  // Indexes (formerly Collections)
+  indexes: any[]
+  indexesLoading: boolean
+  indexesError: string | null
+  refreshIndexes: () => Promise<void>
+
+  // Vectors (formerly Documents)
+  queryVectors: (params: QueryVectorsParams) => Promise<QueryResult>
+
+  // Cache management
+  invalidateCache: () => void
+
+  // Legacy aliases
   collections: any[]
   collectionsLoading: boolean
   collectionsError: string | null
   refreshCollections: () => Promise<void>
-
-  // Documents (per tab)
-  searchDocuments: (params: SearchDocumentsParams) => Promise<DocumentRecord[]>
-
-  // Cache management
-  invalidateCache: () => void
 }
 
-const ChromaDBContext = createContext<ChromaDBContextValue | null>(null)
+const PineconeContext = createContext<PineconeContextValue | null>(null)
 
-interface ChromaDBProviderProps {
+interface PineconeProviderProps {
   profile: ConnectionProfile
-  windowId: string // For future use if needed
+  windowId: string
   children: ReactNode
 }
 
-export function ChromaDBProvider({ profile, windowId, children }: ChromaDBProviderProps) {
+export function ChromaDBProvider({ profile, windowId, children }: PineconeProviderProps) {
   const [currentProfile, setCurrentProfile] = useState<ConnectionProfile | null>(profile)
   const [isConnected, setIsConnected] = useState(false)
   const queryClient = useQueryClient()
 
-  // Use React Query for collections
+  // Use React Query for indexes
   const {
-    data: collections = [],
-    isLoading: collectionsLoading,
-    error: collectionsError,
-  } = useCollectionsQuery(currentProfile?.id || null, isConnected)
+    data: indexes = [],
+    isLoading: indexesLoading,
+    error: indexesError,
+  } = useIndexesQuery(currentProfile?.id || null, isConnected)
 
   // Connect mutation
   const connectMutation = useConnectMutation()
-  const refreshMutation = useRefreshCollectionsMutation(currentProfile?.id || '')
+  const refreshMutation = useRefreshIndexesMutation(currentProfile?.id || '')
 
   const connect = useCallback(async (newProfile: ConnectionProfile) => {
     try {
@@ -63,34 +69,33 @@ export function ChromaDBProvider({ profile, windowId, children }: ChromaDBProvid
     setIsConnected(false)
     // Clear all queries for this profile
     if (currentProfile) {
-      queryClient.removeQueries({ queryKey: ['chroma', 'collections', currentProfile.id] })
-      queryClient.removeQueries({ queryKey: ['chroma', 'documents', currentProfile.id] })
+      queryClient.removeQueries({ queryKey: ['pinecone', 'indexes', currentProfile.id] })
+      queryClient.removeQueries({ queryKey: ['pinecone', 'vectors', currentProfile.id] })
     }
   }, [currentProfile, queryClient])
 
-  const refreshCollections = useCallback(async () => {
+  const refreshIndexes = useCallback(async () => {
     if (!currentProfile) return
     await refreshMutation.mutateAsync()
   }, [currentProfile, refreshMutation])
 
-  const searchDocuments = useCallback(async (params: SearchDocumentsParams): Promise<DocumentRecord[]> => {
+  const queryVectors = useCallback(async (params: QueryVectorsParams): Promise<QueryResult> => {
     if (!currentProfile) {
-      throw new Error('Not connected to ChromaDB')
+      throw new Error('Not connected to Pinecone')
     }
 
-    // Fetch documents directly (React Query will cache at component level)
     try {
-      const results = await window.electronAPI.chromadb.searchDocuments(currentProfile.id, params)
+      const results = await window.electronAPI.pinecone.queryVectors(currentProfile.id, params)
       return results
     } catch (error) {
-      console.error('Error searching documents:', error)
+      console.error('Error querying vectors:', error)
       throw error
     }
   }, [currentProfile])
 
   const invalidateCache = useCallback(() => {
     if (currentProfile) {
-      queryClient.invalidateQueries({ queryKey: ['chroma', 'documents', currentProfile.id] })
+      queryClient.invalidateQueries({ queryKey: ['pinecone', 'vectors', currentProfile.id] })
     }
   }, [currentProfile, queryClient])
 
@@ -101,41 +106,55 @@ export function ChromaDBProvider({ profile, windowId, children }: ChromaDBProvid
     }
   }, [profile, currentProfile, isConnected, connect])
 
-  // Listen for Cmd+R refresh (via custom window event) - only refresh documents
+  // Listen for Cmd+R refresh (via custom window event) - only refresh vectors
   useEffect(() => {
     const handleRefresh = () => {
       if (currentProfile) {
-        queryClient.resetQueries({ queryKey: ['chroma', 'documents', currentProfile.id] })
+        queryClient.resetQueries({ queryKey: ['pinecone', 'vectors', currentProfile.id] })
       }
     }
+    window.addEventListener('pinecone:refresh', handleRefresh)
+    // Also listen for legacy event name
     window.addEventListener('chroma:refresh', handleRefresh)
-    return () => window.removeEventListener('chroma:refresh', handleRefresh)
+    return () => {
+      window.removeEventListener('pinecone:refresh', handleRefresh)
+      window.removeEventListener('chroma:refresh', handleRefresh)
+    }
   }, [currentProfile, queryClient])
 
-  const value: ChromaDBContextValue = {
+  const value: PineconeContextValue = {
     currentProfile,
     isConnected,
     connect,
     disconnect,
-    collections,
-    collectionsLoading,
-    collectionsError: collectionsError ? (collectionsError as Error).message : null,
-    refreshCollections,
-    searchDocuments,
+    indexes,
+    indexesLoading,
+    indexesError: indexesError ? (indexesError as Error).message : null,
+    refreshIndexes,
+    queryVectors,
     invalidateCache,
+    // Legacy aliases
+    collections: indexes,
+    collectionsLoading: indexesLoading,
+    collectionsError: indexesError ? (indexesError as Error).message : null,
+    refreshCollections: refreshIndexes,
   }
 
   return (
-    <ChromaDBContext.Provider value={value}>
+    <PineconeContext.Provider value={value}>
       {children}
-    </ChromaDBContext.Provider>
+    </PineconeContext.Provider>
   )
 }
 
 export function useChromaDB() {
-  const context = useContext(ChromaDBContext)
+  const context = useContext(PineconeContext)
   if (!context) {
-    throw new Error('useChromaDB must be used within a ChromaDBProvider')
+    throw new Error('useChromaDB must be used within a ChromaDBProvider (PineconeProvider)')
   }
   return context
 }
+
+// Alias for migration
+export const usePinecone = useChromaDB
+export const PineconeProvider = ChromaDBProvider

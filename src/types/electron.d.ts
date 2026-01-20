@@ -1,157 +1,180 @@
-declare global {
-  type EmbeddingFunctionType =
-    | 'default'
-    | 'openai'
-    | 'ollama'
-    | 'cohere'
-    | 'google-gemini'
-    | 'jina'
-    | 'mistral'
-    | 'voyageai'
-    | 'together-ai'
-    | 'huggingface-server'
-    | 'cloudflare-worker-ai'
-    | 'morph'
-    | 'chroma-cloud-qwen'
-    | 'sentence-transformer'
+// Pinecone Explorer type declarations
 
-  interface EmbeddingFunctionOverride {
-    type: EmbeddingFunctionType
+declare global {
+  type EmbeddingProviderType =
+    | 'openai'
+    | 'cohere'
+    | 'voyage'
+    | 'huggingface'
+    | 'ollama'
+
+  interface EmbeddingConfig {
+    provider: EmbeddingProviderType
     modelName?: string
-    url?: string // For Ollama, HuggingFace Server
-    accountId?: string // For Cloudflare Workers AI
+    apiKeyEnvVar?: string // Environment variable name for API key
+    url?: string // For Ollama or custom endpoints
   }
 
   interface ConnectionProfile {
     id: string
     name: string
-    url: string
-    tenant?: string
-    database?: string
-    apiKey?: string
+    apiKey: string // Pinecone API key
     createdAt: number
     lastUsed?: number
-    embeddingOverrides?: Record<string, EmbeddingFunctionOverride>
+    defaultEmbeddingConfig?: EmbeddingConfig
+    embeddingOverrides?: Record<string, EmbeddingConfig>
   }
 
-  interface CollectionInfo {
+  interface IndexInfo {
     name: string
+    dimension: number
+    metric: 'cosine' | 'euclidean' | 'dotproduct'
+    host: string
+    status: {
+      ready: boolean
+      state: string
+    }
+    spec: {
+      serverless?: {
+        cloud: 'aws' | 'gcp' | 'azure'
+        region: string
+      }
+      pod?: {
+        environment: string
+        podType: string
+        pods?: number
+        replicas?: number
+        shards?: number
+      }
+    }
+    deletionProtection?: 'enabled' | 'disabled'
+  }
+
+  interface IndexStats {
+    namespaces: Record<string, { vectorCount: number }>
+    dimension: number
+    indexFullness: number
+    totalVectorCount: number
+  }
+
+  interface VectorRecord {
     id: string
-    metadata: Record<string, unknown> | null
-    count: number
-    dimension?: number | null
-    embeddingFunction?: {
-      name: string
-      type: 'known' | 'legacy' | 'unknown'
-      config?: Record<string, unknown>
-    } | null
-  }
-
-  interface DocumentRecord {
-    id: string
-    document: string | null
-    metadata: Record<string, unknown> | null
-    embedding: number[] | null
-  }
-
-  interface SearchDocumentsParams {
-    collectionName: string
-    queryText?: string
-    nResults?: number
-    metadataFilter?: Record<string, any>
-    ids?: string[] // Filter by specific IDs (no embedding function needed)
-    limit?: number
-    offset?: number
-  }
-
-  interface UpdateDocumentParams {
-    collectionName: string
-    documentId: string
-    document?: string | null
+    values: number[]
     metadata?: Record<string, unknown> | null
-    embedding?: number[] | null
-    regenerateEmbedding?: boolean
+    sparseValues?: {
+      indices: number[]
+      values: number[]
+    }
+    score?: number
   }
 
-  interface CreateDocumentParams {
-    collectionName: string
+  interface QueryVectorsParams {
+    indexName: string
+    namespace?: string
+    vector?: number[]
+    queryText?: string
+    topK?: number
+    filter?: Record<string, unknown>
+    includeValues?: boolean
+    includeMetadata?: boolean
+  }
+
+  interface QueryResult {
+    matches: Array<{
+      id: string
+      score: number
+      values?: number[]
+      metadata?: Record<string, unknown>
+      sparseValues?: {
+        indices: number[]
+        values: number[]
+      }
+    }>
+    namespace: string
+    usage?: {
+      readUnits: number
+    }
+  }
+
+  interface CreateVectorParams {
+    indexName: string
+    namespace?: string
     id: string
-    document?: string
+    values?: number[]
+    text?: string
     metadata?: Record<string, unknown>
-    embedding?: number[]
     generateEmbedding?: boolean
   }
 
-  interface DeleteDocumentsParams {
-    collectionName: string
-    ids: string[]
+  interface UpdateVectorParams {
+    indexName: string
+    namespace?: string
+    id: string
+    values?: number[]
+    metadata?: Record<string, unknown>
+    text?: string
+    regenerateEmbedding?: boolean
   }
 
-  interface CreateDocumentsBatchParams {
-    collectionName: string
-    documents: Array<{
+  interface DeleteVectorsParams {
+    indexName: string
+    namespace?: string
+    ids?: string[]
+    deleteAll?: boolean
+    filter?: Record<string, unknown>
+  }
+
+  interface BatchImportParams {
+    indexName: string
+    namespace?: string
+    vectors: Array<{
       id: string
-      document?: string
+      text?: string
       metadata?: Record<string, unknown>
+      values?: number[]
     }>
     generateEmbeddings?: boolean
   }
 
-  interface HNSWConfig {
-    space?: 'l2' | 'cosine' | 'ip'
-    efConstruction?: number
-    efSearch?: number
-    maxNeighbors?: number
-    numThreads?: number
-    batchSize?: number
-    syncThreshold?: number
-    resizeFactor?: number
+  interface BatchImportResult {
+    upsertedCount: number
+    errors: string[]
   }
 
-  interface CreateCollectionParams {
+  interface CreateIndexParams {
     name: string
-    embeddingFunction?: {
-      type: EmbeddingFunctionType
-      modelName?: string
-      url?: string // For Ollama, HuggingFace Server
-      accountId?: string // For Cloudflare Workers AI
+    dimension: number
+    metric?: 'cosine' | 'euclidean' | 'dotproduct'
+    spec: {
+      serverless: {
+        cloud: 'aws' | 'gcp' | 'azure'
+        region: string
+      }
+    } | {
+      pod: {
+        environment: string
+        podType: string
+        pods?: number
+        replicas?: number
+        shards?: number
+      }
     }
-    metadata?: Record<string, unknown>
-    hnsw?: HNSWConfig
-    firstDocument?: {
-      id: string
-      document?: string
-      metadata?: Record<string, unknown>
-    }
+    deletionProtection?: 'enabled' | 'disabled'
   }
 
-  interface CopyCollectionParams {
-    sourceCollectionName: string
-    targetName: string
-    embeddingFunction?: {
-      type: EmbeddingFunctionType
-      modelName?: string
-      url?: string // For Ollama, HuggingFace Server
-      accountId?: string // For Cloudflare Workers AI
-    }
-    hnsw?: HNSWConfig
-    metadata?: Record<string, unknown>
-    regenerateEmbeddings: boolean
-  }
-
-  interface CopyCollectionResult {
-    success: boolean
-    collectionInfo?: CollectionInfo
-    totalDocuments: number
-    copiedDocuments: number
-    error?: string
-  }
-
-  interface CopyProgress {
+  interface CloneProgress {
     phase: 'creating' | 'copying' | 'complete' | 'error' | 'cancelled'
-    totalDocuments: number
-    processedDocuments: number
+    totalVectors: number
+    processedVectors: number
     message: string
+  }
+
+  interface CloneResult {
+    success: boolean
+    indexInfo?: IndexInfo
+    totalVectors: number
+    copiedVectors: number
+    error?: string
   }
 
   interface UpdateInfo {
@@ -173,28 +196,29 @@ declare global {
   }
 
   interface ElectronAPI {
-    chromadb: {
+    pinecone: {
       connect: (profileId: string, profile: ConnectionProfile) => Promise<void>
-      listCollections: (profileId: string) => Promise<CollectionInfo[]>
-      getDocuments: (profileId: string, collectionName: string) => Promise<DocumentRecord[]>
-      searchDocuments: (profileId: string, params: SearchDocumentsParams) => Promise<DocumentRecord[]>
-      updateDocument: (profileId: string, params: UpdateDocumentParams) => Promise<void>
-      createDocument: (profileId: string, params: CreateDocumentParams) => Promise<void>
-      deleteDocuments: (profileId: string, params: DeleteDocumentsParams) => Promise<void>
-      createDocumentsBatch: (profileId: string, params: CreateDocumentsBatchParams) => Promise<{ createdIds: string[]; errors: string[] }>
-      createCollection: (profileId: string, params: CreateCollectionParams) => Promise<CollectionInfo>
-      deleteCollection: (profileId: string, collectionName: string) => Promise<void>
-      copyCollection: (profileId: string, params: CopyCollectionParams) => Promise<CopyCollectionResult>
-      onCopyProgress: (callback: (progress: CopyProgress) => void) => () => void
-      cancelCopy: (profileId: string) => Promise<void>
+      listIndexes: (profileId: string) => Promise<IndexInfo[]>
+      getIndexStats: (profileId: string, indexName: string) => Promise<IndexStats>
+      getAllVectors: (profileId: string, indexName: string, namespace?: string, limit?: number) => Promise<VectorRecord[]>
+      queryVectors: (profileId: string, params: QueryVectorsParams) => Promise<QueryResult>
+      createVector: (profileId: string, params: CreateVectorParams) => Promise<void>
+      updateVector: (profileId: string, params: UpdateVectorParams) => Promise<void>
+      deleteVectors: (profileId: string, params: DeleteVectorsParams) => Promise<void>
+      batchImport: (profileId: string, params: BatchImportParams) => Promise<BatchImportResult>
+      createIndex: (profileId: string, params: CreateIndexParams) => Promise<IndexInfo>
+      deleteIndex: (profileId: string, indexName: string) => Promise<void>
+      cloneIndex: (profileId: string, params: { sourceIndexName: string; sourceNamespace?: string; targetIndexName: string; targetNamespace?: string; regenerateEmbeddings?: boolean }) => Promise<CloneResult>
+      onCloneProgress: (callback: (progress: CloneProgress) => void) => () => void
+      cancelClone: (profileId: string) => Promise<void>
     }
     contextMenu: {
-      showCollectionMenu: (collectionName: string, options?: { hasCopiedCollection?: boolean }) => void
-      showCollectionPanelMenu: (options?: { hasCopiedCollection?: boolean }) => void
-      onAction: (callback: (action: { action: string; collectionName: string }) => void) => () => void
-      showDocumentMenu: (documentId: string, options?: { hasCopiedDocuments?: boolean }) => void
-      showDocumentsPanelMenu: (options?: { hasCopiedDocuments?: boolean }) => void
-      onDocumentAction: (callback: (action: { action: string; documentId?: string }) => void) => () => void
+      showIndexMenu: (indexName: string, options?: { hasCopiedIndex?: boolean }) => void
+      showIndexPanelMenu: (options?: { hasCopiedIndex?: boolean }) => void
+      onAction: (callback: (action: { action: string; indexName: string }) => void) => () => void
+      showVectorMenu: (vectorId: string, options?: { hasCopiedVectors?: boolean }) => void
+      showVectorsPanelMenu: (options?: { hasCopiedVectors?: boolean }) => void
+      onVectorAction: (callback: (action: { action: string; vectorId?: string }) => void) => () => void
       showProfileMenu: (profileId: string) => void
       onProfileAction: (callback: (action: { action: string; profileId: string }) => void) => () => void
     }
@@ -204,9 +228,9 @@ declare global {
       delete: (id: string) => Promise<void>
       getLastActive: () => Promise<string | null>
       setLastActive: (id: string | null) => Promise<void>
-      getEmbeddingOverride: (profileId: string, collectionName: string) => Promise<EmbeddingFunctionOverride | null>
-      setEmbeddingOverride: (profileId: string, collectionName: string, override: EmbeddingFunctionOverride) => Promise<void>
-      clearEmbeddingOverride: (profileId: string, collectionName: string) => Promise<void>
+      getEmbeddingOverride: (profileId: string, indexName: string) => Promise<EmbeddingConfig | null>
+      setEmbeddingOverride: (profileId: string, indexName: string, override: EmbeddingConfig) => Promise<void>
+      clearEmbeddingOverride: (profileId: string, indexName: string) => Promise<void>
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>
@@ -233,20 +257,20 @@ declare global {
       onStatus: (callback: (status: UpdateStatus) => void) => () => void
     }
     menu: {
-      // Collection menu events
-      onNewCollection: (callback: () => void) => () => void
-      onDuplicateCollection: (callback: () => void) => () => void
-      onRenameCollection: (callback: () => void) => () => void
-      onDeleteCollection: (callback: () => void) => () => void
-      onCopyCollection: (callback: () => void) => () => void
-      onPasteCollection: (callback: () => void) => () => void
-      // Document menu events
-      onNewDocument: (callback: () => void) => () => void
-      onEditDocument: (callback: () => void) => () => void
+      // Index menu events
+      onNewIndex: (callback: () => void) => () => void
+      onDuplicateIndex: (callback: () => void) => () => void
+      onRenameIndex: (callback: () => void) => () => void
+      onDeleteIndex: (callback: () => void) => () => void
+      onCopyIndex: (callback: () => void) => () => void
+      onPasteIndex: (callback: () => void) => () => void
+      // Vector menu events
+      onNewVector: (callback: () => void) => () => void
+      onEditVector: (callback: () => void) => () => void
       onDeleteSelected: (callback: () => void) => () => void
-      onCopyDocuments: (callback: () => void) => () => void
-      onPasteDocuments: (callback: () => void) => () => void
-      onSelectAllDocuments: (callback: () => void) => () => void
+      onCopyVectors: (callback: () => void) => () => void
+      onPasteVectors: (callback: () => void) => () => void
+      onSelectAllVectors: (callback: () => void) => () => void
       onConfigureEmbedding: (callback: () => void) => () => void
       // View menu events
       onToggleLeftPanel: (callback: () => void) => () => void
@@ -264,6 +288,10 @@ declare global {
   interface Window {
     electronAPI: ElectronAPI
   }
+
+  // Legacy aliases for backwards compatibility
+  type CollectionInfo = IndexInfo
+  type DocumentRecord = VectorRecord
 }
 
 export {}

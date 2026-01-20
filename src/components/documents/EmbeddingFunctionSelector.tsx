@@ -7,9 +7,9 @@ import { EMBEDDING_FUNCTIONS, EMBEDDING_FUNCTION_GROUPS } from '../../constants/
 
 interface EmbeddingFunctionSelectorProps {
   collectionName: string
-  currentOverride: EmbeddingFunctionOverride | null
+  currentOverride: EmbeddingConfig | null
   serverConfig: { name: string; type: string; config?: Record<string, unknown> } | null
-  onSave: (override: EmbeddingFunctionOverride) => Promise<void>
+  onSave: (override: EmbeddingConfig) => Promise<void>
   onClear: () => Promise<void>
   embeddingDimension?: number | null
 }
@@ -30,7 +30,7 @@ export function EmbeddingFunctionSelector({
   useEffect(() => {
     if (currentOverride) {
       const match = EMBEDDING_FUNCTIONS.find(
-        ef => ef.type === currentOverride.type && ef.modelName === currentOverride.modelName
+        ef => ef.type === currentOverride.provider && ef.modelName === currentOverride.modelName
       )
       setSelectedId(match?.id || '')
     } else {
@@ -48,10 +48,9 @@ export function EmbeddingFunctionSelector({
     setSaving(true)
     try {
       await onSave({
-        type: selectedEF.type,
+        provider: selectedEF.type as EmbeddingProviderType,
         modelName: selectedEF.modelName,
         url: selectedEF.url,
-        accountId: selectedEF.accountId,
       })
       setOpen(false)
     } finally {
@@ -82,29 +81,29 @@ export function EmbeddingFunctionSelector({
           title={currentOverride ? 'Override active - Click to change' : 'Click to override embedding function'}
         >
           {currentOverride
-            ? `${currentOverride.type}: ${currentOverride.modelName}`
-            : serverConfig?.name || 'No EF configured'
+            ? `${currentOverride.provider}: ${currentOverride.modelName}`
+            : serverConfig?.name || 'Configure embedding'
           }
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-3" align="start">
         {/* Header */}
         <div className="px-1 mb-3">
-          <h4 className="font-medium text-[13px] text-foreground">Embedding Function</h4>
+          <h4 className="font-medium text-[13px] text-foreground">Embedding Configuration</h4>
         </div>
 
         <div className="space-y-3">
-          {/* Server config info */}
+          {/* Current config info */}
           <div className="px-1">
-            <Label className="text-muted-foreground text-[11px] font-normal">Server</Label>
+            <Label className="text-muted-foreground text-[11px] font-normal">Current</Label>
             <p className="font-mono text-[11px] text-foreground/80 mt-0.5">
-              {serverConfig?.name || 'Not configured'}
+              {currentOverride ? `${currentOverride.provider}: ${currentOverride.modelName}` : 'Not configured'}
             </p>
           </div>
 
           {/* Selector */}
           <div className="px-1 space-y-1.5">
-            <Label htmlFor="ef-select" className="text-[11px] font-normal">Client Override</Label>
+            <Label htmlFor="ef-select" className="text-[11px] font-normal">Embedding Provider</Label>
             <div className="relative">
               <select
                 id="ef-select"
@@ -154,16 +153,16 @@ export function EmbeddingFunctionSelector({
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full ${hasDimensionMismatch ? 'bg-[#FF3B30] dark:bg-[#FF453A]' : 'bg-[#007AFF] dark:bg-[#0A84FF]'}`} />
                     <span className={`font-medium text-[10px] ${accentColor}`}>
-                      {hasDimensionMismatch ? 'Dimension Mismatch' : 'Client Override'}
+                      {hasDimensionMismatch ? 'Dimension Mismatch' : 'Selected'}
                     </span>
                   </div>
                 )}
-                <p className="text-muted-foreground"><span className="text-foreground/60">Type:</span> {displayEF.type}</p>
+                <p className="text-muted-foreground"><span className="text-foreground/60">Provider:</span> {displayEF.type}</p>
                 <p className="text-muted-foreground"><span className="text-foreground/60">Model:</span> {displayEF.modelName}</p>
                 <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {displayEF.dimensions ?? 'variable'}</p>
                 {embeddingDimension && (
                   <p className="text-muted-foreground pt-1 border-t border-black/5 dark:border-white/5 mt-1">
-                    <span className="text-foreground/60">Collection:</span> {embeddingDimension}d
+                    <span className="text-foreground/60">Index:</span> {embeddingDimension}d
                   </p>
                 )}
               </div>

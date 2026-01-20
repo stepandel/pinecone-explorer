@@ -1,165 +1,298 @@
-import { Metadata } from "chromadb"
+// Pinecone Explorer Types
 
-export type EmbeddingFunctionType =
-  | 'default'
+/**
+ * Supported embedding provider types
+ */
+export type EmbeddingProviderType =
   | 'openai'
-  | 'ollama'
   | 'cohere'
-  | 'google-gemini'
-  | 'jina'
-  | 'mistral'
-  | 'voyageai'
-  | 'together-ai'
-  | 'huggingface-server'
-  | 'cloudflare-worker-ai'
-  | 'morph'
-  | 'chroma-cloud-qwen'
-  | 'sentence-transformer'
+  | 'voyage'
+  | 'huggingface'
+  | 'ollama'
 
-export interface EmbeddingFunctionOverride {
-  type: EmbeddingFunctionType
-  modelName?: string // e.g., 'text-embedding-3-large', 'Xenova/all-MiniLM-L6-v2'
-  url?: string // For Ollama, HuggingFace Server
-  accountId?: string // For Cloudflare Workers AI
+/**
+ * Configuration for embedding generation
+ */
+export interface EmbeddingConfig {
+  provider: EmbeddingProviderType
+  modelName?: string
+  apiKeyEnvVar?: string // Environment variable name for API key
+  url?: string // For Ollama or custom endpoints
 }
 
+/**
+ * Connection profile for Pinecone
+ */
 export interface ConnectionProfile {
   id: string // UUID
-  name: string // User-friendly name (e.g., "Production Server")
+  name: string // User-friendly name (e.g., "Production")
 
-  // Connection URL (required)
-  url: string // e.g., "http://localhost:8000" or "https://api.trychroma.com"
-
-  // Optional fields for remote/cloud connections
-  tenant?: string // Chroma Cloud tenant ID
-  database?: string // Chroma Cloud database name
-  apiKey?: string // API key for authentication
+  // Pinecone authentication
+  apiKey: string // Pinecone API key
 
   createdAt: number // Timestamp
   lastUsed?: number // Timestamp
 
-  // Embedding function overrides per collection
-  embeddingOverrides?: Record<string, EmbeddingFunctionOverride>
+  // Default embedding config for this connection
+  defaultEmbeddingConfig?: EmbeddingConfig
+
+  // Per-index embedding overrides
+  embeddingOverrides?: Record<string, EmbeddingConfig>
 }
 
-export interface CollectionInfo {
+/**
+ * Pinecone index information
+ */
+export interface IndexInfo {
   name: string
+  dimension: number
+  metric: 'cosine' | 'euclidean' | 'dotproduct'
+  host: string
+  status: {
+    ready: boolean
+    state: string
+  }
+  spec: {
+    serverless?: {
+      cloud: 'aws' | 'gcp' | 'azure'
+      region: string
+    }
+    pod?: {
+      environment: string
+      podType: string
+      pods?: number
+      replicas?: number
+      shards?: number
+    }
+  }
+  deletionProtection?: 'enabled' | 'disabled'
+}
+
+/**
+ * Index statistics including namespace information
+ */
+export interface IndexStats {
+  namespaces: Record<string, { vectorCount: number }>
+  dimension: number
+  indexFullness: number
+  totalVectorCount: number
+}
+
+/**
+ * Vector record (equivalent to DocumentRecord in ChromaDB)
+ */
+export interface VectorRecord {
   id: string
-  metadata: Record<string, unknown> | null
-  count: number
-  dimension?: number | null
-  embeddingFunction?: {
-    name: string
-    type: 'known' | 'legacy' | 'unknown'
-    config?: Record<string, unknown>
-  } | null
+  values: number[] // The vector embedding
+  metadata?: Record<string, unknown> | null
+  sparseValues?: {
+    indices: number[]
+    values: number[]
+  }
+  score?: number // Only present in query results (similarity score)
 }
 
-export interface DocumentRecord {
+/**
+ * Parameters for querying vectors
+ */
+export interface QueryVectorsParams {
+  indexName: string
+  namespace?: string
+  vector?: number[] // Query vector
+  queryText?: string // Text to embed and query (requires embedding config)
+  topK?: number // Max results (default: 10)
+  filter?: Record<string, unknown> // Metadata filter
+  includeValues?: boolean // Include vector values in response
+  includeMetadata?: boolean // Include metadata in response
+}
+
+/**
+ * Query result from Pinecone
+ */
+export interface QueryResult {
+  matches: Array<{
+    id: string
+    score: number
+    values?: number[]
+    metadata?: Record<string, unknown>
+    sparseValues?: {
+      indices: number[]
+      values: number[]
+    }
+  }>
+  namespace: string
+  usage?: {
+    readUnits: number
+  }
+}
+
+/**
+ * Parameters for upserting vectors
+ */
+export interface UpsertVectorsParams {
+  indexName: string
+  namespace?: string
+  vectors: Array<{
+    id: string
+    values: number[]
+    metadata?: Record<string, unknown>
+    sparseValues?: {
+      indices: number[]
+      values: number[]
+    }
+  }>
+}
+
+/**
+ * Parameters for creating a vector (single upsert with optional text embedding)
+ */
+export interface CreateVectorParams {
+  indexName: string
+  namespace?: string
   id: string
-  document: string | null
-  metadata: Record<string, unknown> | null
-  embedding: number[] | null
-  distance?: number | null // Only present for semantic search results
+  values?: number[] // Provide embedding directly
+  text?: string // Or provide text to generate embedding
+  metadata?: Record<string, unknown>
+  generateEmbedding?: boolean // If true, generate embedding from text
 }
 
-export interface SearchDocumentsParams {
-  collectionName: string
-  queryText?: string // Triggers semantic search
-  nResults?: number // Max results (default: 10)
-  metadataFilter?: Record<string, any> // Where clause
-  ids?: string[] // Filter by specific IDs (no embedding function needed)
-  limit?: number // For get() pagination
-  offset?: number // For get() pagination
-}
-
-export interface UpdateDocumentParams {
-  collectionName: string
-  documentId: string
-  document?: string
-  metadata?: Metadata
-  embedding?: number[]
-  regenerateEmbedding?: boolean // If true, regenerate embedding from document text
-}
-
-export interface CreateDocumentParams {
-  collectionName: string
+/**
+ * Parameters for updating a vector
+ */
+export interface UpdateVectorParams {
+  indexName: string
+  namespace?: string
   id: string
-  document?: string
-  metadata?: Metadata
-  embedding?: number[]
-  generateEmbedding?: boolean // If true, generate embedding from document text
+  values?: number[] // New embedding values
+  metadata?: Record<string, unknown> // New metadata (merged with existing)
+  text?: string // New text to store in metadata
+  regenerateEmbedding?: boolean // If true, regenerate embedding from text
 }
 
-export interface DeleteDocumentsParams {
-  collectionName: string
+/**
+ * Parameters for deleting vectors
+ */
+export interface DeleteVectorsParams {
+  indexName: string
+  namespace?: string
+  ids?: string[] // Delete specific IDs
+  deleteAll?: boolean // Delete all vectors in namespace
+  filter?: Record<string, unknown> // Delete by metadata filter
+}
+
+/**
+ * Parameters for fetching vectors by ID
+ */
+export interface FetchVectorsParams {
+  indexName: string
+  namespace?: string
   ids: string[]
 }
 
-export interface CreateDocumentsBatchParams {
-  collectionName: string
-  documents: Array<{
+/**
+ * Parameters for listing vectors (paginated)
+ */
+export interface ListVectorsParams {
+  indexName: string
+  namespace?: string
+  prefix?: string // ID prefix filter
+  limit?: number // Max results per page
+  paginationToken?: string // Token for next page
+}
+
+/**
+ * List vectors result with pagination
+ */
+export interface ListVectorsResult {
+  vectors: Array<{ id: string }>
+  pagination?: {
+    next?: string
+  }
+  namespace: string
+  usage?: {
+    readUnits: number
+  }
+}
+
+/**
+ * Parameters for creating a new index
+ */
+export interface CreateIndexParams {
+  name: string
+  dimension: number
+  metric?: 'cosine' | 'euclidean' | 'dotproduct'
+  spec: {
+    serverless: {
+      cloud: 'aws' | 'gcp' | 'azure'
+      region: string
+    }
+  } | {
+    pod: {
+      environment: string
+      podType: string
+      pods?: number
+      replicas?: number
+      shards?: number
+    }
+  }
+  deletionProtection?: 'enabled' | 'disabled'
+}
+
+/**
+ * Parameters for batch import
+ */
+export interface BatchImportParams {
+  indexName: string
+  namespace?: string
+  vectors: Array<{
     id: string
-    document?: string
+    text?: string
     metadata?: Record<string, unknown>
+    values?: number[]
   }>
   generateEmbeddings?: boolean
 }
 
-export interface HNSWConfig {
-  space?: 'l2' | 'cosine' | 'ip'
-  efConstruction?: number
-  efSearch?: number
-  maxNeighbors?: number
-  numThreads?: number
-  batchSize?: number
-  syncThreshold?: number
-  resizeFactor?: number
+/**
+ * Batch import result
+ */
+export interface BatchImportResult {
+  upsertedCount: number
+  errors: string[]
 }
 
-export interface CreateCollectionParams {
-  name: string
-  embeddingFunction?: {
-    type: EmbeddingFunctionType
-    modelName?: string
-    url?: string // For Ollama, HuggingFace Server
-    accountId?: string // For Cloudflare Workers AI
-  }
-  metadata?: Record<string, unknown>
-  hnsw?: HNSWConfig
-  // Optional: create first document in same call
-  firstDocument?: {
-    id: string
-    document?: string
-    metadata?: Record<string, unknown>
-  }
+/**
+ * Parameters for cloning/copying an index
+ */
+export interface CloneIndexParams {
+  sourceIndexName: string
+  sourceNamespace?: string
+  targetIndexName: string
+  targetNamespace?: string
+  regenerateEmbeddings?: boolean
 }
 
-export interface CopyCollectionParams {
-  sourceCollectionName: string
-  targetName: string
-  embeddingFunction?: {
-    type: EmbeddingFunctionType
-    modelName?: string
-    url?: string // For Ollama, HuggingFace Server
-    accountId?: string // For Cloudflare Workers AI
-  }
-  hnsw?: HNSWConfig
-  metadata?: Record<string, unknown>
-  regenerateEmbeddings: boolean
+/**
+ * Clone progress tracking
+ */
+export interface CloneProgress {
+  phase: 'creating' | 'copying' | 'complete' | 'error' | 'cancelled'
+  totalVectors: number
+  processedVectors: number
+  message: string
 }
 
-export interface CopyCollectionResult {
+/**
+ * Clone result
+ */
+export interface CloneResult {
   success: boolean
-  collectionInfo?: CollectionInfo
-  totalDocuments: number
-  copiedDocuments: number
+  indexInfo?: IndexInfo
+  totalVectors: number
+  copiedVectors: number
   error?: string
 }
 
-export interface CopyProgress {
-  phase: 'creating' | 'copying' | 'complete' | 'error' | 'cancelled'
-  totalDocuments: number
-  processedDocuments: number
-  message: string
-}
+// Legacy type aliases for backwards compatibility during migration
+export type CollectionInfo = IndexInfo
+export type DocumentRecord = VectorRecord

@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { ConnectionProfile } from './types'
 import { ConnectionWindowData } from './window-types'
-import { chromaDBConnectionPool } from './chromadb-service'
+import { pineconeConnectionPool } from './pinecone-service'
 import { randomUUID } from 'crypto'
 import { settingsStore } from './settings-store'
 
@@ -93,7 +93,7 @@ class WindowManager {
       minimizable: false,
       maximizable: false,
       titleBarStyle: 'hiddenInset',
-      title: 'Chroma Explorer - Setup',
+      title: 'Pinecone Explorer - Setup',
       center: true,
       transparent: true,
       vibrancy: 'under-window',
@@ -223,7 +223,7 @@ class WindowManager {
       x: 100 + offset,
       y: 100 + offset,
       titleBarStyle: 'hiddenInset',
-      title: `Chroma Explorer - ${profile.name}`,
+      title: `Pinecone Explorer - ${profile.name}`,
       transparent: true,
       vibrancy: 'under-window',
       visualEffectState: 'active',
@@ -263,8 +263,8 @@ class WindowManager {
 
     // Handle window close
     win.on('closed', () => {
-      // Disconnect from ChromaDB connection pool (decrements refCount)
-      chromaDBConnectionPool.disconnect(profileId)
+      // Disconnect from Pinecone connection pool (decrements refCount)
+      pineconeConnectionPool.disconnect(profileId)
 
       // Remove from registry
       this.registry.connections.delete(windowId)

@@ -1,29 +1,19 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useChromaDB } from '../providers/ChromaDBProvider'
 import { useCollection } from './CollectionContext'
-import { useCollectionsQuery } from '../hooks/useChromaQueries'
-
-interface ServerEmbeddingConfig {
-  name: string
-  type: 'known' | 'legacy' | 'unknown'
-  config?: Record<string, unknown>
-}
 
 interface EmbeddingContextType {
-  // Server-side config from collection metadata
-  serverConfig: ServerEmbeddingConfig | null
+  // Client-side override (persisted per profile/index)
+  clientOverride: EmbeddingConfig | null
 
-  // Client-side override (persisted per profile/collection)
-  clientOverride: EmbeddingFunctionOverride | null
-
-  // The active config (client override takes precedence)
+  // The active config
   activeConfig: {
-    type: 'server' | 'client'
-    config: ServerEmbeddingConfig | EmbeddingFunctionOverride | null
+    type: 'client' | 'default'
+    config: EmbeddingConfig | null
   }
 
   // Actions
-  setOverride: (override: EmbeddingFunctionOverride) => Promise<void>
+  setOverride: (override: EmbeddingConfig) => Promise<void>
   clearOverride: () => Promise<void>
 
   // Loading state
@@ -35,16 +25,11 @@ const EmbeddingContext = createContext<EmbeddingContextType | undefined>(undefin
 export function EmbeddingProvider({ children }: { children: ReactNode }) {
   const { currentProfile } = useChromaDB()
   const { activeCollection } = useCollection()
-  const { data: collections = [] } = useCollectionsQuery(currentProfile?.id || null)
 
-  const [clientOverride, setClientOverride] = useState<EmbeddingFunctionOverride | null>(null)
+  const [clientOverride, setClientOverride] = useState<EmbeddingConfig | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Get server config from collection metadata
-  const currentCollection = collections.find(c => c.name === activeCollection)
-  const serverConfig: ServerEmbeddingConfig | null = currentCollection?.embeddingFunction || null
-
-  // Fetch client override when collection changes
+  // Fetch client override when index changes
   useEffect(() => {
     const fetchOverride = async () => {
       if (!currentProfile?.id || !activeCollection) {
@@ -70,7 +55,7 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
     fetchOverride()
   }, [currentProfile?.id, activeCollection])
 
-  const setOverride = useCallback(async (override: EmbeddingFunctionOverride) => {
+  const setOverride = useCallback(async (override: EmbeddingConfig) => {
     if (!currentProfile?.id || !activeCollection) return
 
     await window.electronAPI.profiles.setEmbeddingOverride(
@@ -91,15 +76,15 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
     setClientOverride(null)
   }, [currentProfile?.id, activeCollection])
 
-  // Determine active config
+  // Determine active config - use client override or profile default
+  const defaultConfig = currentProfile?.defaultEmbeddingConfig || null
   const activeConfig: EmbeddingContextType['activeConfig'] = clientOverride
     ? { type: 'client', config: clientOverride }
-    : { type: 'server', config: serverConfig }
+    : { type: 'default', config: defaultConfig }
 
   return (
     <EmbeddingContext.Provider
       value={{
-        serverConfig,
         clientOverride,
         activeConfig,
         setOverride,

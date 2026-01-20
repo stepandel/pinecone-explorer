@@ -4,8 +4,10 @@ import EmbeddingCell from './EmbeddingCell'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
 import { useUpdateDocumentMutation } from '../../hooks/useChromaQueries'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
-import { Metadata } from 'chromadb'
 import { TypedMetadataRecord, TypedMetadataField, MetadataValueType, validateMetadataValue } from '../../types/metadata'
+
+// Metadata type for Pinecone vectors
+type Metadata = Record<string, unknown>
 
 interface DocumentRecord {
   id: string
@@ -115,10 +117,10 @@ export default function DocumentDetailPanel({
     // Otherwise save metadata and/or embedding changes
     try {
       const updates: {
-        documentId: string
+        id: string
         metadata?: Metadata
-        embedding?: number[]
-      } = { documentId: document.id }
+        values?: number[]
+      } = { id: document.id }
 
       if (hasMetadataChanges && draftMetadata) {
         updates.metadata = draftMetadata as Metadata
@@ -130,7 +132,7 @@ export default function DocumentDetailPanel({
           setEmbeddingError('Embedding must be an array of numbers')
           return
         }
-        updates.embedding = parsed
+        updates.values = parsed
       }
 
       if (hasMetadataChanges || hasEmbeddingChanges) {
@@ -158,14 +160,14 @@ export default function DocumentDetailPanel({
   const handleRegenerateConfirm = async (regenerate: boolean) => {
     try {
       const updates: {
-        documentId: string
-        document?: string
+        id: string
+        text?: string
         metadata?: Metadata
-        embedding?: number[]
+        values?: number[]
         regenerateEmbedding?: boolean
       } = {
-        documentId: document.id,
-        document: draftDocument ?? undefined,
+        id: document.id,
+        text: draftDocument ?? undefined,
         regenerateEmbedding: regenerate,
       }
 
@@ -179,7 +181,7 @@ export default function DocumentDetailPanel({
         try {
           const parsed = JSON.parse(draftEmbedding)
           if (Array.isArray(parsed) && parsed.every((n) => typeof n === 'number')) {
-            updates.embedding = parsed
+            updates.values = parsed
           }
         } catch {
           // Ignore invalid embedding when saving with document

@@ -39,7 +39,6 @@ export function TopBar() {
         <span className="text-[12px] font-medium text-foreground/80">
           {currentProfile?.name || 'Connected'}
         </span>
-        <span className="text-[11px] text-foreground/40">{currentProfile?.url}</span>
       </div>
 
       {/* Right side - Panel toggles + Disconnect */}

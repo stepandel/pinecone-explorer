@@ -2,53 +2,15 @@ import Store from 'electron-store'
 import { app } from 'electron'
 import path from 'path'
 import { existsSync } from 'fs'
-import { ConnectionProfile, EmbeddingFunctionOverride } from './types'
+import { ConnectionProfile, EmbeddingConfig } from './types'
 import { getEncryptionKey } from './secure-key-manager'
-
-// Migrate data from legacy v1 store (hardcoded key) to v2 store (keychain)
-function migrateFromLegacyStore(newStore: Store<StoreSchema>): void {
-  // Only migrate if new store is empty
-  const currentProfiles = newStore.get('profiles', [])
-  if (currentProfiles.length > 0) return
-
-  // Check if legacy store file exists
-  const legacyPath = path.join(app.getPath('userData'), 'chroma-connections.json')
-  if (!existsSync(legacyPath)) return
-
-  try {
-    const legacyStore = new Store<StoreSchema>({
-      name: 'chroma-connections',
-      defaults: {
-        profiles: [],
-        lastActiveProfileId: null,
-        embeddingOverrides: {},
-      },
-      encryptionKey: 'chroma-explorer-obfuscation-key-v1',
-    })
-
-    const legacyProfiles = legacyStore.get('profiles', [])
-    const legacyLastActive = legacyStore.get('lastActiveProfileId', null)
-    const legacyOverrides = legacyStore.get('embeddingOverrides', {})
-
-    if (legacyProfiles.length > 0) {
-      console.log(`[ConnectionStore] Migrating ${legacyProfiles.length} profiles from legacy store`)
-      newStore.set('profiles', legacyProfiles)
-      newStore.set('lastActiveProfileId', legacyLastActive)
-      newStore.set('embeddingOverrides', legacyOverrides)
-      legacyStore.clear()
-      console.log('[ConnectionStore] Migration complete')
-    }
-  } catch (error) {
-    console.warn('[ConnectionStore] Could not migrate from legacy store:', error)
-  }
-}
 
 interface StoreSchema {
   profiles: ConnectionProfile[]
   lastActiveProfileId: string | null
-  // Store overrides separately so they persist even for unsaved profiles
-  // Key format: "profileId:collectionName"
-  embeddingOverrides: Record<string, EmbeddingFunctionOverride>
+  // Store embedding overrides separately so they persist even for unsaved profiles
+  // Key format: "profileId:indexName"
+  embeddingOverrides: Record<string, EmbeddingConfig>
 }
 
 // Lazy-initialized store (requires app to be ready for keychain access)
@@ -58,7 +20,7 @@ function getStore(): Store<StoreSchema> {
   if (!store) {
     try {
       store = new Store<StoreSchema>({
-        name: 'chroma-connections-v2',
+        name: 'pinecone-connections',
         defaults: {
           profiles: [],
           lastActiveProfileId: null,
@@ -70,13 +32,14 @@ function getStore(): Store<StoreSchema> {
       // Test if we can read the store (will throw if encryption key is wrong)
       store.get('profiles')
 
-      migrateFromLegacyStore(store)
+      // Migrate from old Chroma store if exists and new store is empty
+      migrateFromChromaStore(store)
     } catch (error) {
       console.error('[ConnectionStore] Failed to initialize store:', error)
 
-      // If decryption failed, the encryption key changed (e.g., keychain denied after previous allow)
+      // If decryption failed, the encryption key changed
       // Clear the corrupted store and start fresh
-      const storePath = path.join(app.getPath('userData'), 'chroma-connections-v2.json')
+      const storePath = path.join(app.getPath('userData'), 'pinecone-connections.json')
       if (existsSync(storePath)) {
         console.warn('[ConnectionStore] Removing corrupted store file to start fresh')
         try {
@@ -89,7 +52,7 @@ function getStore(): Store<StoreSchema> {
 
       // Create a fresh store
       store = new Store<StoreSchema>({
-        name: 'chroma-connections-v2',
+        name: 'pinecone-connections',
         defaults: {
           profiles: [],
           lastActiveProfileId: null,
@@ -102,9 +65,44 @@ function getStore(): Store<StoreSchema> {
   return store
 }
 
+/**
+ * Migrate data from old Chroma Explorer store if it exists
+ * Note: Only profile names are migrated; users need to re-enter Pinecone API keys
+ */
+function migrateFromChromaStore(newStore: Store<StoreSchema>): void {
+  // Only migrate if new store is empty
+  const currentProfiles = newStore.get('profiles', [])
+  if (currentProfiles.length > 0) return
+
+  // Check if legacy Chroma store file exists
+  const legacyPaths = [
+    path.join(app.getPath('userData'), 'chroma-connections-v2.json'),
+    path.join(app.getPath('userData'), 'chroma-connections.json'),
+  ]
+
+  for (const legacyPath of legacyPaths) {
+    if (!existsSync(legacyPath)) continue
+
+    try {
+      console.log(`[ConnectionStore] Found legacy Chroma store at ${legacyPath}`)
+
+      // We can't decrypt the old store (different encryption), so just log migration notice
+      console.log('[ConnectionStore] Note: Existing ChromaDB profiles cannot be automatically migrated.')
+      console.log('[ConnectionStore] Users will need to create new profiles with Pinecone API keys.')
+      break
+    } catch (error) {
+      console.warn('[ConnectionStore] Could not check legacy store:', error)
+    }
+  }
+}
+
 export class ConnectionStore {
   getProfiles(): ConnectionProfile[] {
     return getStore().get('profiles', [])
+  }
+
+  getProfile(id: string): ConnectionProfile | undefined {
+    return this.getProfiles().find((p) => p.id === id)
   }
 
   saveProfile(profile: ConnectionProfile): void {
@@ -130,6 +128,16 @@ export class ConnectionStore {
     if (this.getLastActiveProfileId() === id) {
       this.setLastActiveProfileId(null)
     }
+
+    // Clear any embedding overrides for this profile
+    const overrides = getStore().get('embeddingOverrides', {})
+    const newOverrides: Record<string, EmbeddingConfig> = {}
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!key.startsWith(`${id}:`)) {
+        newOverrides[key] = value
+      }
+    }
+    getStore().set('embeddingOverrides', newOverrides)
   }
 
   getLastActiveProfileId(): string | null {
@@ -140,24 +148,63 @@ export class ConnectionStore {
     getStore().set('lastActiveProfileId', id)
   }
 
-  getEmbeddingOverride(profileId: string, collectionName: string): EmbeddingFunctionOverride | null {
-    const key = `${profileId}:${collectionName}`
+  /**
+   * Get embedding override for a specific profile and index
+   */
+  getEmbeddingOverride(profileId: string, indexName: string): EmbeddingConfig | null {
+    const key = `${profileId}:${indexName}`
     const overrides = getStore().get('embeddingOverrides', {})
     return overrides[key] ?? null
   }
 
-  setEmbeddingOverride(profileId: string, collectionName: string, override: EmbeddingFunctionOverride): void {
-    const key = `${profileId}:${collectionName}`
+  /**
+   * Set embedding override for a specific profile and index
+   */
+  setEmbeddingOverride(profileId: string, indexName: string, override: EmbeddingConfig): void {
+    const key = `${profileId}:${indexName}`
     const overrides = getStore().get('embeddingOverrides', {})
     overrides[key] = override
     getStore().set('embeddingOverrides', overrides)
   }
 
-  clearEmbeddingOverride(profileId: string, collectionName: string): void {
-    const key = `${profileId}:${collectionName}`
+  /**
+   * Clear embedding override for a specific profile and index
+   */
+  clearEmbeddingOverride(profileId: string, indexName: string): void {
+    const key = `${profileId}:${indexName}`
     const overrides = getStore().get('embeddingOverrides', {})
     delete overrides[key]
     getStore().set('embeddingOverrides', overrides)
+  }
+
+  /**
+   * Get all embedding overrides for a profile
+   */
+  getProfileEmbeddingOverrides(profileId: string): Record<string, EmbeddingConfig> {
+    const overrides = getStore().get('embeddingOverrides', {})
+    const result: Record<string, EmbeddingConfig> = {}
+
+    for (const [key, value] of Object.entries(overrides)) {
+      if (key.startsWith(`${profileId}:`)) {
+        const indexName = key.substring(profileId.length + 1)
+        result[indexName] = value
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Update profile's default embedding config
+   */
+  setDefaultEmbeddingConfig(profileId: string, config: EmbeddingConfig | undefined): void {
+    const profiles = this.getProfiles()
+    const profile = profiles.find((p) => p.id === profileId)
+
+    if (profile) {
+      profile.defaultEmbeddingConfig = config
+      getStore().set('profiles', profiles)
+    }
   }
 }
 

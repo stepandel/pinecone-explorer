@@ -1,33 +1,33 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 
-interface CollectionClipboard {
-  type: 'collection'
-  collection: CollectionInfo
+interface IndexClipboard {
+  type: 'collection'  // Keep 'collection' for internal compatibility
+  collection: IndexInfo
   sourceProfileId: string
 }
 
-interface DocumentsClipboard {
-  type: 'documents'
+interface VectorsClipboard {
+  type: 'documents'  // Keep 'documents' for internal compatibility
   documents: Array<{
     id: string
-    document: string | null
+    document: string | null  // Will store text from metadata if available
     metadata: Record<string, unknown> | null
   }>
   sourceCollectionName: string
   sourceProfileId: string
 }
 
-type ClipboardItem = CollectionClipboard | DocumentsClipboard
+type ClipboardItem = IndexClipboard | VectorsClipboard
 
 interface ClipboardContextValue {
   clipboard: ClipboardItem | null
 
-  // Collection methods
-  copyCollection: (collection: CollectionInfo, profileId: string) => void
+  // Index methods (legacy name: collection)
+  copyCollection: (index: IndexInfo, profileId: string) => void
   hasCopiedCollection: boolean
 
-  // Document methods
-  copyDocuments: (documents: DocumentRecord[], collectionName: string, profileId: string) => void
+  // Vector methods (legacy name: documents)
+  copyDocuments: (vectors: VectorRecord[], indexName: string, profileId: string) => void
   hasCopiedDocuments: boolean
 
   // Shared
@@ -43,21 +43,22 @@ interface ClipboardProviderProps {
 export function ClipboardProvider({ children }: ClipboardProviderProps) {
   const [clipboard, setClipboard] = useState<ClipboardItem | null>(null)
 
-  const copyCollection = useCallback((collection: CollectionInfo, profileId: string) => {
-    setClipboard({ type: 'collection', collection, sourceProfileId: profileId })
+  const copyCollection = useCallback((index: IndexInfo, profileId: string) => {
+    setClipboard({ type: 'collection', collection: index, sourceProfileId: profileId })
   }, [])
 
-  const copyDocuments = useCallback((documents: DocumentRecord[], collectionName: string, profileId: string) => {
-    // Copy documents without embeddings (they'll be regenerated on paste)
-    const docsToClipboard = documents.map(doc => ({
-      id: doc.id,
-      document: doc.document,
-      metadata: doc.metadata,
+  const copyDocuments = useCallback((vectors: VectorRecord[], indexName: string, profileId: string) => {
+    // Copy vectors without embeddings (they'll be regenerated on paste)
+    // Store text from metadata.text if available
+    const vectorsToClipboard = vectors.map(vec => ({
+      id: vec.id,
+      document: (vec.metadata?.text as string) || null,
+      metadata: vec.metadata || null,
     }))
     setClipboard({
       type: 'documents',
-      documents: docsToClipboard,
-      sourceCollectionName: collectionName,
+      documents: vectorsToClipboard,
+      sourceCollectionName: indexName,
       sourceProfileId: profileId,
     })
   }, [])
