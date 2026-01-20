@@ -4,24 +4,25 @@ import { cn } from '@/lib/utils'
 
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
 
-interface DeleteCollectionDialogProps {
+interface DeleteNamespaceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  collectionName: string
-  documentCount: number
+  namespaceName: string
+  vectorCount: number
   onConfirm: () => void
   isDeleting: boolean
 }
 
-export function DeleteCollectionDialog({
+export function DeleteNamespaceDialog({
   open,
   onOpenChange,
-  collectionName,
-  documentCount,
+  namespaceName,
+  vectorCount,
   onConfirm,
   isDeleting,
-}: DeleteCollectionDialogProps) {
+}: DeleteNamespaceDialogProps) {
   const [confirmInput, setConfirmInput] = useState('')
+  const displayName = namespaceName || '(default)'
 
   // Reset input when dialog opens/closes
   useEffect(() => {
@@ -30,7 +31,7 @@ export function DeleteCollectionDialog({
     }
   }, [open])
 
-  const isConfirmValid = confirmInput === collectionName
+  const isConfirmValid = confirmInput === displayName
 
   const handleConfirm = () => {
     if (isConfirmValid) {
@@ -60,24 +61,24 @@ export function DeleteCollectionDialog({
           {/* Content */}
           <div className="px-5 pt-5 pb-4 text-center">
             <DialogPrimitive.Title className="text-[13px] font-semibold text-destructive">
-              Delete Collection
+              Delete Namespace
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="mt-2 text-[11px] text-muted-foreground leading-[1.4]">
-              This will permanently delete <span className="font-medium text-foreground">{collectionName}</span> and
-              all <span className="font-medium text-foreground">{documentCount}</span> document{documentCount !== 1 ? 's' : ''}.
+              This will permanently delete all <span className="font-medium text-foreground">{vectorCount.toLocaleString()}</span> vector{vectorCount !== 1 ? 's' : ''} in
+              the <span className="font-medium text-foreground">{displayName}</span> namespace.
               This action cannot be undone.
             </DialogPrimitive.Description>
 
             {/* Confirmation input */}
             <div className="mt-3">
               <label className="text-[10px] text-muted-foreground">
-                Type <span className="font-mono text-foreground">{collectionName}</span> to confirm
+                Type <span className="font-mono text-foreground">{displayName}</span> to confirm
               </label>
               <input
                 type="text"
                 value={confirmInput}
                 onChange={(e) => setConfirmInput(e.target.value)}
-                placeholder={collectionName}
+                placeholder={displayName}
                 className={cn(
                   "mt-1.5 w-full h-7 px-2 text-[11px] text-center",
                   "rounded-md border border-input bg-background/50",

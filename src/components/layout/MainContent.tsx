@@ -5,7 +5,7 @@ import { usePanel } from '../../context/PanelContext'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { IndexesPanel, INDEXES_PANEL_WIDTH } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
-import { CollectionConfigView } from '../collections/CollectionConfigView'
+import { IndexConfigView } from '../indexes/IndexConfigView'
 import DocumentsView from '../documents/DocumentsView'
 import DocumentDetailPanel from '../documents/DocumentDetailPanel'
 
@@ -117,7 +117,7 @@ export function MainContent() {
         style={{ paddingLeft: `${leftPadding}px`, paddingRight: `${rightPadding}px` }}
       >
         {draftCollection ? (
-          <CollectionConfigView />
+          <IndexConfigView />
         ) : showDocuments ? (
           <DocumentsView
             collectionName={activeIndex}

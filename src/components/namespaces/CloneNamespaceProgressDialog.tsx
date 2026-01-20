@@ -1,36 +1,39 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { cn } from '@/lib/utils'
 
-interface CopyProgressDialogProps {
+interface CloneNamespaceProgressDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  sourceCollectionName: string
-  targetCollectionName: string
+  sourceNamespace: string
+  targetNamespace: string
   progress: {
-    phase: 'creating' | 'copying' | 'complete' | 'error' | 'cancelled'
-    totalDocuments: number
-    processedDocuments: number
+    phase: 'preparing' | 'copying' | 'complete' | 'error' | 'cancelled'
+    totalVectors: number
+    processedVectors: number
     message: string
   }
   onCancel: () => void
 }
 
-export function CopyProgressDialog({
+export function CloneNamespaceProgressDialog({
   open,
   onOpenChange,
-  sourceCollectionName,
-  targetCollectionName,
+  sourceNamespace,
+  targetNamespace,
   progress,
   onCancel,
-}: CopyProgressDialogProps) {
-  const percentage = progress.totalDocuments > 0
-    ? Math.round((progress.processedDocuments / progress.totalDocuments) * 100)
+}: CloneNamespaceProgressDialogProps) {
+  const percentage = progress.totalVectors > 0
+    ? Math.round((progress.processedVectors / progress.totalVectors) * 100)
     : 0
+
+  const sourceDisplay = sourceNamespace || '(default)'
+  const targetDisplay = targetNamespace || '(default)'
 
   const isComplete = progress.phase === 'complete'
   const isError = progress.phase === 'error'
   const isCancelled = progress.phase === 'cancelled'
-  const isWorking = progress.phase === 'creating' || progress.phase === 'copying'
+  const isWorking = progress.phase === 'preparing' || progress.phase === 'copying'
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -52,17 +55,17 @@ export function CopyProgressDialog({
         >
           <div className="px-5 pt-5 pb-4 text-center">
             <DialogPrimitive.Title className="text-[13px] font-semibold text-foreground">
-              {isComplete ? 'Copy Complete' : isError ? 'Copy Failed' : isCancelled ? 'Copy Cancelled' : 'Copying Collection'}
+              {isComplete ? 'Clone Complete' : isError ? 'Clone Failed' : isCancelled ? 'Clone Cancelled' : 'Cloning Namespace'}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="mt-2 text-[11px] text-muted-foreground leading-[1.4]">
               {isComplete ? (
-                <>Copied <span className="font-medium text-foreground">{progress.processedDocuments}</span> documents to <span className="font-medium text-foreground">{targetCollectionName}</span></>
+                <>Copied <span className="font-medium text-foreground">{progress.processedVectors.toLocaleString()}</span> vectors to <span className="font-medium text-foreground">{targetDisplay}</span></>
               ) : isError ? (
                 <span className="text-destructive">{progress.message}</span>
               ) : isCancelled ? (
-                <>Copy was cancelled. <span className="font-medium text-foreground">{progress.processedDocuments}</span> of <span className="font-medium text-foreground">{progress.totalDocuments}</span> documents were copied.</>
+                <>Clone was cancelled. <span className="font-medium text-foreground">{progress.processedVectors.toLocaleString()}</span> of <span className="font-medium text-foreground">{progress.totalVectors.toLocaleString()}</span> vectors were copied.</>
               ) : (
-                <>Copying <span className="font-medium text-foreground">{sourceCollectionName}</span> to <span className="font-medium text-foreground">{targetCollectionName}</span></>
+                <>Cloning <span className="font-medium text-foreground">{sourceDisplay}</span> to <span className="font-medium text-foreground">{targetDisplay}</span></>
               )}
             </DialogPrimitive.Description>
 
