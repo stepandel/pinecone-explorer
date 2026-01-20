@@ -7,13 +7,12 @@ interface IndexClipboard {
 }
 
 interface VectorsClipboard {
-  type: 'documents'  // Keep 'documents' for internal compatibility
-  documents: Array<{
+  type: 'vectors'
+  vectors: Array<{
     id: string
-    document: string | null  // Will store text from metadata if available
     metadata: Record<string, unknown> | null
   }>
-  sourceCollectionName: string
+  sourceIndexName: string
   sourceProfileId: string
 }
 
@@ -26,9 +25,9 @@ interface ClipboardContextValue {
   copyCollection: (index: IndexInfo, profileId: string) => void
   hasCopiedCollection: boolean
 
-  // Vector methods (legacy name: documents)
-  copyDocuments: (vectors: VectorRecord[], indexName: string, profileId: string) => void
-  hasCopiedDocuments: boolean
+  // Vector methods
+  copyVectors: (vectors: VectorRecord[], indexName: string, profileId: string) => void
+  hasCopiedVectors: boolean
 
   // Shared
   clearClipboard: () => void
@@ -47,18 +46,16 @@ export function ClipboardProvider({ children }: ClipboardProviderProps) {
     setClipboard({ type: 'collection', collection: index, sourceProfileId: profileId })
   }, [])
 
-  const copyDocuments = useCallback((vectors: VectorRecord[], indexName: string, profileId: string) => {
+  const copyVectors = useCallback((vectors: VectorRecord[], indexName: string, profileId: string) => {
     // Copy vectors without embeddings (they'll be regenerated on paste)
-    // Store text from metadata.text if available
     const vectorsToClipboard = vectors.map(vec => ({
       id: vec.id,
-      document: (vec.metadata?.text as string) || null,
       metadata: vec.metadata || null,
     }))
     setClipboard({
-      type: 'documents',
-      documents: vectorsToClipboard,
-      sourceCollectionName: indexName,
+      type: 'vectors',
+      vectors: vectorsToClipboard,
+      sourceIndexName: indexName,
       sourceProfileId: profileId,
     })
   }, [])
@@ -71,8 +68,8 @@ export function ClipboardProvider({ children }: ClipboardProviderProps) {
     clipboard,
     copyCollection,
     hasCopiedCollection: clipboard?.type === 'collection',
-    copyDocuments,
-    hasCopiedDocuments: clipboard?.type === 'documents',
+    copyVectors,
+    hasCopiedVectors: clipboard?.type === 'vectors',
     clearClipboard,
   }
 

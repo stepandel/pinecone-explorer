@@ -7,21 +7,21 @@ interface PanelContextType {
   leftPanelWidth: number
   setLeftPanelWidth: (width: number) => void
 
-  // Right panel (DocumentDetailPanel) state
+  // Right panel (VectorDetailPanel) state
   rightPanelOpen: boolean
   setRightPanelOpen: (open: boolean) => void
   rightPanelWidth: number
   setRightPanelWidth: (width: number) => void
 
-  // Multi-select document state
-  selectedDocumentIds: Set<string>
-  primarySelectedDocumentId: string | null // Last selected, shown in detail panel
+  // Multi-select vector state
+  selectedVectorIds: Set<string>
+  primarySelectedVectorId: string | null // Last selected, shown in detail panel
   selectionAnchor: string | null // For shift+click range selection
 
   // Selection actions
-  selectDocument: (id: string) => void // Single select (clears others)
-  toggleDocumentSelection: (id: string) => void // ⌘+click toggle
-  selectDocumentRange: (ids: string[], newAnchor?: string) => void // Range select
+  selectVector: (id: string) => void // Single select (clears others)
+  toggleVectorSelection: (id: string) => void // ⌘+click toggle
+  selectVectorRange: (ids: string[], newAnchor?: string) => void // Range select
   addToSelection: (ids: string[]) => void // Add range to existing
   clearSelection: () => void
   setSelectionAnchor: (id: string | null) => void
@@ -34,44 +34,44 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [leftPanelWidth, setLeftPanelWidth] = useState(220)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
   const [rightPanelWidth, setRightPanelWidth] = useState(320)
-  const [selectedDocumentIds, setSelectedDocumentIds] = useState<Set<string>>(new Set())
-  const [primarySelectedDocumentId, setPrimarySelectedDocumentId] = useState<string | null>(null)
+  const [selectedVectorIds, setSelectedVectorIds] = useState<Set<string>>(new Set())
+  const [primarySelectedVectorId, setPrimarySelectedVectorId] = useState<string | null>(null)
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null)
 
   // Single select - clears all others, sets this as primary and anchor
-  const selectDocument = useCallback((id: string) => {
-    setSelectedDocumentIds(new Set([id]))
-    setPrimarySelectedDocumentId(id)
+  const selectVector = useCallback((id: string) => {
+    setSelectedVectorIds(new Set([id]))
+    setPrimarySelectedVectorId(id)
     setSelectionAnchor(id)
     setRightPanelOpen(true)
   }, [])
 
   // Toggle selection (⌘+click)
-  const toggleDocumentSelection = useCallback((id: string) => {
-    setSelectedDocumentIds(prev => {
+  const toggleVectorSelection = useCallback((id: string) => {
+    setSelectedVectorIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) {
         next.delete(id)
         // Update primary if we removed it
-        if (id === primarySelectedDocumentId) {
+        if (id === primarySelectedVectorId) {
           const remaining = Array.from(next)
-          setPrimarySelectedDocumentId(remaining.length > 0 ? remaining[remaining.length - 1] : null)
+          setPrimarySelectedVectorId(remaining.length > 0 ? remaining[remaining.length - 1] : null)
         }
       } else {
         next.add(id)
-        setPrimarySelectedDocumentId(id)
+        setPrimarySelectedVectorId(id)
       }
       // Open/close panel based on selection
       setRightPanelOpen(next.size > 0)
       return next
     })
     setSelectionAnchor(id)
-  }, [primarySelectedDocumentId])
+  }, [primarySelectedVectorId])
 
   // Range select (shift+click) - replaces selection with range
-  const selectDocumentRange = useCallback((ids: string[], newAnchor?: string) => {
-    setSelectedDocumentIds(new Set(ids))
-    setPrimarySelectedDocumentId(ids.length > 0 ? ids[ids.length - 1] : null)
+  const selectVectorRange = useCallback((ids: string[], newAnchor?: string) => {
+    setSelectedVectorIds(new Set(ids))
+    setPrimarySelectedVectorId(ids.length > 0 ? ids[ids.length - 1] : null)
     if (newAnchor !== undefined) {
       setSelectionAnchor(newAnchor)
     }
@@ -80,20 +80,20 @@ export function PanelProvider({ children }: { children: ReactNode }) {
 
   // Add to selection (⌘+shift+click) - adds range to existing
   const addToSelection = useCallback((ids: string[]) => {
-    setSelectedDocumentIds(prev => {
+    setSelectedVectorIds(prev => {
       const next = new Set([...prev, ...ids])
       return next
     })
     if (ids.length > 0) {
-      setPrimarySelectedDocumentId(ids[ids.length - 1])
+      setPrimarySelectedVectorId(ids[ids.length - 1])
       setRightPanelOpen(true)
     }
   }, [])
 
   // Clear all selection
   const clearSelection = useCallback(() => {
-    setSelectedDocumentIds(new Set())
-    setPrimarySelectedDocumentId(null)
+    setSelectedVectorIds(new Set())
+    setPrimarySelectedVectorId(null)
     setSelectionAnchor(null)
     setRightPanelOpen(false)
   }, [])
@@ -109,12 +109,12 @@ export function PanelProvider({ children }: { children: ReactNode }) {
         setRightPanelOpen,
         rightPanelWidth,
         setRightPanelWidth,
-        selectedDocumentIds,
-        primarySelectedDocumentId,
+        selectedVectorIds,
+        primarySelectedVectorId,
         selectionAnchor,
-        selectDocument,
-        toggleDocumentSelection,
-        selectDocumentRange,
+        selectVector,
+        toggleVectorSelection,
+        selectVectorRange,
         addToSelection,
         clearSelection,
         setSelectionAnchor,

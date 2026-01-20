@@ -3,31 +3,30 @@ import { usePinecone } from '../../providers/PineconeProvider'
 import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
-import DocumentsTable from './DocumentsTable'
+import VectorsTable from './VectorsTable'
 import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filters'
 import { TypedMetadataRecord, TypedMetadataField, typedMetadataToPineconeFormat, validateMetadataValue } from '../../types/metadata'
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
 import { FilterRow } from '../filters/FilterRow'
 
-interface DraftDocument {
+interface DraftVector {
   id: string
-  document: string
   metadata: TypedMetadataRecord
 }
 
-interface DocumentRecord {
+// Local VectorRecord for this view (maps from API's values to embedding for display)
+interface LocalVectorRecord {
   id: string
-  document: string | null
   metadata: Record<string, unknown> | null
   embedding: number[] | null
 }
 
-interface DocumentsViewProps {
+interface VectorsViewProps {
   collectionName: string
   namespace?: string
   // Multi-select props
-  selectedDocumentIds: Set<string>
-  primarySelectedDocumentId: string | null
+  selectedVectorIds: Set<string>
+  primarySelectedVectorId: string | null
   selectionAnchor: string | null
   onSingleSelect: (id: string) => void
   onToggleSelect: (id: string) => void
@@ -35,11 +34,11 @@ interface DocumentsViewProps {
   onAddToSelection: (ids: string[]) => void
   onClearSelection: () => void
   onSetSelectionAnchor: (id: string | null) => void
-  onSelectedDocumentChange: (document: DocumentRecord | null, isDraft: boolean) => void
+  onSelectedVectorChange: (vector: LocalVectorRecord | null, isDraft: boolean) => void
   // Expose draft change handler for external updates (e.g., from detail panel)
-  onExposeDraftHandler?: (handler: ((updates: { id?: string; document?: string; metadata?: Record<string, unknown> }) => void) | null) => void
-  // Callback to notify parent if current draft is for the first document (empty collection)
-  onIsFirstDocumentChange?: (isFirst: boolean) => void
+  onExposeDraftHandler?: (handler: ((updates: { id?: string; metadata?: Record<string, unknown> }) => void) | null) => void
+  // Callback to notify parent if current draft is for the first vector (empty collection)
+  onIsFirstVectorChange?: (isFirst: boolean) => void
 }
 
 function createDefaultFilterRow(): FilterRowType {
@@ -50,11 +49,11 @@ function createDefaultFilterRow(): FilterRowType {
   }
 }
 
-export default function DocumentsView({
+export default function VectorsView({
   collectionName,
   namespace,
-  selectedDocumentIds,
-  primarySelectedDocumentId,
+  selectedVectorIds,
+  primarySelectedVectorId,
   selectionAnchor,
   onSingleSelect,
   onToggleSelect,
@@ -62,26 +61,26 @@ export default function DocumentsView({
   onAddToSelection,
   onClearSelection,
   onSetSelectionAnchor,
-  onSelectedDocumentChange,
+  onSelectedVectorChange,
   onExposeDraftHandler,
-  onIsFirstDocumentChange,
-}: DocumentsViewProps) {
+  onIsFirstVectorChange,
+}: VectorsViewProps) {
   const { currentProfile } = usePinecone()
   const [filterRows, setFilterRows] = useState<FilterRowType[]>([createDefaultFilterRow()])
   const [nResults, setNResults] = useState(10)
 
-  // Draft documents state - supports single new document or multiple pasted documents
-  const [draftDocuments, setDraftDocuments] = useState<DraftDocument[]>([])
+  // Draft vectors state - supports single new vector or multiple pasted vectors
+  const [draftVectors, setDraftVectors] = useState<DraftVector[]>([])
 
-  // Validation error for draft documents
+  // Validation error for draft vectors
   const [draftError, setDraftError] = useState<string | null>(null)
 
   // Helper to check if we have drafts
-  const hasDrafts = draftDocuments.length > 0
+  const hasDrafts = draftVectors.length > 0
   // For backwards compatibility with single draft operations
-  const draftDocument = draftDocuments.length === 1 ? draftDocuments[0] : null
+  const draftVector = draftVectors.length === 1 ? draftVectors[0] : null
 
-  // Marked for deletion state (set of document IDs)
+  // Marked for deletion state (set of vector IDs)
   const [markedForDeletion, setMarkedForDeletion] = useState<Set<string>>(new Set())
 
   // Create vector mutation
@@ -109,7 +108,7 @@ export default function DocumentsView({
   )
 
   // Clipboard context
-  const { clipboard, copyDocuments, hasCopiedDocuments } = useClipboard()
+  const { clipboard, copyVectors, hasCopiedVectors } = useClipboard()
 
   // Fetch indexes to get the current index's info
   const { data: indexes = [] } = useIndexesQuery(currentProfile?.id || null)
@@ -159,7 +158,7 @@ export default function DocumentsView({
     setFilterRows([createDefaultFilterRow()])
     setNResults(10)
     setMarkedForDeletion(new Set())
-    setDraftDocuments([])
+    setDraftVectors([])
     setDraftError(null)
   }, [collectionName])
 
@@ -232,12 +231,11 @@ export default function DocumentsView({
     isFetching,
   } = useVectorsQuery(currentProfile?.id || null, collectionName, namespace)
 
-  // Map vectors to document-like format for backwards compatibility
-  const rawDocuments: DocumentRecord[] = useMemo(() => {
-    const vectors = queryData?.vectors ?? []
-    return vectors.map((vec: VectorRecord) => ({
+  // Map vectors to record format
+  const rawVectors: LocalVectorRecord[] = useMemo(() => {
+    const vecs = queryData?.vectors ?? []
+    return vecs.map((vec: VectorRecord) => ({
       id: vec.id,
-      document: (vec.metadata?.text as string) || null,
       metadata: vec.metadata || null,
       embedding: vec.values || null,
     }))
@@ -251,25 +249,25 @@ export default function DocumentsView({
   }, [filterRows])
 
   // Apply client-side ID filter (case-insensitive "includes" match)
-  const documents = useMemo(() => {
+  const vectors = useMemo(() => {
     if (!idFilterValue) {
-      return rawDocuments
+      return rawVectors
     }
-    return rawDocuments.filter((doc: DocumentRecord) =>
-      doc.id.toLowerCase().includes(idFilterValue)
+    return rawVectors.filter((vec: LocalVectorRecord) =>
+      vec.id.toLowerCase().includes(idFilterValue)
     )
-  }, [rawDocuments, idFilterValue])
+  }, [rawVectors, idFilterValue])
 
-  // Extract unique metadata fields from documents (needed for draft creation)
+  // Extract unique metadata fields from vectors (needed for draft creation)
   const metadataFields = useMemo(() => {
     const fields = new Set<string>()
-    documents.forEach((doc: DocumentRecord) => {
-      if (doc.metadata) {
-        Object.keys(doc.metadata).forEach(key => fields.add(key))
+    vectors.forEach((vec: LocalVectorRecord) => {
+      if (vec.metadata) {
+        Object.keys(vec.metadata).forEach(key => fields.add(key))
       }
     })
     return Array.from(fields).sort()
-  }, [documents])
+  }, [vectors])
 
   // Filter row handlers
   const handleFilterRowChange = useCallback((id: string, updates: Partial<FilterRowType>) => {
@@ -302,39 +300,38 @@ export default function DocumentsView({
     (row.type === 'select' && row.selectValue?.trim())
   )
 
-  // Draft document handlers
+  // Draft vector handlers
   const handleStartCreate = useCallback(() => {
     const newId = crypto.randomUUID()
-    // Check if this is the first document (collection is empty)
-    const isFirstDocument = documents.length === 0
-    // Initialize metadata with same keys as existing documents (empty values)
-    // If first document, start with empty metadata (user will add fields)
+    // Check if this is the first vector (collection is empty)
+    const isFirstVector = vectors.length === 0
+    // Initialize metadata with same keys as existing vectors (empty values)
+    // If first vector, start with empty metadata (user will add fields)
     const initialMetadata: TypedMetadataRecord = {}
-    if (!isFirstDocument) {
-      // Infer types from existing documents
+    if (!isFirstVector) {
+      // Infer types from existing vectors
       metadataFields.forEach(key => {
-        // Find the first document with this metadata key to infer type
-        const existingDoc = documents.find((d: DocumentRecord) => d.metadata && key in d.metadata)
-        const existingValue = existingDoc?.metadata?.[key]
+        // Find the first vector with this metadata key to infer type
+        const existingVec = vectors.find((v: LocalVectorRecord) => v.metadata && key in v.metadata)
+        const existingValue = existingVec?.metadata?.[key]
         let inferredType: 'string' | 'number' | 'boolean' = 'string'
         if (typeof existingValue === 'number') inferredType = 'number'
         else if (typeof existingValue === 'boolean') inferredType = 'boolean'
         initialMetadata[key] = { value: '', type: inferredType }
       })
     }
-    setDraftDocuments([{
+    setDraftVectors([{
       id: newId,
-      document: '',
       metadata: initialMetadata,
     }])
     // Select the draft so it shows in the detail panel
     onSingleSelect(newId)
-    // Notify parent about first document status
-    onIsFirstDocumentChange?.(isFirstDocument)
-  }, [onSingleSelect, metadataFields, documents.length, onIsFirstDocumentChange])
+    // Notify parent about first vector status
+    onIsFirstVectorChange?.(isFirstVector)
+  }, [onSingleSelect, metadataFields, vectors.length, onIsFirstVectorChange])
 
-  const handleDraftChange = useCallback((draft: DraftDocument, index: number = 0) => {
-    setDraftDocuments(prev => {
+  const handleDraftChange = useCallback((draft: DraftVector, index: number = 0) => {
+    setDraftVectors(prev => {
       const next = [...prev]
       next[index] = draft
       return next
@@ -343,18 +340,17 @@ export default function DocumentsView({
   }, [])
 
   // Handler for external draft updates (from detail panel) - only works for single draft
-  const handleExternalDraftUpdate = useCallback((updates: { id?: string; document?: string; metadata?: Record<string, unknown> }) => {
-    setDraftDocuments((prev) => {
+  const handleExternalDraftUpdate = useCallback((updates: { id?: string; metadata?: Record<string, unknown> }) => {
+    setDraftVectors((prev) => {
       if (prev.length !== 1) return prev
       const newId = updates.id !== undefined ? updates.id : prev[0].id
       return [{
         ...prev[0],
         id: newId,
-        document: updates.document !== undefined ? updates.document : prev[0].document,
         metadata: updates.metadata !== undefined ? (updates.metadata as TypedMetadataRecord) : prev[0].metadata,
       }]
     })
-    // Also update the primary selected document ID if ID changed
+    // Also update the primary selected vector ID if ID changed
     if (updates.id !== undefined) {
       onSingleSelect(updates.id)
     }
@@ -364,33 +360,26 @@ export default function DocumentsView({
   // Expose the draft update handler to parent (only for single draft)
   useEffect(() => {
     if (onExposeDraftHandler) {
-      onExposeDraftHandler(draftDocuments.length === 1 ? handleExternalDraftUpdate : null)
+      onExposeDraftHandler(draftVectors.length === 1 ? handleExternalDraftUpdate : null)
     }
-  }, [onExposeDraftHandler, draftDocuments.length, handleExternalDraftUpdate])
+  }, [onExposeDraftHandler, draftVectors.length, handleExternalDraftUpdate])
 
   const handleCancelDraft = useCallback(() => {
-    setDraftDocuments([])
+    setDraftVectors([])
     setDraftError(null)
     onClearSelection() // Deselect when cancelling
-    onIsFirstDocumentChange?.(false) // Reset first document flag
-  }, [onClearSelection, onIsFirstDocumentChange])
+    onIsFirstVectorChange?.(false) // Reset first vector flag
+  }, [onClearSelection, onIsFirstVectorChange])
 
   const handleSaveDraft = useCallback(async () => {
-    if (draftDocuments.length === 0) return
+    if (draftVectors.length === 0) return
     setDraftError(null)
 
     // Validate all drafts
-    for (let i = 0; i < draftDocuments.length; i++) {
-      const draft = draftDocuments[i]
+    for (let i = 0; i < draftVectors.length; i++) {
+      const draft = draftVectors[i]
       if (!draft.id.trim()) {
-        setDraftError(`Document ${i + 1}: ID is required`)
-        return
-      }
-
-      // Document text is required (Pinecone needs content to generate embeddings)
-      const documentText = draft.document?.trim()
-      if (!documentText) {
-        setDraftError(`Document ${i + 1}: Document text is required`)
+        setDraftError(`Vector ${i + 1}: ID is required`)
         return
       }
 
@@ -400,7 +389,7 @@ export default function DocumentsView({
           const typedField = field as TypedMetadataField
           const error = validateMetadataValue(typedField.value, typedField.type)
           if (error) {
-            setDraftError(`Document ${i + 1} - Metadata "${key}": ${error}`)
+            setDraftError(`Vector ${i + 1} - Metadata "${key}": ${error}`)
             return
           }
         }
@@ -408,44 +397,42 @@ export default function DocumentsView({
     }
 
     try {
-      if (draftDocuments.length === 1) {
-        // Single document - use single create mutation
-        const draft = draftDocuments[0]
+      if (draftVectors.length === 1) {
+        // Single vector - use single create mutation
+        const draft = draftVectors[0]
         const metadata = typedMetadataToPineconeFormat(draft.metadata)
         await createMutation.mutateAsync({
           id: draft.id,
-          text: draft.document.trim(),
           metadata,
-          generateEmbedding: true,
+          generateEmbedding: false,
         })
       } else {
-        // Multiple documents - use batch import mutation
-        const vectorsToCreate = draftDocuments.map(draft => ({
+        // Multiple vectors - use batch import mutation
+        const vectorsToCreate = draftVectors.map(draft => ({
           id: draft.id,
-          text: draft.document.trim(),
           metadata: typedMetadataToPineconeFormat(draft.metadata),
         }))
         await createBatchMutation.mutateAsync({
           vectors: vectorsToCreate,
-          generateEmbeddings: true,
+          generateEmbeddings: false,
         })
       }
-      setDraftDocuments([])
+      setDraftVectors([])
       setDraftError(null)
       onClearSelection() // Deselect after saving
-      onIsFirstDocumentChange?.(false) // Reset first document flag
+      onIsFirstVectorChange?.(false) // Reset first vector flag
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create document(s)'
+      const message = error instanceof Error ? error.message : 'Failed to create vector(s)'
       setDraftError(message)
     }
-  }, [draftDocuments, createMutation, createBatchMutation, onClearSelection, onIsFirstDocumentChange])
+  }, [draftVectors, createMutation, createBatchMutation, onClearSelection, onIsFirstVectorChange])
 
-  // Toggle deletion mark for all selected documents
+  // Toggle deletion mark for all selected vectors
   const handleToggleDeletion = useCallback(() => {
-    if (selectedDocumentIds.size === 0) return
+    if (selectedVectorIds.size === 0) return
     // Filter out drafts from selection
-    const draftIds = new Set(draftDocuments.map(d => d.id))
-    const idsToMark = Array.from(selectedDocumentIds).filter(
+    const draftIds = new Set(draftVectors.map(d => d.id))
+    const idsToMark = Array.from(selectedVectorIds).filter(
       id => !draftIds.has(id)
     )
     if (idsToMark.length === 0) return
@@ -463,7 +450,7 @@ export default function DocumentsView({
       }
       return next
     })
-  }, [selectedDocumentIds, draftDocuments])
+  }, [selectedVectorIds, draftVectors])
 
   // Commit deletions
   const handleCommitDeletions = useCallback(async () => {
@@ -471,63 +458,63 @@ export default function DocumentsView({
 
     try {
       await deleteMutation.mutateAsync(Array.from(markedForDeletion))
-      // Clear marked items and clear selection if any selected docs were deleted
-      const deletedSelected = Array.from(selectedDocumentIds).some(id => markedForDeletion.has(id))
+      // Clear marked items and clear selection if any selected vectors were deleted
+      const deletedSelected = Array.from(selectedVectorIds).some(id => markedForDeletion.has(id))
       if (deletedSelected) {
         onClearSelection()
       }
       setMarkedForDeletion(new Set())
     } catch (error) {
-      console.error('Failed to delete documents:', error)
+      console.error('Failed to delete vectors:', error)
     }
-  }, [markedForDeletion, deleteMutation, selectedDocumentIds, onClearSelection])
+  }, [markedForDeletion, deleteMutation, selectedVectorIds, onClearSelection])
 
-  // Copy selected documents to clipboard
-  const handleCopyDocuments = useCallback(() => {
-    if (selectedDocumentIds.size === 0 || !currentProfile?.id) return
-    // Filter out drafts from selection and get document data
-    const draftIds = new Set(draftDocuments.map((d: DraftDocument) => d.id))
-    const docsToCopy = documents.filter(
-      (doc: DocumentRecord) => selectedDocumentIds.has(doc.id) && !draftIds.has(doc.id)
+  // Copy selected vectors to clipboard
+  const handleCopyVectors = useCallback(() => {
+    if (selectedVectorIds.size === 0 || !currentProfile?.id) return
+    // Filter out drafts from selection and get vector data
+    const draftIds = new Set(draftVectors.map((d: DraftVector) => d.id))
+    const vecsToCopy = vectors.filter(
+      (vec: LocalVectorRecord) => selectedVectorIds.has(vec.id) && !draftIds.has(vec.id)
     )
-    if (docsToCopy.length === 0) return
-    // Convert to VectorRecord format for clipboard
-    const vectorsToCopy: VectorRecord[] = docsToCopy.map((doc: DocumentRecord) => ({
-      id: doc.id,
-      values: doc.embedding || [],
-      metadata: doc.metadata || undefined,
+    if (vecsToCopy.length === 0) return
+    // Convert to global VectorRecord format for clipboard
+    const vectorsToCopy: VectorRecord[] = vecsToCopy.map((vec: LocalVectorRecord) => ({
+      id: vec.id,
+      values: vec.embedding || [],
+      metadata: vec.metadata || undefined,
     }))
-    copyDocuments(vectorsToCopy, collectionName, currentProfile.id)
-  }, [selectedDocumentIds, documents, draftDocuments, collectionName, currentProfile?.id, copyDocuments])
+    copyVectors(vectorsToCopy, collectionName, currentProfile.id)
+  }, [selectedVectorIds, vectors, draftVectors, collectionName, currentProfile?.id, copyVectors])
 
   // Resolve ID conflicts for pasting
   const resolveConflictingIds = useCallback((
-    documentsToPaste: Array<{ id: string; document: string | null; metadata: Record<string, unknown> | null }>,
+    vectorsToPaste: Array<{ id: string; metadata: Record<string, unknown> | null }>,
     existingIds: Set<string>
   ) => {
     const usedIds = new Set(existingIds)
-    return documentsToPaste.map(doc => {
-      let newId = doc.id
+    return vectorsToPaste.map(vec => {
+      let newId = vec.id
       let copyNum = 0
 
       while (usedIds.has(newId)) {
         copyNum++
         newId = copyNum === 1
-          ? `${doc.id}-copy`
-          : `${doc.id}-copy-${copyNum}`
+          ? `${vec.id}-copy`
+          : `${vec.id}-copy-${copyNum}`
       }
 
       usedIds.add(newId)
-      return { ...doc, id: newId }
+      return { ...vec, id: newId }
     })
   }, [])
 
-  // Infer metadata field types from existing documents
+  // Infer metadata field types from existing vectors
   const inferMetadataTypes = useCallback((): Record<string, 'string' | 'number' | 'boolean'> => {
     const types: Record<string, 'string' | 'number' | 'boolean'> = {}
-    documents.forEach((doc: DocumentRecord) => {
-      if (doc.metadata) {
-        Object.entries(doc.metadata).forEach(([key, value]) => {
+    vectors.forEach((vec: LocalVectorRecord) => {
+      if (vec.metadata) {
+        Object.entries(vec.metadata).forEach(([key, value]) => {
           if (!(key in types)) {
             if (typeof value === 'number') types[key] = 'number'
             else if (typeof value === 'boolean') types[key] = 'boolean'
@@ -537,34 +524,34 @@ export default function DocumentsView({
       }
     })
     return types
-  }, [documents])
+  }, [vectors])
 
-  // Paste documents from clipboard - creates draft documents for review
-  const handlePasteDocuments = useCallback(() => {
-    if (!clipboard || clipboard.type !== 'documents' || !currentProfile?.id) return
+  // Paste vectors from clipboard - creates draft vectors for review
+  const handlePasteVectors = useCallback(() => {
+    if (!clipboard || clipboard.type !== 'vectors' || !currentProfile?.id) return
     if (hasDrafts) return // Don't paste if there are already drafts
 
-    // Get existing document IDs (including any current drafts)
-    const existingIds = new Set<string>(documents.map((d: DocumentRecord) => d.id))
+    // Get existing vector IDs (including any current drafts)
+    const existingIds = new Set<string>(vectors.map((v: LocalVectorRecord) => v.id))
 
     // Resolve any ID conflicts
-    const resolvedDocs = resolveConflictingIds(clipboard.documents, existingIds)
+    const resolvedVecs = resolveConflictingIds(clipboard.vectors, existingIds)
 
-    // Infer metadata types from existing documents
+    // Infer metadata types from existing vectors
     const existingTypes = inferMetadataTypes()
 
-    // Convert to draft documents with proper metadata typing
-    const drafts: DraftDocument[] = resolvedDocs.map(doc => {
+    // Convert to draft vectors with proper metadata typing
+    const drafts: DraftVector[] = resolvedVecs.map(vec => {
       const typedMetadata: TypedMetadataRecord = {}
 
-      // Process each metadata field from the pasted document
-      if (doc.metadata) {
-        Object.entries(doc.metadata).forEach(([key, value]) => {
+      // Process each metadata field from the pasted vector
+      if (vec.metadata) {
+        Object.entries(vec.metadata).forEach(([key, value]) => {
           const expectedType = existingTypes[key]
           const actualType = typeof value
 
           if (expectedType) {
-            // We have a type expectation from existing documents
+            // We have a type expectation from existing vectors
             if (
               (expectedType === 'number' && actualType === 'number') ||
               (expectedType === 'boolean' && actualType === 'boolean') ||
@@ -577,7 +564,7 @@ export default function DocumentsView({
               typedMetadata[key] = { value: '', type: expectedType }
             }
           } else {
-            // New metadata key not in existing documents - infer type from value
+            // New metadata key not in existing vectors - infer type from value
             let inferredType: 'string' | 'number' | 'boolean' = 'string'
             if (actualType === 'number') inferredType = 'number'
             else if (actualType === 'boolean') inferredType = 'boolean'
@@ -586,7 +573,7 @@ export default function DocumentsView({
         })
       }
 
-      // Add any metadata fields that exist in the collection but not in the pasted document
+      // Add any metadata fields that exist in the collection but not in the pasted vector
       Object.entries(existingTypes).forEach(([key, type]) => {
         if (!(key in typedMetadata)) {
           typedMetadata[key] = { value: '', type }
@@ -594,40 +581,38 @@ export default function DocumentsView({
       })
 
       return {
-        id: doc.id,
-        document: doc.document || '',
+        id: vec.id,
         metadata: typedMetadata,
       }
     })
 
-    setDraftDocuments(drafts)
+    setDraftVectors(drafts)
     // Select the first draft
     if (drafts.length > 0) {
       onSingleSelect(drafts[0].id)
     }
-  }, [clipboard, currentProfile?.id, documents, hasDrafts, resolveConflictingIds, inferMetadataTypes, onSingleSelect])
+  }, [clipboard, currentProfile?.id, vectors, hasDrafts, resolveConflictingIds, inferMetadataTypes, onSingleSelect])
 
-  // Context menu handler for document row
-  const handleDocumentContextMenu = useCallback((e: React.MouseEvent, documentId: string) => {
+  // Context menu handler for vector row
+  const handleVectorContextMenu = useCallback((e: React.MouseEvent, vectorId: string) => {
     e.preventDefault()
     e.stopPropagation()
-    window.electronAPI.contextMenu.showVectorMenu(documentId, { hasCopiedVectors: hasCopiedDocuments })
-  }, [hasCopiedDocuments])
+    window.electronAPI.contextMenu.showVectorMenu(vectorId, { hasCopiedVectors: hasCopiedVectors })
+  }, [hasCopiedVectors])
 
   // Context menu handler for empty space in table
   const handleTableContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    window.electronAPI.contextMenu.showVectorsPanelMenu({ hasCopiedVectors: hasCopiedDocuments })
-  }, [hasCopiedDocuments])
+    window.electronAPI.contextMenu.showVectorsPanelMenu({ hasCopiedVectors: hasCopiedVectors })
+  }, [hasCopiedVectors])
 
-  // Inline document update handler
-  const handleInlineDocumentUpdate = useCallback(async (
-    documentId: string,
-    updates: { document?: string; metadata?: Record<string, unknown> }
+  // Inline vector update handler
+  const handleInlineVectorUpdate = useCallback(async (
+    vectorId: string,
+    updates: { metadata?: Record<string, unknown> }
   ) => {
     await updateMutation.mutateAsync({
-      id: documentId,
-      text: updates.document,
+      id: vectorId,
       metadata: updates.metadata as Record<string, string | number | boolean> | undefined,
     })
   }, [updateMutation])
@@ -636,9 +621,9 @@ export default function DocumentsView({
   useEffect(() => {
     const unsubscribe = window.electronAPI.contextMenu.onVectorAction((data: { action: string; vectorId?: string }) => {
       if (data.action === 'copy') {
-        handleCopyDocuments()
+        handleCopyVectors()
       } else if (data.action === 'paste') {
-        handlePasteDocuments()
+        handlePasteVectors()
       } else if (data.action === 'delete' && data.vectorId) {
         // Select and mark for deletion
         onSingleSelect(data.vectorId)
@@ -646,15 +631,15 @@ export default function DocumentsView({
       }
     })
     return unsubscribe
-  }, [handleCopyDocuments, handlePasteDocuments, onSingleSelect])
+  }, [handleCopyVectors, handlePasteVectors, onSingleSelect])
 
-  // Select all documents handler
-  const handleSelectAllDocuments = useCallback(() => {
-    if (documents.length > 0) {
-      const allIds = documents.map((d: DocumentRecord) => d.id)
+  // Select all vectors handler
+  const handleSelectAllVectors = useCallback(() => {
+    if (vectors.length > 0) {
+      const allIds = vectors.map((v: LocalVectorRecord) => v.id)
       onRangeSelect(allIds, allIds[0])
     }
-  }, [documents, onRangeSelect])
+  }, [vectors, onRangeSelect])
 
   // Clear all filters handler
   const handleClearAllFilters = useCallback(() => {
@@ -667,31 +652,31 @@ export default function DocumentsView({
 
   // Menu event listeners (from native app menu)
   useEffect(() => {
-    // New document
-    const handleMenuNewDocument = () => {
+    // New vector
+    const handleMenuNewVector = () => {
       handleStartCreate()
     }
 
     // Delete selected
     const handleMenuDeleteSelected = () => {
-      if (selectedDocumentIds.size > 0 && !hasDrafts) {
+      if (selectedVectorIds.size > 0 && !hasDrafts) {
         handleToggleDeletion()
       }
     }
 
-    // Copy documents
-    const handleMenuCopyDocuments = () => {
-      handleCopyDocuments()
+    // Copy vectors
+    const handleMenuCopyVectors = () => {
+      handleCopyVectors()
     }
 
-    // Paste documents
-    const handleMenuPasteDocuments = () => {
-      handlePasteDocuments()
+    // Paste vectors
+    const handleMenuPasteVectors = () => {
+      handlePasteVectors()
     }
 
-    // Select all documents
+    // Select all vectors
     const handleMenuSelectAll = () => {
-      handleSelectAllDocuments()
+      handleSelectAllVectors()
     }
 
     // Focus search
@@ -718,47 +703,47 @@ export default function DocumentsView({
       }
     }
 
-    // Edit document
-    const handleMenuEditDocument = () => {
+    // Edit vector
+    const handleMenuEditVector = () => {
       // This triggers inline editing - implementation depends on your table structure
-      // For now, we'll dispatch a custom event that DocumentsTable can listen to
-      if (primarySelectedDocumentId) {
-        window.dispatchEvent(new CustomEvent('menu:trigger-edit', { detail: { documentId: primarySelectedDocumentId } }))
+      // For now, we'll dispatch a custom event that VectorsTable can listen to
+      if (primarySelectedVectorId) {
+        window.dispatchEvent(new CustomEvent('menu:trigger-edit', { detail: { vectorId: primarySelectedVectorId } }))
       }
     }
 
     // Listen for menu events dispatched from useMenuHandlers
-    window.addEventListener('menu:new-document', handleMenuNewDocument)
+    window.addEventListener('menu:new-document', handleMenuNewVector)
     window.addEventListener('menu:delete-selected', handleMenuDeleteSelected)
-    window.addEventListener('menu:copy-documents', handleMenuCopyDocuments)
-    window.addEventListener('menu:paste-documents', handleMenuPasteDocuments)
+    window.addEventListener('menu:copy-documents', handleMenuCopyVectors)
+    window.addEventListener('menu:paste-documents', handleMenuPasteVectors)
     window.addEventListener('menu:select-all-documents', handleMenuSelectAll)
     window.addEventListener('menu:focus-search', handleMenuFocusSearch)
     window.addEventListener('menu:clear-filters', handleMenuClearFilters)
     window.addEventListener('menu:configure-embedding', handleMenuConfigureEmbedding)
-    window.addEventListener('menu:edit-document', handleMenuEditDocument)
+    window.addEventListener('menu:edit-document', handleMenuEditVector)
 
     return () => {
-      window.removeEventListener('menu:new-document', handleMenuNewDocument)
+      window.removeEventListener('menu:new-document', handleMenuNewVector)
       window.removeEventListener('menu:delete-selected', handleMenuDeleteSelected)
-      window.removeEventListener('menu:copy-documents', handleMenuCopyDocuments)
-      window.removeEventListener('menu:paste-documents', handleMenuPasteDocuments)
+      window.removeEventListener('menu:copy-documents', handleMenuCopyVectors)
+      window.removeEventListener('menu:paste-documents', handleMenuPasteVectors)
       window.removeEventListener('menu:select-all-documents', handleMenuSelectAll)
       window.removeEventListener('menu:focus-search', handleMenuFocusSearch)
       window.removeEventListener('menu:clear-filters', handleMenuClearFilters)
       window.removeEventListener('menu:configure-embedding', handleMenuConfigureEmbedding)
-      window.removeEventListener('menu:edit-document', handleMenuEditDocument)
+      window.removeEventListener('menu:edit-document', handleMenuEditVector)
     }
   }, [
     handleStartCreate,
-    selectedDocumentIds,
+    selectedVectorIds,
     hasDrafts,
     handleToggleDeletion,
-    handleCopyDocuments,
-    handlePasteDocuments,
-    handleSelectAllDocuments,
+    handleCopyVectors,
+    handlePasteVectors,
+    handleSelectAllVectors,
     handleClearAllFilters,
-    primarySelectedDocumentId,
+    primarySelectedVectorId,
   ])
 
   // Keyboard shortcuts - using centralized SHORTCUTS definitions
@@ -794,50 +779,49 @@ export default function DocumentsView({
         e.preventDefault()
         handleToggleDeletion()
       }
-      // Command+C to copy selected documents (but not if text is selected - let native copy work)
-      if (matchesShortcut(e, SHORTCUTS.COPY_DOCUMENTS) && selectedDocumentIds.size > 0 && !hasDrafts && !isInputting && !hasTextSelection) {
+      // Command+C to copy selected vectors (but not if text is selected - let native copy work)
+      if (matchesShortcut(e, SHORTCUTS.COPY_DOCUMENTS) && selectedVectorIds.size > 0 && !hasDrafts && !isInputting && !hasTextSelection) {
         e.preventDefault()
-        handleCopyDocuments()
+        handleCopyVectors()
       }
-      // Command+V to paste documents
-      if (matchesShortcut(e, SHORTCUTS.PASTE_DOCUMENTS) && hasCopiedDocuments && !hasDrafts && !isInputting) {
+      // Command+V to paste vectors
+      if (matchesShortcut(e, SHORTCUTS.PASTE_DOCUMENTS) && hasCopiedVectors && !hasDrafts && !isInputting) {
         e.preventDefault()
-        handlePasteDocuments()
+        handlePasteVectors()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [hasDrafts, handleSaveDraft, handleCancelDraft, handleToggleDeletion, handleCommitDeletions, markedForDeletion, selectedDocumentIds, handleCopyDocuments, handlePasteDocuments, hasCopiedDocuments])
+  }, [hasDrafts, handleSaveDraft, handleCancelDraft, handleToggleDeletion, handleCommitDeletions, markedForDeletion, selectedVectorIds, handleCopyVectors, handlePasteVectors, hasCopiedVectors])
 
-  // Find primary selected document for drawer (check drafts first, then existing documents)
-  const selectedDocument: DocumentRecord | null = useMemo(() => {
-    if (!primarySelectedDocumentId) return null
+  // Find primary selected vector for drawer (check drafts first, then existing vectors)
+  const selectedVector: LocalVectorRecord | null = useMemo(() => {
+    if (!primarySelectedVectorId) return null
 
     // Check if a draft is selected
-    const selectedDraft = draftDocuments.find(d => d.id === primarySelectedDocumentId)
+    const selectedDraft = draftVectors.find(d => d.id === primarySelectedVectorId)
     if (selectedDraft) {
       // Include metadata if there are any keys, even with empty values
       const hasMetadataKeys = Object.keys(selectedDraft.metadata).length > 0
       return {
         id: selectedDraft.id,
-        document: selectedDraft.document || null,
         metadata: hasMetadataKeys ? selectedDraft.metadata : null,
         embedding: null,
       }
     }
 
-    // Check existing documents
-    return documents.find((doc: DocumentRecord) => doc.id === primarySelectedDocumentId) || null
-  }, [primarySelectedDocumentId, draftDocuments, documents])
+    // Check existing vectors
+    return vectors.find((vec: LocalVectorRecord) => vec.id === primarySelectedVectorId) || null
+  }, [primarySelectedVectorId, draftVectors, vectors])
 
-  // Check if selected document is a draft
-  const isDraft = draftDocuments.some(d => d.id === primarySelectedDocumentId)
+  // Check if selected vector is a draft
+  const isDraft = draftVectors.some(d => d.id === primarySelectedVectorId)
 
-  // Notify parent when selected document changes
+  // Notify parent when selected vector changes
   useEffect(() => {
-    onSelectedDocumentChange(selectedDocument, isDraft)
-  }, [selectedDocument, isDraft, onSelectedDocumentChange])
+    onSelectedVectorChange(selectedVector, isDraft)
+  }, [selectedVector, isDraft, onSelectedVectorChange])
 
   return (
     <div className="flex flex-col h-full">
@@ -859,7 +843,7 @@ export default function DocumentsView({
             </div>
           </div>
           <span className="text-xs text-muted-foreground flex-shrink-0">
-            {!loading && !error && `${documents.length} record${documents.length !== 1 ? 's' : ''}`}
+            {!loading && !error && `${vectors.length} vector${vectors.length !== 1 ? 's' : ''}`}
           </span>
         </div>
 
@@ -891,23 +875,23 @@ export default function DocumentsView({
           background: 'var(--canvas-background)',
         }}
       >
-        <DocumentsTable
-          documents={documents}
+        <VectorsTable
+          vectors={vectors}
           loading={loading}
           error={error ? (error as Error).message : null}
           hasActiveFilters={hasActiveFilters}
-          selectedDocumentIds={selectedDocumentIds}
+          selectedVectorIds={selectedVectorIds}
           selectionAnchor={selectionAnchor}
           onSingleSelect={onSingleSelect}
           onToggleSelect={onToggleSelect}
           onRangeSelect={onRangeSelect}
           onAddToSelection={onAddToSelection}
-          draftDocuments={draftDocuments}
+          draftVectors={draftVectors}
           onDraftChange={handleDraftChange}
           onDraftCancel={handleCancelDraft}
           markedForDeletion={markedForDeletion}
-          onDocumentUpdate={handleInlineDocumentUpdate}
-          onDocumentContextMenu={handleDocumentContextMenu}
+          onVectorUpdate={handleInlineVectorUpdate}
+          onVectorContextMenu={handleVectorContextMenu}
           onTableContextMenu={handleTableContextMenu}
         />
       </div>
@@ -918,7 +902,7 @@ export default function DocumentsView({
           onClick={handleStartCreate}
           disabled={hasDrafts || markedForDeletion.size > 0}
           className="h-6 w-6 p-0 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Add document"
+          title="Add vector"
         >
           +
         </button>
@@ -928,7 +912,7 @@ export default function DocumentsView({
               <span className="text-[11px] text-destructive">{draftError}</span>
             )}
             <span className="text-[11px] text-muted-foreground">
-              {draftDocuments.length} document{draftDocuments.length !== 1 ? 's' : ''} to add
+              {draftVectors.length} vector{draftVectors.length !== 1 ? 's' : ''} to add
             </span>
             <div className="flex gap-2">
               <button
@@ -940,10 +924,10 @@ export default function DocumentsView({
               </button>
               <button
                 onClick={handleSaveDraft}
-                disabled={createMutation.isPending || createBatchMutation.isPending || draftDocuments.some(d => !d.id.trim())}
+                disabled={createMutation.isPending || createBatchMutation.isPending || draftVectors.some(d => !d.id.trim())}
                 className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(createMutation.isPending || createBatchMutation.isPending) ? 'Saving...' : (draftDocuments.length === 1 ? 'Save' : 'Save All')}
+                {(createMutation.isPending || createBatchMutation.isPending) ? 'Saving...' : (draftVectors.length === 1 ? 'Save' : 'Save All')}
               </button>
             </div>
           </div>

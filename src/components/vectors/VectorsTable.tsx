@@ -6,79 +6,75 @@ import {
   flexRender,
   ColumnResizeMode,
 } from '@tanstack/react-table'
-import EmbeddingCell from './EmbeddingCell'
 import { TypedMetadataRecord } from '../../types/metadata'
 
-interface DocumentRecord {
+interface VectorRecord {
   id: string
-  document: string | null
   metadata: Record<string, unknown> | null
   embedding: number[] | null
   distance?: number | null
 }
 
-interface DraftDocument {
+interface DraftVector {
   id: string
-  document: string
   metadata: TypedMetadataRecord
 }
 
 interface EditingState {
-  documentId: string
-  document: string
+  vectorId: string
   metadata: Record<string, unknown>
 }
 
-interface DocumentsTableProps {
-  documents: DocumentRecord[]
+interface VectorsTableProps {
+  vectors: VectorRecord[]
   loading: boolean
   error: string | null
   hasActiveFilters?: boolean
   // Multi-select props
-  selectedDocumentIds: Set<string>
+  selectedVectorIds: Set<string>
   selectionAnchor: string | null
   onSingleSelect: (id: string) => void
   onToggleSelect: (id: string) => void
   onRangeSelect: (ids: string[], newAnchor?: string) => void
   onAddToSelection: (ids: string[]) => void
   // Draft props - supports multiple drafts for paste operations
-  draftDocuments?: DraftDocument[]
-  onDraftChange?: (draft: DraftDocument, index: number) => void
+  draftVectors?: DraftVector[]
+  onDraftChange?: (draft: DraftVector, index: number) => void
   onDraftCancel?: () => void
   markedForDeletion?: Set<string>
   // Inline editing props
-  onDocumentUpdate?: (documentId: string, updates: { document?: string; metadata?: Record<string, unknown> }) => Promise<void>
+  onVectorUpdate?: (vectorId: string, updates: { metadata?: Record<string, unknown> }) => Promise<void>
   // Context menu props
-  onDocumentContextMenu?: (e: React.MouseEvent, documentId: string) => void
+  onVectorContextMenu?: (e: React.MouseEvent, vectorId: string) => void
   onTableContextMenu?: (e: React.MouseEvent) => void
 }
 
-export default function DocumentsTable({
-  documents,
+export default function VectorsTable({
+  vectors,
   loading,
   error,
   hasActiveFilters = false,
-  selectedDocumentIds,
+  selectedVectorIds,
   selectionAnchor,
   onSingleSelect,
   onToggleSelect,
   onRangeSelect,
   onAddToSelection,
-  draftDocuments = [],
+  draftVectors = [],
   onDraftChange,
   onDraftCancel,
   markedForDeletion = new Set(),
-  onDocumentUpdate,
-  onDocumentContextMenu,
+  onVectorUpdate,
+  onVectorContextMenu,
   onTableContextMenu,
-}: DocumentsTableProps) {
+}: VectorsTableProps) {
   // Ref for auto-focusing the id input when draft starts
   const draftIdInputRef = useRef<HTMLInputElement>(null)
   const prevDraftCountRef = useRef<number>(0)
 
   // Auto-focus only when drafts are first created (not on every change)
   useEffect(() => {
-    const currentDraftCount = draftDocuments.length
+    const currentDraftCount = draftVectors.length
     const prevDraftCount = prevDraftCountRef.current
 
     // Only focus if we just created drafts (went from 0 to having drafts)
@@ -87,19 +83,18 @@ export default function DocumentsTable({
     }
 
     prevDraftCountRef.current = currentDraftCount
-  }, [draftDocuments.length])
+  }, [draftVectors.length])
 
   // Inline editing state
   const [editingState, setEditingState] = useState<EditingState | null>(null)
   const editingInputRef = useRef<HTMLInputElement>(null)
 
-  // Start editing a document
-  const startEditing = (doc: DocumentRecord) => {
-    if (!onDocumentUpdate) return
+  // Start editing a vector
+  const startEditing = (vec: VectorRecord) => {
+    if (!onVectorUpdate) return
     setEditingState({
-      documentId: doc.id,
-      document: doc.document || '',
-      metadata: doc.metadata ? { ...doc.metadata } : {},
+      vectorId: vec.id,
+      metadata: vec.metadata ? { ...vec.metadata } : {},
     })
   }
 
@@ -110,51 +105,45 @@ export default function DocumentsTable({
 
   // Save editing changes
   const saveEditing = async () => {
-    if (!editingState || !onDocumentUpdate) return
-    const originalDoc = documents.find(d => d.id === editingState.documentId)
-    if (!originalDoc) return
+    if (!editingState || !onVectorUpdate) return
+    const originalVec = vectors.find(v => v.id === editingState.vectorId)
+    if (!originalVec) return
 
     // Check if there are actual changes
-    const hasDocChanges = editingState.document !== (originalDoc.document || '')
-    const hasMetaChanges = JSON.stringify(editingState.metadata) !== JSON.stringify(originalDoc.metadata || {})
+    const hasMetaChanges = JSON.stringify(editingState.metadata) !== JSON.stringify(originalVec.metadata || {})
 
-    if (hasDocChanges || hasMetaChanges) {
+    if (hasMetaChanges) {
       try {
-        await onDocumentUpdate(editingState.documentId, {
-          document: hasDocChanges ? editingState.document : undefined,
+        await onVectorUpdate(editingState.vectorId, {
           metadata: hasMetaChanges ? editingState.metadata : undefined,
         })
       } catch (error) {
-        console.error('Failed to update document:', error)
+        console.error('Failed to update vector:', error)
       }
     }
     setEditingState(null)
   }
 
   // Handle editing field change
-  const handleEditChange = (field: 'document' | string, value: string) => {
+  const handleEditChange = (field: string, value: string) => {
     if (!editingState) return
-    if (field === 'document') {
-      setEditingState({ ...editingState, document: value })
-    } else {
-      // Metadata field - try to preserve original type
-      const originalDoc = documents.find(d => d.id === editingState.documentId)
-      const originalValue = originalDoc?.metadata?.[field]
-      let parsedValue: unknown = value
+    // Metadata field - try to preserve original type
+    const originalVec = vectors.find(v => v.id === editingState.vectorId)
+    const originalValue = originalVec?.metadata?.[field]
+    let parsedValue: unknown = value
 
-      if (typeof originalValue === 'number') {
-        const num = Number(value)
-        if (!isNaN(num)) parsedValue = num
-      } else if (typeof originalValue === 'boolean') {
-        if (value.toLowerCase() === 'true') parsedValue = true
-        else if (value.toLowerCase() === 'false') parsedValue = false
-      }
-
-      setEditingState({
-        ...editingState,
-        metadata: { ...editingState.metadata, [field]: parsedValue },
-      })
+    if (typeof originalValue === 'number') {
+      const num = Number(value)
+      if (!isNaN(num)) parsedValue = num
+    } else if (typeof originalValue === 'boolean') {
+      if (value.toLowerCase() === 'true') parsedValue = true
+      else if (value.toLowerCase() === 'false') parsedValue = false
     }
+
+    setEditingState({
+      ...editingState,
+      metadata: { ...editingState.metadata, [field]: parsedValue },
+    })
   }
 
   // Handle keyboard events in editing mode
@@ -174,79 +163,79 @@ export default function DocumentsTable({
       editingInputRef.current.focus()
       editingInputRef.current.select()
     }
-  }, [editingState?.documentId])
+  }, [editingState?.vectorId])
 
   // Drag selection state
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartIndex, setDragStartIndex] = useState<number | null>(null)
 
-  // Get all document IDs including drafts at the top
-  const allDocIds = useMemo(() => {
+  // Get all vector IDs including drafts at the top
+  const allVecIds = useMemo(() => {
     const ids: string[] = []
-    // Add all draft document IDs first
-    ids.push(...draftDocuments.map(d => d.id))
-    ids.push(...documents.map(d => d.id))
+    // Add all draft vector IDs first
+    ids.push(...draftVectors.map(v => v.id))
+    ids.push(...vectors.map(v => v.id))
     return ids
-  }, [documents, draftDocuments])
+  }, [vectors, draftVectors])
 
   // Handle row click with modifier keys (macOS-style)
-  const handleRowClick = (e: React.MouseEvent, docId: string, rowIndex: number) => {
+  const handleRowClick = (e: React.MouseEvent, vecId: string, rowIndex: number) => {
     // Prevent text selection during click
     e.preventDefault()
 
     if (e.metaKey && e.shiftKey) {
       // ⌘+Shift+Click: Add range to existing selection
       if (selectionAnchor) {
-        const anchorIndex = allDocIds.indexOf(selectionAnchor)
+        const anchorIndex = allVecIds.indexOf(selectionAnchor)
         if (anchorIndex !== -1) {
           const start = Math.min(anchorIndex, rowIndex)
           const end = Math.max(anchorIndex, rowIndex)
-          const rangeIds = allDocIds.slice(start, end + 1)
+          const rangeIds = allVecIds.slice(start, end + 1)
           onAddToSelection(rangeIds)
           return
         }
       }
       // No anchor, just add this one
-      onToggleSelect(docId)
+      onToggleSelect(vecId)
     } else if (e.shiftKey) {
       // Shift+Click: Range select (replace selection)
       if (selectionAnchor) {
-        const anchorIndex = allDocIds.indexOf(selectionAnchor)
+        const anchorIndex = allVecIds.indexOf(selectionAnchor)
         if (anchorIndex !== -1) {
           const start = Math.min(anchorIndex, rowIndex)
           const end = Math.max(anchorIndex, rowIndex)
-          const rangeIds = allDocIds.slice(start, end + 1)
+          const rangeIds = allVecIds.slice(start, end + 1)
           onRangeSelect(rangeIds)
           return
         }
       }
       // No anchor, just select this one
-      onSingleSelect(docId)
+      onSingleSelect(vecId)
     } else if (e.metaKey) {
       // ⌘+Click: Toggle this row in selection
-      onToggleSelect(docId)
+      onToggleSelect(vecId)
     } else {
       // Plain click: Select only this row, or deselect if already the only selected
-      if (selectedDocumentIds.has(docId) && selectedDocumentIds.size === 1) {
+      if (selectedVectorIds.has(vecId) && selectedVectorIds.size === 1) {
         // Already selected and it's the only one - deselect
-        onToggleSelect(docId)
+        onToggleSelect(vecId)
       } else {
-        onSingleSelect(docId)
+        onSingleSelect(vecId)
       }
     }
   }
 
   // Handle double-click to start inline editing
-  const handleRowDoubleClick = (e: React.MouseEvent, docId: string) => {
+  const handleRowDoubleClick = (e: React.MouseEvent, vecId: string) => {
     e.preventDefault()
     e.stopPropagation()
-    // Find the document and start editing
-    const doc = documents.find(d => d.id === docId)
-    if (doc && onDocumentUpdate) {
-      startEditing(doc)
+    // Find the vector and start editing
+    const vec = vectors.find(v => v.id === vecId)
+    if (vec && onVectorUpdate) {
+      startEditing(vec)
     }
     // Also select the row
-    onSingleSelect(docId)
+    onSingleSelect(vecId)
   }
 
   // Drag selection handlers
@@ -262,8 +251,8 @@ export default function DocumentsTable({
     if (isDragging && dragStartIndex !== null) {
       const start = Math.min(dragStartIndex, rowIndex)
       const end = Math.max(dragStartIndex, rowIndex)
-      const rangeIds = allDocIds.slice(start, end + 1)
-      onRangeSelect(rangeIds, allDocIds[dragStartIndex])
+      const rangeIds = allVecIds.slice(start, end + 1)
+      onRangeSelect(rangeIds, allVecIds[dragStartIndex])
     }
   }
 
@@ -277,27 +266,27 @@ export default function DocumentsTable({
     return () => window.removeEventListener('mouseup', handleMouseUp)
   }, [])
 
-  // Extract all unique metadata keys from documents
+  // Extract all unique metadata keys from vectors
   const metadataKeys = useMemo(() =>
     Array.from(
       new Set(
-        documents.flatMap(doc =>
-          doc.metadata ? Object.keys(doc.metadata) : []
+        vectors.flatMap(vec =>
+          vec.metadata ? Object.keys(vec.metadata) : []
         )
       )
     ).sort(),
-    [documents]
+    [vectors]
   )
 
-  // Check if any documents have distance scores (semantic search results)
+  // Check if any vectors have distance scores (semantic search results)
   const hasDistances = useMemo(() =>
-    documents.some(doc => doc.distance !== undefined && doc.distance !== null),
-    [documents]
+    vectors.some(vec => vec.distance !== undefined && vec.distance !== null),
+    [vectors]
   )
 
   // Define columns
-  const columns = useMemo<ColumnDef<DocumentRecord>[]>(() => {
-    const baseColumns: ColumnDef<DocumentRecord>[] = []
+  const columns = useMemo<ColumnDef<VectorRecord>[]>(() => {
+    const baseColumns: ColumnDef<VectorRecord>[] = []
 
     // Add distance column only when we have semantic search results
     if (hasDistances) {
@@ -316,36 +305,19 @@ export default function DocumentsTable({
       })
     }
 
-    baseColumns.push(
-      {
-        accessorKey: 'id',
-        header: 'id',
-        size: 200,
-        cell: info => (
-          <div className="text-xs font-mono text-foreground">
-            {info.getValue() as string}
-          </div>
-        ),
-      },
-      {
-        accessorKey: 'document',
-        header: 'document',
-        size: 300,
-        cell: info => {
-          const value = info.getValue() as string | null
-          return (
-            <div className="text-xs text-foreground">
-              <div className="line-clamp-2">
-                {value || <span className="text-muted-foreground italic">No document</span>}
-              </div>
-            </div>
-          )
-        },
-      },
-    )
+    baseColumns.push({
+      accessorKey: 'id',
+      header: 'id',
+      size: 250,
+      cell: info => (
+        <div className="text-xs font-mono text-foreground">
+          {info.getValue() as string}
+        </div>
+      ),
+    })
 
     // Add dynamic metadata columns
-    const metadataColumns: ColumnDef<DocumentRecord>[] = metadataKeys.map(key => ({
+    const metadataColumns: ColumnDef<VectorRecord>[] = metadataKeys.map(key => ({
       id: `metadata.${key}`,
       header: key,
       size: 150,
@@ -378,7 +350,7 @@ export default function DocumentsTable({
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange')
 
   const table = useReactTable({
-    data: documents,
+    data: vectors,
     columns,
     columnResizeMode,
     getCoreRowModel: getCoreRowModel(),
@@ -388,7 +360,7 @@ export default function DocumentsTable({
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-muted-foreground">
-          {hasActiveFilters ? 'Searching documents...' : 'Loading documents...'}
+          {hasActiveFilters ? 'Searching vectors...' : 'Loading vectors...'}
         </div>
       </div>
     )
@@ -421,15 +393,15 @@ export default function DocumentsTable({
     )
   }
 
-  if (documents.length === 0) {
+  if (vectors.length === 0) {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
-          <h3 className="text-foreground font-semibold text-lg mb-2">No Documents Found</h3>
+          <h3 className="text-foreground font-semibold text-lg mb-2">No Vectors Found</h3>
           <p className="text-muted-foreground">
             {hasActiveFilters
-              ? 'No documents match your filters. Try adjusting your search criteria.'
-              : "This collection doesn't have any documents yet."}
+              ? 'No vectors match your filters. Try adjusting your search criteria.'
+              : "This namespace doesn't have any vectors yet."}
           </p>
         </div>
       </div>
@@ -469,15 +441,14 @@ export default function DocumentsTable({
           ))}
         </thead>
         <tbody className="select-none">
-          {/* Draft rows for creating/pasting documents */}
-          {draftDocuments.length > 0 && onDraftChange && draftDocuments.map((draft, draftIndex) => {
+          {/* Draft rows for creating/pasting vectors */}
+          {draftVectors.length > 0 && onDraftChange && draftVectors.map((draft, draftIndex) => {
             // Column indices depend on whether distance column is shown
             const idColIndex = hasDistances ? 1 : 0
-            const docColIndex = hasDistances ? 2 : 1
             return (
             <tr
               key={`draft-${draftIndex}`}
-              className={`cursor-pointer ${selectedDocumentIds.has(draft.id) ? 'bg-primary/15 dark:bg-primary/25' : 'bg-primary/5 dark:bg-primary/10'}`}
+              className={`cursor-pointer ${selectedVectorIds.has(draft.id) ? 'bg-primary/15 dark:bg-primary/25' : 'bg-primary/5 dark:bg-primary/10'}`}
               onClick={(e) => handleRowClick(e, draft.id, draftIndex)}
               onDoubleClick={(e) => handleRowDoubleClick(e, draft.id)}
               onMouseDown={(e) => handleMouseDown(e, draftIndex)}
@@ -502,21 +473,8 @@ export default function DocumentsTable({
                   type="text"
                   value={draft.id}
                   onChange={(e) => onDraftChange({ ...draft, id: e.target.value }, draftIndex)}
-                  placeholder="Enter document ID"
+                  placeholder="Enter vector ID"
                   className="w-full text-xs font-mono bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/50"
-                />
-              </td>
-              {/* Document cell - editable */}
-              <td
-                className="pl-3 py-0.5 align-top "
-                style={{ width: table.getHeaderGroups()[0]?.headers[docColIndex]?.getSize() }}
-              >
-                <input
-                  type="text"
-                  value={draft.document}
-                  onChange={(e) => onDraftChange({ ...draft, document: e.target.value }, draftIndex)}
-                  placeholder="Enter document text"
-                  className="w-full text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/50"
                 />
               </td>
               {/* Editable metadata cells */}
@@ -548,13 +506,13 @@ export default function DocumentsTable({
             </tr>
           )})}
           {table.getRowModel().rows.map((row, index) => {
-            const isSelected = selectedDocumentIds.has(row.original.id)
+            const isSelected = selectedVectorIds.has(row.original.id)
             const isMarkedForDeletion = markedForDeletion.has(row.original.id)
-            const isEditing = editingState?.documentId === row.original.id
+            const isEditing = editingState?.vectorId === row.original.id
             // Adjust index for alternating colors when drafts exist
-            const draftCount = draftDocuments.length
+            const draftCount = draftVectors.length
             const adjustedIndex = draftCount > 0 ? index + draftCount : index
-            // Row index in allDocIds (drafts take indices 0 to draftCount-1)
+            // Row index in allVecIds (drafts take indices 0 to draftCount-1)
             const rowIndex = draftCount > 0 ? index + draftCount : index
 
             // Determine row background - calmer, macOS-style selection with subtle zebra
@@ -571,7 +529,6 @@ export default function DocumentsTable({
 
             // Column indices depend on whether distance column is shown
             const idColIndex = hasDistances ? 1 : 0
-            const docColIndex = hasDistances ? 2 : 1
 
             // Render editing row
             if (isEditing && editingState) {
@@ -579,7 +536,7 @@ export default function DocumentsTable({
                 <tr
                   key={row.id}
                   className={`transition-colors cursor-pointer ${rowBgClass}`}
-                  onContextMenu={(e) => onDocumentContextMenu?.(e, row.original.id)}
+                  onContextMenu={(e) => onVectorContextMenu?.(e, row.original.id)}
                 >
                   {/* Distance cell - display only when distance column is visible */}
                   {hasDistances && (
@@ -603,23 +560,8 @@ export default function DocumentsTable({
                       {row.original.id}
                     </div>
                   </td>
-                  {/* Document cell - editable */}
-                  <td
-                    className="pl-3 py-0.5 align-top "
-                    style={{ width: table.getHeaderGroups()[0]?.headers[docColIndex]?.getSize() }}
-                  >
-                    <input
-                      ref={editingInputRef}
-                      type="text"
-                      value={editingState.document}
-                      onChange={(e) => handleEditChange('document', e.target.value)}
-                      onKeyDown={handleEditKeyDown}
-                      onBlur={saveEditing}
-                      className="w-full text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground"
-                    />
-                  </td>
                   {/* Editable metadata cells */}
-                  {metadataKeys.map(key => {
+                  {metadataKeys.map((key, keyIndex) => {
                     const value = editingState.metadata[key]
                     const displayValue = value !== undefined && value !== null ? String(value) : ''
                     return (
@@ -628,6 +570,7 @@ export default function DocumentsTable({
                         className="pl-3 py-0.5 align-top "
                       >
                         <input
+                          ref={keyIndex === 0 ? editingInputRef : undefined}
                           type="text"
                           value={displayValue}
                           onChange={(e) => handleEditChange(key, e.target.value)}
@@ -654,7 +597,7 @@ export default function DocumentsTable({
                 onDoubleClick={(e) => handleRowDoubleClick(e, row.original.id)}
                 onMouseDown={(e) => handleMouseDown(e, rowIndex)}
                 onMouseEnter={() => handleMouseEnter(rowIndex)}
-                onContextMenu={(e) => onDocumentContextMenu?.(e, row.original.id)}
+                onContextMenu={(e) => onVectorContextMenu?.(e, row.original.id)}
               >
                 {row.getVisibleCells().map(cell => (
                   <td

@@ -9,33 +9,31 @@ import { TypedMetadataRecord, TypedMetadataField, MetadataValueType, validateMet
 // Metadata type for Pinecone vectors
 type Metadata = Record<string, unknown>
 
-interface DocumentRecord {
+interface VectorRecord {
   id: string
-  document: string | null
   metadata: Record<string, unknown> | null
   embedding: number[] | null
 }
 
-interface DocumentDetailPanelProps {
-  document: DocumentRecord
+interface VectorDetailPanelProps {
+  vector: VectorRecord
   collectionName: string
   profileId: string
   isDraft?: boolean
-  isFirstDocument?: boolean
-  onDraftChange?: (updates: { id?: string; document?: string; metadata?: Record<string, unknown> }) => void
+  isFirstVector?: boolean
+  onDraftChange?: (updates: { id?: string; metadata?: Record<string, unknown> }) => void
 }
 
-export default function DocumentDetailPanel({
-  document,
+export default function VectorDetailPanel({
+  vector,
   collectionName,
   profileId,
   isDraft = false,
-  isFirstDocument = false,
+  isFirstVector = false,
   onDraftChange,
-}: DocumentDetailPanelProps) {
+}: VectorDetailPanelProps) {
   // Draft state
-  const [draftDocument, setDraftDocument] = useState(document.document)
-  const [draftMetadata, setDraftMetadata] = useState(document.metadata)
+  const [draftMetadata, setDraftMetadata] = useState(vector.metadata)
   const [draftEmbedding, setDraftEmbedding] = useState<string>('')
   const [embeddingError, setEmbeddingError] = useState<string | null>(null)
   const [isEditingEmbedding, setIsEditingEmbedding] = useState(false)
@@ -73,54 +71,44 @@ export default function DocumentDetailPanel({
   }, [draftEmbedding, isEditingEmbedding])
 
   // Check if there are unsaved changes
-  // For drafts (new documents), always consider dirty since they need to be saved
-  const hasDocumentChanges = draftDocument !== document.document
-  const hasMetadataChanges = JSON.stringify(draftMetadata) !== JSON.stringify(document.metadata)
+  // For drafts (new vectors), always consider dirty since they need to be saved
+  const hasMetadataChanges = JSON.stringify(draftMetadata) !== JSON.stringify(vector.metadata)
   const hasEmbeddingChanges = (() => {
-    if (!draftEmbedding && !document.embedding) return false
-    if (!draftEmbedding || !document.embedding) return true
+    if (!draftEmbedding && !vector.embedding) return false
+    if (!draftEmbedding || !vector.embedding) return true
     try {
       const parsed = JSON.parse(draftEmbedding)
-      return JSON.stringify(parsed) !== JSON.stringify(document.embedding)
+      return JSON.stringify(parsed) !== JSON.stringify(vector.embedding)
     } catch {
       return true
     }
   })()
-  const hasDirtyChanges = isDraft || hasDocumentChanges || hasMetadataChanges || hasEmbeddingChanges
+  const hasDirtyChanges = isDraft || hasMetadataChanges || hasEmbeddingChanges
 
-  // Reset drafts when document changes
+  // Reset drafts when vector changes
   useEffect(() => {
-    setDraftDocument(document.document)
-    setDraftMetadata(document.metadata)
-    setDraftEmbedding(document.embedding ? JSON.stringify(document.embedding) : '')
+    setDraftMetadata(vector.metadata)
+    setDraftEmbedding(vector.embedding ? JSON.stringify(vector.embedding) : '')
     setEmbeddingError(null)
     setIsEditingEmbedding(false)
-  }, [document.id, document.document, document.metadata, document.embedding])
+  }, [vector.id, vector.metadata, vector.embedding])
 
   // Handle cancel/revert all changes
   const handleCancel = useCallback(() => {
-    setDraftDocument(document.document)
-    setDraftMetadata(document.metadata)
-    setDraftEmbedding(document.embedding ? JSON.stringify(document.embedding) : '')
+    setDraftMetadata(vector.metadata)
+    setDraftEmbedding(vector.embedding ? JSON.stringify(vector.embedding) : '')
     setEmbeddingError(null)
     setIsEditingEmbedding(false)
-  }, [document.document, document.metadata, document.embedding])
+  }, [vector.metadata, vector.embedding])
 
   // Handle save all changes
   const handleSave = useCallback(async () => {
-    // If document changed, show regenerate dialog
-    if (hasDocumentChanges) {
-      setShowRegenerateDialog(true)
-      return
-    }
-
-    // Otherwise save metadata and/or embedding changes
     try {
       const updates: {
         id: string
         metadata?: Metadata
         values?: number[]
-      } = { id: document.id }
+      } = { id: vector.id }
 
       if (hasMetadataChanges && draftMetadata) {
         updates.metadata = draftMetadata as Metadata
@@ -147,54 +135,13 @@ export default function DocumentDetailPanel({
       }
     }
   }, [
-    document.id,
-    hasDocumentChanges,
+    vector.id,
     hasMetadataChanges,
     hasEmbeddingChanges,
     draftMetadata,
     draftEmbedding,
     updateMutation,
   ])
-
-  // Handle regenerate dialog response
-  const handleRegenerateConfirm = async (regenerate: boolean) => {
-    try {
-      const updates: {
-        id: string
-        text?: string
-        metadata?: Metadata
-        values?: number[]
-        regenerateEmbedding?: boolean
-      } = {
-        id: document.id,
-        text: draftDocument ?? undefined,
-        regenerateEmbedding: regenerate,
-      }
-
-      // Include metadata changes if any
-      if (hasMetadataChanges && draftMetadata) {
-        updates.metadata = draftMetadata as Metadata
-      }
-
-      // Include embedding changes if not regenerating and has changes
-      if (!regenerate && hasEmbeddingChanges && draftEmbedding) {
-        try {
-          const parsed = JSON.parse(draftEmbedding)
-          if (Array.isArray(parsed) && parsed.every((n) => typeof n === 'number')) {
-            updates.values = parsed
-          }
-        } catch {
-          // Ignore invalid embedding when saving with document
-        }
-      }
-
-      await updateMutation.mutateAsync(updates)
-      setShowRegenerateDialog(false)
-      setEmbeddingError(null)
-    } catch (error) {
-      console.error('Failed to update document:', error)
-    }
-  }
 
   // Handle metadata value change
   const handleMetadataChange = (key: string, value: string) => {
@@ -214,8 +161,8 @@ export default function DocumentDetailPanel({
         [key]: { ...typedField, value }
       }
     } else {
-      // For existing documents, try to preserve original type
-      const originalValue = document.metadata?.[key]
+      // For existing vectors, try to preserve original type
+      const originalValue = vector.metadata?.[key]
       let parsedValue: unknown = value
 
       if (typeof originalValue === 'number') {
@@ -238,7 +185,7 @@ export default function DocumentDetailPanel({
     }
   }
 
-  // Add a new metadata field (only for first document drafts)
+  // Add a new metadata field (only for first vector drafts)
   const handleAddMetadataField = useCallback(() => {
     const currentMetadata = (draftMetadata || {}) as TypedMetadataRecord
     let keyNum = 1
@@ -257,7 +204,7 @@ export default function DocumentDetailPanel({
     }
   }, [draftMetadata, isDraft, onDraftChange])
 
-  // Remove a metadata field (only for first document drafts)
+  // Remove a metadata field (only for first vector drafts)
   const handleRemoveMetadataField = useCallback((keyToRemove: string) => {
     if (!draftMetadata) return
     const { [keyToRemove]: _, ...rest } = draftMetadata as TypedMetadataRecord
@@ -267,7 +214,7 @@ export default function DocumentDetailPanel({
     }
   }, [draftMetadata, isDraft, onDraftChange])
 
-  // Handle metadata key rename (only for first document drafts)
+  // Handle metadata key rename (only for first vector drafts)
   const handleMetadataKeyRename = useCallback((oldKey: string, newKey: string) => {
     if (!draftMetadata || oldKey === newKey) return
     const typedMetadata = draftMetadata as TypedMetadataRecord
@@ -279,7 +226,7 @@ export default function DocumentDetailPanel({
     }
   }, [draftMetadata, isDraft, onDraftChange])
 
-  // Handle metadata type change (only for first document drafts)
+  // Handle metadata type change (only for first vector drafts)
   const handleMetadataTypeChange = useCallback((key: string, newType: MetadataValueType) => {
     if (!draftMetadata) return
     const typedMetadata = draftMetadata as TypedMetadataRecord
@@ -295,7 +242,7 @@ export default function DocumentDetailPanel({
     }
   }, [draftMetadata, isDraft, onDraftChange])
 
-  // Handle metadata value change for typed fields (first document drafts)
+  // Handle metadata value change for typed fields (first vector drafts)
   const handleTypedMetadataValueChange = useCallback((key: string, newValue: string) => {
     if (!draftMetadata) return
     const typedMetadata = draftMetadata as TypedMetadataRecord
@@ -363,44 +310,26 @@ export default function DocumentDetailPanel({
         {isDraft ? (
           <input
             type="text"
-            value={document.id}
+            value={vector.id}
             onChange={(e) => {
               if (onDraftChange) {
                 onDraftChange({ id: e.target.value })
               }
             }}
-            placeholder="Enter document ID"
+            placeholder="Enter vector ID"
             className="w-full text-xs font-mono p-2 bg-black/[0.03] dark:bg-white/[0.04] rounded-md ring-1 ring-blue-500/20 focus:outline-none focus:ring-blue-500/30"
           />
         ) : (
           <div className="p-2 bg-black/[0.03] dark:bg-white/[0.04] rounded-md">
-            <code className="text-xs font-mono break-all">{document.id}</code>
+            <code className="text-xs font-mono break-all">{vector.id}</code>
           </div>
         )}
-      </section>
-
-      {/* Document Text Section */}
-      <section>
-        <h3 className="text-xs font-semibold text-muted-foreground mb-1">document</h3>
-        <textarea
-          rows={1}
-          value={draftDocument ?? ''}
-          onChange={(e) => {
-            setDraftDocument(e.target.value)
-            if (isDraft && onDraftChange) {
-              onDraftChange({ document: e.target.value })
-            }
-          }}
-          placeholder="No document - type to add"
-          style={{ fieldSizing: 'content' } as React.CSSProperties}
-          className={`w-full text-xs whitespace-pre-wrap overflow-hidden focus:outline-none resize-none ${getFieldStyle(hasDocumentChanges)}`}
-        />
       </section>
 
       {/* Metadata Fields - Each as Individual Section */}
       {(() => {
         if (!draftMetadata) return null
-        const canEditSchema = isDraft && isFirstDocument
+        const canEditSchema = isDraft && isFirstVector
         const entries = Object.entries(draftMetadata)
         // Only sort when not editing schema (sorting while editing causes focus issues)
         if (!canEditSchema) {
@@ -417,16 +346,16 @@ export default function DocumentDetailPanel({
                 : String(value)
               : ''
           )
-          const originalValue = document.metadata?.[key]
+          const originalValue = vector.metadata?.[key]
           const isDirty = isDraft ? true : value !== originalValue
-          // Validate typed fields for all drafts (not just first document)
+          // Validate typed fields for all drafts (not just first vector)
           const validationError = isDraft && typedField ? validateMetadataValue(typedField.value, typedField.type) : null
 
           // Use index as key when editing schema to prevent focus loss when key name changes
           return (
             <section key={canEditSchema ? `field-${index}` : key}>
               {canEditSchema ? (
-                // First document draft - editable key with type selector and remove button
+                // First vector draft - editable key with type selector and remove button
                 <div className="flex items-center gap-1 mb-1">
                   <input
                     type="text"
@@ -482,8 +411,8 @@ export default function DocumentDetailPanel({
         })
       })()}
 
-      {/* Add metadata field button - only for first document drafts */}
-      {isDraft && isFirstDocument && (
+      {/* Add metadata field button - only for first vector drafts */}
+      {isDraft && isFirstVector && (
         <section>
           <button
             type="button"
@@ -522,7 +451,7 @@ export default function DocumentDetailPanel({
               onClick={() => setIsEditingEmbedding(true)}
               className={`cursor-pointer ${getFieldStyle(hasEmbeddingChanges)}`}
             >
-              <EmbeddingCell embedding={document.embedding} />
+              <EmbeddingCell embedding={vector.embedding} />
             </div>
           )}
         </section>
@@ -543,7 +472,9 @@ export default function DocumentDetailPanel({
             setShowRegenerateDialog(false)
           }
         }}
-        onConfirm={handleRegenerateConfirm}
+        onConfirm={() => {
+          setShowRegenerateDialog(false)
+        }}
         isLoading={isPending}
       />
       </div>

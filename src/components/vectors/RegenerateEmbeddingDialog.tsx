@@ -39,7 +39,7 @@ export function RegenerateEmbeddingDialog({
               Update Embedding?
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="mt-2 text-[11px] text-muted-foreground leading-[1.4]">
-              You have modified the document text. Would you like to regenerate the embedding vector?
+              You have modified the vector text. Would you like to regenerate the embedding vector?
             </DialogPrimitive.Description>
           </div>
 

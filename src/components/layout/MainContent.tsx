@@ -6,12 +6,11 @@ import { usePinecone } from '../../providers/PineconeProvider'
 import { IndexesPanel, INDEXES_PANEL_WIDTH } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
 import { IndexConfigView } from '../indexes/IndexConfigView'
-import DocumentsView from '../documents/DocumentsView'
-import DocumentDetailPanel from '../documents/DocumentDetailPanel'
+import VectorsView from '../vectors/VectorsView'
+import VectorDetailPanel from '../vectors/VectorDetailPanel'
 
-interface DocumentRecord {
+interface VectorRecord {
   id: string
-  document: string | null
   metadata: Record<string, unknown> | null
   embedding: number[] | null
 }
@@ -27,36 +26,36 @@ export function MainContent() {
     rightPanelOpen,
     rightPanelWidth,
     setRightPanelWidth,
-    selectedDocumentIds,
-    primarySelectedDocumentId,
+    selectedVectorIds,
+    primarySelectedVectorId,
     selectionAnchor,
-    selectDocument,
-    toggleDocumentSelection,
-    selectDocumentRange,
+    selectVector,
+    toggleVectorSelection,
+    selectVectorRange,
     addToSelection,
     clearSelection,
     setSelectionAnchor,
   } = usePanel()
-  const [selectedDocument, setSelectedDocument] = useState<DocumentRecord | null>(null)
+  const [selectedVector, setSelectedVector] = useState<VectorRecord | null>(null)
   const [isSelectedDraft, setIsSelectedDraft] = useState(false)
-  const [isFirstDocument, setIsFirstDocument] = useState(false)
-  const [draftUpdateHandler, setDraftUpdateHandler] = useState<((updates: { id?: string; document?: string; metadata?: Record<string, unknown> }) => void) | null>(null)
+  const [isFirstVector, setIsFirstVector] = useState(false)
+  const [draftUpdateHandler, setDraftUpdateHandler] = useState<((updates: { id?: string; metadata?: Record<string, unknown> }) => void) | null>(null)
 
   // Resize state
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const [isResizingRight, setIsResizingRight] = useState(false)
 
-  const handleSelectedDocumentChange = (document: DocumentRecord | null, isDraft: boolean) => {
-    setSelectedDocument(document)
+  const handleSelectedVectorChange = (vector: VectorRecord | null, isDraft: boolean) => {
+    setSelectedVector(vector)
     setIsSelectedDraft(isDraft)
   }
 
-  const handleExposeDraftHandler = (handler: ((updates: { id?: string; document?: string; metadata?: Record<string, unknown> }) => void) | null) => {
+  const handleExposeDraftHandler = (handler: ((updates: { id?: string; metadata?: Record<string, unknown> }) => void) | null) => {
     setDraftUpdateHandler(() => handler)
   }
 
-  const handleIsFirstDocumentChange = (isFirst: boolean) => {
-    setIsFirstDocument(isFirst)
+  const handleIsFirstVectorChange = (isFirst: boolean) => {
+    setIsFirstVector(isFirst)
   }
 
   // Handle mouse move for resizing
@@ -99,7 +98,7 @@ export function MainContent() {
   const rightPadding = rightPanelOpen ? rightPanelWidth : 0
 
   // Determine what to show in the main area
-  const showDocuments = activeIndex && activeNamespace !== null
+  const showVectors = activeIndex && activeNamespace !== null
 
   return (
     <main className="flex-1 relative overflow-hidden bg-content">
@@ -118,22 +117,22 @@ export function MainContent() {
       >
         {draftCollection ? (
           <IndexConfigView />
-        ) : showDocuments ? (
-          <DocumentsView
+        ) : showVectors ? (
+          <VectorsView
             collectionName={activeIndex}
             namespace={activeNamespace}
-            selectedDocumentIds={selectedDocumentIds}
-            primarySelectedDocumentId={primarySelectedDocumentId}
+            selectedVectorIds={selectedVectorIds}
+            primarySelectedVectorId={primarySelectedVectorId}
             selectionAnchor={selectionAnchor}
-            onSingleSelect={selectDocument}
-            onToggleSelect={toggleDocumentSelection}
-            onRangeSelect={selectDocumentRange}
+            onSingleSelect={selectVector}
+            onToggleSelect={toggleVectorSelection}
+            onRangeSelect={selectVectorRange}
             onAddToSelection={addToSelection}
             onClearSelection={clearSelection}
             onSetSelectionAnchor={setSelectionAnchor}
-            onSelectedDocumentChange={handleSelectedDocumentChange}
+            onSelectedVectorChange={handleSelectedVectorChange}
             onExposeDraftHandler={handleExposeDraftHandler}
-            onIsFirstDocumentChange={handleIsFirstDocumentChange}
+            onIsFirstVectorChange={handleIsFirstVectorChange}
           />
         ) : (
           <div
@@ -180,20 +179,20 @@ export function MainContent() {
         )}
       </aside>
 
-      {/* Right Panel: Document Detail - Floating glass overlay */}
+      {/* Right Panel: Vector Detail - Floating glass overlay */}
       <aside
         className={`absolute top-0 right-0 h-full transition-transform duration-200 ${
           rightPanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         style={{ width: `${rightPanelWidth}px` }}
       >
-        {selectedDocument && activeIndex && currentProfile ? (
-          <DocumentDetailPanel
-            document={selectedDocument}
+        {selectedVector && activeIndex && currentProfile ? (
+          <VectorDetailPanel
+            vector={selectedVector}
             collectionName={activeIndex}
             profileId={currentProfile.id}
             isDraft={isSelectedDraft}
-            isFirstDocument={isFirstDocument}
+            isFirstVector={isFirstVector}
             onDraftChange={isSelectedDraft ? draftUpdateHandler ?? undefined : undefined}
           />
         ) : (
