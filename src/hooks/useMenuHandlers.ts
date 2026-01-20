@@ -37,35 +37,35 @@ export function useMenuHandlers() {
   }, [startCreation])
 
   const handleDuplicateIndex = useCallback(() => {
-    // Dispatch event for CollectionPanel to duplicate the active index
+    // Dispatch event to duplicate the active index
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:duplicate-collection'))
     }
   }, [activeCollection])
 
   const handleRenameIndex = useCallback(() => {
-    // Dispatch event for CollectionPanel to start renaming
+    // Dispatch event to start renaming
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:rename-collection'))
     }
   }, [activeCollection])
 
   const handleDeleteIndex = useCallback(() => {
-    // Dispatch event for CollectionPanel to delete the active index
+    // Dispatch event to delete the active index
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:delete-collection'))
     }
   }, [activeCollection])
 
   const handleCopyIndex = useCallback(() => {
-    // Dispatch event for CollectionPanel to copy the active index
+    // Dispatch event to copy the active index
     if (activeCollection) {
       window.dispatchEvent(new CustomEvent('menu:copy-collection'))
     }
   }, [activeCollection])
 
   const handlePasteIndex = useCallback(() => {
-    // Dispatch event for CollectionPanel to paste index
+    // Dispatch event to paste index
     window.dispatchEvent(new CustomEvent('menu:paste-collection'))
   }, [])
 

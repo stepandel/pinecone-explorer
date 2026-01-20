@@ -3,7 +3,8 @@ import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { usePanel } from '../../context/PanelContext'
 import { usePinecone } from '../../providers/PineconeProvider'
-import { CollectionPanel } from '../collections/CollectionPanel'
+import { IndexesPanel, INDEXES_PANEL_WIDTH } from '../indexes/IndexesPanel'
+import { NamespacesPanel } from '../namespaces/NamespacesPanel'
 import { CollectionConfigView } from '../collections/CollectionConfigView'
 import DocumentsView from '../documents/DocumentsView'
 import DocumentDetailPanel from '../documents/DocumentDetailPanel'
@@ -16,7 +17,7 @@ interface DocumentRecord {
 }
 
 export function MainContent() {
-  const { activeCollection } = useCollection()
+  const { activeIndex, activeNamespace } = useCollection()
   const { draftCollection } = useDraftCollection()
   const { currentProfile } = usePinecone()
   const {
@@ -61,7 +62,8 @@ export function MainContent() {
   // Handle mouse move for resizing
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isResizingLeft) {
-      const newWidth = Math.max(180, Math.min(400, e.clientX))
+      // Adjust for the fixed IndexesPanel width
+      const newWidth = Math.max(180, Math.min(400, e.clientX - INDEXES_PANEL_WIDTH))
       setLeftPanelWidth(newWidth)
     } else if (isResizingRight) {
       const newWidth = Math.max(250, Math.min(600, window.innerWidth - e.clientX))
@@ -92,21 +94,34 @@ export function MainContent() {
   }, [isResizingLeft, isResizingRight, handleMouseMove, handleMouseUp])
 
   // Calculate main content padding based on open panels
-  const leftPadding = leftPanelOpen ? `${leftPanelWidth}px` : '0'
-  const rightPadding = rightPanelOpen ? `${rightPanelWidth}px` : '0'
+  // Always account for fixed IndexesPanel, plus the namespaces panel if open
+  const leftPadding = INDEXES_PANEL_WIDTH + (leftPanelOpen ? leftPanelWidth : 0)
+  const rightPadding = rightPanelOpen ? rightPanelWidth : 0
+
+  // Determine what to show in the main area
+  const showDocuments = activeIndex && activeNamespace !== null
 
   return (
     <main className="flex-1 relative overflow-hidden bg-content">
-      {/* Main content area - extends behind panels for blur effect */}
+      {/* Fixed IndexesPanel - always visible */}
+      <div
+        className="absolute top-0 left-0 h-full z-30"
+        style={{ width: `${INDEXES_PANEL_WIDTH}px` }}
+      >
+        <IndexesPanel />
+      </div>
+
+      {/* Main content area */}
       <div
         className="h-full transition-[padding] duration-200"
-        style={{ paddingLeft: leftPadding, paddingRight: rightPadding }}
+        style={{ paddingLeft: `${leftPadding}px`, paddingRight: `${rightPadding}px` }}
       >
         {draftCollection ? (
           <CollectionConfigView />
-        ) : activeCollection ? (
+        ) : showDocuments ? (
           <DocumentsView
-            collectionName={activeCollection}
+            collectionName={activeIndex}
+            namespace={activeNamespace}
             selectedDocumentIds={selectedDocumentIds}
             primarySelectedDocumentId={primarySelectedDocumentId}
             selectionAnchor={selectionAnchor}
@@ -126,21 +141,33 @@ export function MainContent() {
             style={{ background: 'var(--canvas-background)' }}
           >
             <div className="text-center text-muted-foreground">
-              <p className="text-lg mb-2">No collection selected</p>
-              <p className="text-sm">Select a collection from the sidebar to get started</p>
+              {!activeIndex ? (
+                <>
+                  <p className="text-lg mb-2">No index selected</p>
+                  <p className="text-sm">Select an index from the sidebar to get started</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg mb-2">No namespace selected</p>
+                  <p className="text-sm">Select a namespace to view vectors</p>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Left Panel: Collection Sidebar - Floating glass overlay */}
+      {/* Namespaces Panel - Collapsible, positioned after IndexesPanel */}
       <aside
-        className={`absolute top-0 left-0 h-full transition-transform duration-200 ${
+        className={`absolute top-0 h-full transition-transform duration-200 ${
           leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
-        style={{ width: `${leftPanelWidth}px` }}
+        style={{
+          left: `${INDEXES_PANEL_WIDTH}px`,
+          width: `${leftPanelWidth}px`,
+        }}
       >
-        <CollectionPanel />
+        <NamespacesPanel />
         {/* Resize handle */}
         {leftPanelOpen && (
           <div
@@ -160,10 +187,10 @@ export function MainContent() {
         }`}
         style={{ width: `${rightPanelWidth}px` }}
       >
-        {selectedDocument && activeCollection && currentProfile ? (
+        {selectedDocument && activeIndex && currentProfile ? (
           <DocumentDetailPanel
             document={selectedDocument}
-            collectionName={activeCollection}
+            collectionName={activeIndex}
             profileId={currentProfile.id}
             isDraft={isSelectedDraft}
             isFirstDocument={isFirstDocument}
@@ -180,7 +207,7 @@ export function MainContent() {
             }}
           >
             <div className="text-center text-muted-foreground">
-              <p className="text-sm">No document selected</p>
+              <p className="text-sm">No vector selected</p>
             </div>
           </div>
         )}

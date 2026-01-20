@@ -24,6 +24,7 @@ interface DocumentRecord {
 
 interface DocumentsViewProps {
   collectionName: string
+  namespace?: string
   // Multi-select props
   selectedDocumentIds: Set<string>
   primarySelectedDocumentId: string | null
@@ -51,6 +52,7 @@ function createDefaultFilterRow(): FilterRowType {
 
 export default function DocumentsView({
   collectionName,
+  namespace,
   selectedDocumentIds,
   primarySelectedDocumentId,
   selectionAnchor,
@@ -228,7 +230,7 @@ export default function DocumentsView({
     isLoading: loading,
     error,
     isFetching,
-  } = useVectorsQuery(currentProfile?.id || null, collectionName)
+  } = useVectorsQuery(currentProfile?.id || null, collectionName, namespace)
 
   // Map vectors to document-like format for backwards compatibility
   const rawDocuments: DocumentRecord[] = useMemo(() => {

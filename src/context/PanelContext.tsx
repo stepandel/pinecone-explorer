@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 
 interface PanelContextType {
-  // Left panel (CollectionPanel) state
+  // Left panel (NamespacesPanel) state
   leftPanelOpen: boolean
   setLeftPanelOpen: (open: boolean) => void
   leftPanelWidth: number
