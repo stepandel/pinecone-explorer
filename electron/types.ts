@@ -43,7 +43,7 @@ export interface ConnectionProfile {
  */
 export interface IndexInfo {
   name: string
-  dimension: number
+  dimension?: number // Optional for sparse indexes
   metric: 'cosine' | 'euclidean' | 'dotproduct'
   host: string
   status: {
@@ -217,8 +217,9 @@ export interface ListVectorsResult {
  */
 export interface CreateIndexParams {
   name: string
-  dimension: number
+  dimension?: number // Required for dense indexes, omit for sparse
   metric?: 'cosine' | 'euclidean' | 'dotproduct'
+  vectorType?: 'dense' | 'sparse' // Default is 'dense'
   spec: {
     serverless: {
       cloud: 'aws' | 'gcp' | 'azure'

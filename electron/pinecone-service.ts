@@ -476,14 +476,33 @@ class PineconeService {
       throw new Error('Pinecone client not connected. Please connect first.')
     }
 
-    await this.client.createIndex({
+    const isSparse = params.vectorType === 'sparse'
+
+    // Build the create index request
+    // For sparse indexes: omit dimension, set vectorType
+    // For dense indexes: require dimension
+    const createParams: Record<string, unknown> = {
       name: params.name,
-      dimension: params.dimension,
-      metric: params.metric || 'cosine',
+      metric: params.metric || (isSparse ? 'dotproduct' : 'cosine'),
       spec: params.spec,
       deletionProtection: params.deletionProtection,
       waitUntilReady: true,
-    })
+    }
+
+    // Only add dimension for dense indexes
+    if (!isSparse) {
+      if (!params.dimension || params.dimension <= 0) {
+        throw new Error('Dimension is required for dense indexes')
+      }
+      createParams.dimension = params.dimension
+    }
+
+    // Add vectorType if sparse (dense is the default, no need to specify)
+    if (isSparse) {
+      createParams.vectorType = 'sparse'
+    }
+
+    await this.client.createIndex(createParams as unknown as Parameters<typeof this.client.createIndex>[0])
 
     // Clear cache to pick up new index
     this.indexCache.delete(params.name)

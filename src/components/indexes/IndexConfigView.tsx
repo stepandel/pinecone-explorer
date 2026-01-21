@@ -67,14 +67,18 @@ export function IndexConfigView() {
   // Initialize defaults on mount
   useEffect(() => {
     if (selectedEmbedding) {
+      const updates: Partial<typeof draftCollection> = {
+        embeddingFunctionId: selectedEmbeddingId,
+      }
       // Set default dimension (only for dense models)
       if (!draftCollection?.dimensionOverride && selectedEmbedding.defaultDimension) {
-        updateDraft({ dimensionOverride: String(selectedEmbedding.defaultDimension) })
+        updates.dimensionOverride = String(selectedEmbedding.defaultDimension)
       }
       // Set default metric to first supported
       if (!draftCollection?.metric || !selectedEmbedding.supportedMetrics.includes(draftCollection.metric as DistanceMetric)) {
-        updateDraft({ metric: selectedEmbedding.supportedMetrics[0] })
+        updates.metric = selectedEmbedding.supportedMetrics[0]
       }
+      updateDraft(updates)
     }
   }, []) // Run only on mount
 
@@ -83,17 +87,33 @@ export function IndexConfigView() {
     setSelectedEmbeddingId(embeddingId)
     const ef = getEmbeddingFunctionById(embeddingId)
     if (ef) {
+      const isSparse = ef.vectorType === 'sparse'
+
+      // For sparse models, force AWS as cloud provider (only AWS supports sparse indexes)
+      if (isSparse && cloud !== 'aws') {
+        setCloud('aws')
+        setRegion('us-east-1')
+      }
+
       // Update dimension to the default for this model (only for dense)
       if (ef.defaultDimension) {
-        updateDraft({ dimensionOverride: String(ef.defaultDimension) })
+        updateDraft({
+          embeddingFunctionId: embeddingId,
+          dimensionOverride: String(ef.defaultDimension),
+          metric: ef.supportedMetrics[0],
+          ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
+        })
       } else {
         // Clear dimension for sparse models
-        updateDraft({ dimensionOverride: '' })
+        updateDraft({
+          embeddingFunctionId: embeddingId,
+          dimensionOverride: '',
+          metric: ef.supportedMetrics[0],
+          ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
+        })
       }
-      // Update metric to first supported metric for this model
-      updateDraft({ metric: ef.supportedMetrics[0] })
     }
-  }, [updateDraft])
+  }, [updateDraft, cloud])
 
   // Handle cloud change - update region to first available and sync to draft
   const handleCloudChange = useCallback((newCloud: CloudProvider) => {
@@ -290,8 +310,9 @@ export function IndexConfigView() {
             <select
               value={cloud}
               onChange={(e) => handleCloudChange(e.target.value as CloudProvider)}
-              className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+              className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               style={inputStyle}
+              disabled={isSparseModel}
             >
               <option value="aws">AWS</option>
               <option value="gcp">GCP</option>
@@ -299,6 +320,11 @@ export function IndexConfigView() {
             </select>
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
           </div>
+          {isSparseModel && (
+            <p className="text-[10px] text-muted-foreground">
+              Sparse indexes only support AWS
+            </p>
+          )}
         </div>
 
         {/* Region */}
@@ -321,6 +347,15 @@ export function IndexConfigView() {
           </div>
         </div>
       </div>
+
+      {/* Sparse model info */}
+      {isSparseModel && (
+        <div className="mx-4 mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-md">
+          <p className="text-[11px] text-blue-600 dark:text-blue-400">
+            This will create a sparse index. Sparse indexes only support dotproduct metric and are limited to AWS regions.
+          </p>
+        </div>
+      )}
 
       {/* Footer Actions */}
       <div className="px-4 py-2 border-t border-border flex items-center justify-between bg-background">

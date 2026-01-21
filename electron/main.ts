@@ -270,10 +270,10 @@ ipcMain.handle('pinecone:createIndex', async (_event, profileId: string, params:
     return { success: true }
   } catch (error) {
     // Extract cloud/region from serverless spec for better error messages
-    const serverlessSpec = params.spec?.serverless
+    const spec = params.spec as { serverless?: { cloud?: string; region?: string } }
     const message = parsePineconeError(error, {
-      cloud: serverlessSpec?.cloud,
-      region: serverlessSpec?.region,
+      cloud: spec.serverless?.cloud,
+      region: spec.serverless?.region,
     })
     return { success: false, error: message }
   }

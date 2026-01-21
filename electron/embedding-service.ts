@@ -96,11 +96,7 @@ export class EmbeddingService {
     const inputType = config.inputType || 'passage'
 
     // Build parameters for Pinecone inference
-    const params: {
-      inputType: 'query' | 'passage'
-      truncate: 'END' | 'NONE'
-      dimensions?: number
-    } = {
+    const params: Record<string, unknown> = {
       inputType,
       truncate: 'END',
     }
@@ -113,15 +109,17 @@ export class EmbeddingService {
     const response = await this.pineconeClient.inference.embed(
       modelName,
       texts,
-      params
+      params as Record<string, string>
     )
 
     // Extract values from the response
+    // The SDK types may not match the actual response structure
     return response.data.map(item => {
-      if (!item.values) {
+      const embedding = item as unknown as { values?: number[] }
+      if (!embedding.values) {
         throw new Error('Pinecone inference returned empty embedding values')
       }
-      return item.values as number[]
+      return embedding.values
     })
   }
 

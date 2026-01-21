@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 import { usePinecone } from '../providers/PineconeProvider'
 import { useCreateIndexMutation } from '../hooks/usePineconeQueries'
 import { useCollection } from './CollectionContext'
+import { getEmbeddingFunctionById } from '../constants/embedding-functions'
 
 export interface DraftCollection {
   name: string
@@ -11,6 +12,7 @@ export interface DraftCollection {
     cloud: 'aws' | 'gcp' | 'azure'
     region: string
   }
+  embeddingFunctionId?: string // Track selected embedding model
   // If cloning from an existing index, this will be set
   sourceCollection?: IndexInfo
 }
@@ -111,16 +113,24 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
   const saveDraft = useCallback(async () => {
     if (!draftCollection || !currentProfile) return
 
+    // Check if selected model is sparse (no dimension required)
+    const embeddingConfig = draftCollection.embeddingFunctionId
+      ? getEmbeddingFunctionById(draftCollection.embeddingFunctionId)
+      : null
+    const isSparseModel = embeddingConfig?.vectorType === 'sparse'
+
     // Validate
     const errors: Record<string, string> = {}
     if (!draftCollection.name.trim()) {
       errors.name = 'Index name is required'
     }
 
-    // Validate dimension
+    // Validate dimension (only for dense models)
     const dimension = parseInt(draftCollection.dimensionOverride, 10)
-    if (!draftCollection.dimensionOverride.trim() || isNaN(dimension) || dimension <= 0) {
-      errors.dimension = 'Dimension must be a positive number'
+    if (!isSparseModel) {
+      if (!draftCollection.dimensionOverride.trim() || isNaN(dimension) || dimension <= 0) {
+        errors.dimension = 'Dimension must be a positive number'
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -133,14 +143,21 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
       // Build params for Pinecone index creation
       const params: CreateIndexParams = {
         name: draftCollection.name.trim(),
-        dimension,
-        metric: draftCollection.metric || 'cosine',
+        metric: isSparseModel ? 'dotproduct' : (draftCollection.metric || 'cosine'),
         spec: {
           serverless: draftCollection.serverlessSpec || {
             cloud: 'aws',
             region: 'us-east-1',
           },
         },
+      }
+
+      // For sparse indexes: set vectorType, omit dimension
+      // For dense indexes: set dimension
+      if (isSparseModel) {
+        params.vectorType = 'sparse'
+      } else {
+        params.dimension = dimension
       }
 
       await createMutation.mutateAsync(params)
