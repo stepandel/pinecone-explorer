@@ -14,11 +14,12 @@ import {
 } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { cn } from '@/lib/utils'
+import { CloneNamespaceProgressDialog } from '../namespaces/CloneNamespaceProgressDialog'
 
 export function IndexesPanel() {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useCollection()
-  const { startCreation, startCopyFromCollection, draftCollection } = useDraftCollection()
+  const { startCreation, startCopyFromCollection, draftCollection, cloneProgress, cloneProgressOpen, setCloneProgressOpen, cancelClone } = useDraftCollection()
 
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -94,7 +95,7 @@ export function IndexesPanel() {
     }
   }, [indexes])
 
-  // Handle paste action
+  // Handle paste action - opens config form with source index settings
   const handlePasteIndex = useCallback(() => {
     if (copiedIndex) {
       startCopyFromCollection(copiedIndex)
@@ -290,6 +291,18 @@ export function IndexesPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Clone Progress Dialog */}
+      {cloneProgress && (
+        <CloneNamespaceProgressDialog
+          open={cloneProgressOpen}
+          onOpenChange={setCloneProgressOpen}
+          sourceNamespace={draftCollection?.sourceCollection?.name || ''}
+          targetNamespace={draftCollection?.name || ''}
+          progress={cloneProgress}
+          onCancel={cancelClone}
+        />
+      )}
     </aside>
   )
 }

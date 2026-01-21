@@ -1,8 +1,16 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import { usePinecone } from '../providers/PineconeProvider'
 import { useCreateIndexMutation } from '../hooks/usePineconeQueries'
 import { useCollection } from './CollectionContext'
 import { getEmbeddingFunctionById } from '../constants/embedding-functions'
+
+// Clone progress type matching the dialog's expected format
+export interface CloneProgressState {
+  phase: 'preparing' | 'copying' | 'complete' | 'error' | 'cancelled'
+  totalVectors: number
+  processedVectors: number
+  message: string
+}
 
 export interface DraftCollection {
   name: string
@@ -36,6 +44,12 @@ interface DraftCollectionContextValue {
   cancelCreation: () => void
   saveDraft: () => Promise<void>
   isCopyMode: boolean
+
+  // Clone progress (for copy mode)
+  cloneProgress: CloneProgressState | null
+  cloneProgressOpen: boolean
+  setCloneProgressOpen: (open: boolean) => void
+  cancelClone: () => Promise<void>
 }
 
 const DraftCollectionContext = createContext<DraftCollectionContextValue | null>(null)
@@ -61,9 +75,39 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
   const [isCreating, setIsCreating] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
-  const { currentProfile } = usePinecone()
+  // Clone progress state
+  const [cloneProgress, setCloneProgress] = useState<CloneProgressState | null>(null)
+  const [cloneProgressOpen, setCloneProgressOpen] = useState(false)
+
+  const { currentProfile, refreshIndexes } = usePinecone()
   const { setActiveCollection } = useCollection()
   const createMutation = useCreateIndexMutation(currentProfile?.id || '')
+
+  // Listen for clone progress updates
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.pinecone.onCloneProgress((progress) => {
+      // Map 'creating' phase to 'preparing' for the dialog
+      const phase = progress.phase === 'creating' ? 'preparing' : progress.phase
+      setCloneProgress({
+        phase: phase as CloneProgressState['phase'],
+        totalVectors: progress.totalVectors,
+        processedVectors: progress.processedVectors,
+        message: progress.message,
+      })
+    })
+    return unsubscribe
+  }, [])
+
+  // Cancel clone operation
+  const cancelClone = useCallback(async () => {
+    if (currentProfile) {
+      try {
+        await window.electronAPI.pinecone.cancelClone(currentProfile.id)
+      } catch {
+        // Ignore cancel errors
+      }
+    }
+  }, [currentProfile])
 
   const startCreation = useCallback(() => {
     setDraftCollection(createInitialDraft())
@@ -176,6 +220,7 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
 
       // Success: save embedding config override for this index
       const newIndexName = draftCollection.name.trim()
+      const sourceCollection = draftCollection.sourceCollection
 
       // Always save the embedding config locally (for client-side embedding fallback)
       if (draftCollection.embeddingFunctionId && embeddingConfig) {
@@ -194,17 +239,69 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
         )
       }
 
-      // Clear draft and select new index
-      setDraftCollection(null)
-      setValidationErrors({})
-      setActiveCollection(newIndexName)
+      // If this is a copy operation, clone vectors from source to target
+      if (sourceCollection) {
+        // Show clone progress dialog
+        setCloneProgress({
+          phase: 'preparing',
+          totalVectors: 0,
+          processedVectors: 0,
+          message: 'Starting vector copy...',
+        })
+        setCloneProgressOpen(true)
+
+        // Clear draft but keep isCreating true during clone
+        setDraftCollection(null)
+        setValidationErrors({})
+
+        try {
+          const result = await window.electronAPI.pinecone.cloneIndex(currentProfile.id, {
+            sourceIndexName: sourceCollection.name,
+            targetIndexName: newIndexName,
+            regenerateEmbeddings: true,
+          })
+
+          if (result.success) {
+            setCloneProgress({
+              phase: 'complete',
+              totalVectors: result.totalVectors,
+              processedVectors: result.copiedVectors,
+              message: `Copied ${result.copiedVectors} vectors`,
+            })
+            // Refresh indexes list
+            refreshIndexes()
+            // Select the new index
+            setActiveCollection(newIndexName)
+          } else {
+            setCloneProgress({
+              phase: 'error',
+              totalVectors: result.totalVectors,
+              processedVectors: result.copiedVectors,
+              message: result.error || 'Clone failed',
+            })
+          }
+        } catch (cloneError) {
+          const cloneMessage = cloneError instanceof Error ? cloneError.message : 'Failed to clone vectors'
+          setCloneProgress({
+            phase: 'error',
+            totalVectors: 0,
+            processedVectors: 0,
+            message: cloneMessage,
+          })
+        }
+      } else {
+        // Not a copy operation, just clear draft and select new index
+        setDraftCollection(null)
+        setValidationErrors({})
+        setActiveCollection(newIndexName)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create index'
       setValidationErrors({ _form: message })
     } finally {
       setIsCreating(false)
     }
-  }, [draftCollection, currentProfile, createMutation, setActiveCollection])
+  }, [draftCollection, currentProfile, createMutation, setActiveCollection, refreshIndexes])
 
   const value: DraftCollectionContextValue = {
     draftCollection,
@@ -216,6 +313,10 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
     cancelCreation,
     saveDraft,
     isCopyMode: draftCollection?.sourceCollection !== undefined,
+    cloneProgress,
+    cloneProgressOpen,
+    setCloneProgressOpen,
+    cancelClone,
   }
 
   return <DraftCollectionContext.Provider value={value}>{children}</DraftCollectionContext.Provider>
