@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from '../ui/dialog'
 import { Button } from '../ui/button'
+import { cn } from '@/lib/utils'
 
 export function IndexesPanel() {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
@@ -221,46 +222,55 @@ export function IndexesPanel() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={(open) => !open && handleCancelDelete()}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Delete Index</DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  This action cannot be undone. All vectors in this index will be permanently deleted.
-                </p>
-                <p>
-                  To confirm, type <span className="font-mono font-semibold text-foreground bg-muted px-1 py-0.5 rounded">{indexToDelete}</span> below:
-                </p>
-              </div>
+        <DialogContent className="sm:max-w-[320px] p-0 gap-0 rounded-xl border-0 bg-background/80 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.3)] ring-1 ring-black/10 dark:ring-white/10">
+          <DialogHeader className="px-5 pt-5 pb-4 text-center space-y-2">
+            <DialogTitle className="text-[13px] font-semibold text-destructive">
+              Delete Index
+            </DialogTitle>
+            <DialogDescription className="text-[11px] text-muted-foreground leading-[1.4]">
+              This will permanently delete the <span className="font-medium text-foreground">{indexToDelete}</span> index
+              and all its vectors. This action cannot be undone.
             </DialogDescription>
+
+            {/* Confirmation input */}
+            <div className="pt-1">
+              <label className="text-[10px] text-muted-foreground">
+                Type <span className="font-mono text-foreground">{indexToDelete}</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={confirmationInput}
+                onChange={(e) => {
+                  setConfirmationInput(e.target.value)
+                  setDeleteError(null)
+                }}
+                placeholder={indexToDelete || ''}
+                className={cn(
+                  "mt-1.5 w-full h-7 px-2 text-[11px] text-center",
+                  "rounded-md border border-input bg-background/50",
+                  "placeholder:text-muted-foreground/40",
+                  "focus:outline-none focus:ring-1 focus:ring-ring"
+                )}
+                style={{ boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && confirmationInput === indexToDelete) {
+                    handleConfirmDelete()
+                  }
+                }}
+              />
+              {deleteError && (
+                <p className="mt-2 text-[10px] text-destructive">{deleteError}</p>
+              )}
+            </div>
           </DialogHeader>
-          <div className="py-2">
-            <input
-              type="text"
-              value={confirmationInput}
-              onChange={(e) => {
-                setConfirmationInput(e.target.value)
-                setDeleteError(null)
-              }}
-              placeholder="Enter index name to confirm"
-              className="w-full h-9 px-3 text-sm rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && confirmationInput === indexToDelete) {
-                  handleConfirmDelete()
-                }
-              }}
-            />
-            {deleteError && (
-              <p className="mt-2 text-sm text-destructive">{deleteError}</p>
-            )}
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
+
+          <DialogFooter className="px-4 pb-4 flex-row gap-2 sm:space-x-0">
             <Button
               variant="outline"
               onClick={handleCancelDelete}
               disabled={deleteMutation.isPending}
+              className="flex-1 h-[26px] text-[12px] font-normal"
             >
               Cancel
             </Button>
@@ -268,8 +278,9 @@ export function IndexesPanel() {
               variant="destructive"
               onClick={handleConfirmDelete}
               disabled={deleteMutation.isPending || confirmationInput !== indexToDelete}
+              className="flex-1 h-[26px] text-[12px] font-medium"
             >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete Index'}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
