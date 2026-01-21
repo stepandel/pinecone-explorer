@@ -85,9 +85,27 @@ export const EMBEDDING_FUNCTION_GROUPS = [...new Set(EMBEDDING_FUNCTIONS.map(ef 
 export const getEmbeddingFunctionById = (id: string) =>
   EMBEDDING_FUNCTIONS.find((ef) => ef.id === id)
 
+// Helper to get config by ID with strict validation (throws on not found)
+export const getEmbeddingFunctionByIdStrict = (id: string): EmbeddingFunctionConfig => {
+  const func = EMBEDDING_FUNCTIONS.find((ef) => ef.id === id)
+  if (!func) {
+    throw new Error(`Unknown embedding function ID: ${id}`)
+  }
+  return func
+}
+
 // Helper to get config by type+model
 export const getEmbeddingFunctionByModel = (type: string, modelName: string) =>
   EMBEDDING_FUNCTIONS.find((ef) => ef.type === type && ef.modelName === modelName)
+
+// Helper to get config by type+model with validation (logs warning on not found)
+export const getEmbeddingFunctionByModelStrict = (type: string, modelName: string): EmbeddingFunctionConfig | null => {
+  const func = EMBEDDING_FUNCTIONS.find((ef) => ef.type === type && ef.modelName === modelName)
+  if (!func) {
+    console.warn(`No matching embedding function for type=${type}, model=${modelName}`)
+  }
+  return func ?? null
+}
 
 // Helper to get functions by group
 export const getEmbeddingFunctionsByGroup = (group: string) =>

@@ -275,6 +275,7 @@ export interface CloneIndexParams {
   targetIndexName: string
   targetNamespace?: string
   regenerateEmbeddings?: boolean
+  textField?: string // Metadata field containing text for embedding (default: '_text')
 }
 
 /**

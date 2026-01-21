@@ -304,8 +304,15 @@ ipcMain.handle('pinecone:cloneIndex', async (event, profileId: string, params: C
     const abortController = new AbortController()
     activeCloneOperations.set(profileId, abortController)
 
-    // Check for user embedding override
-    const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.sourceIndexName)
+    // Get embedding config with fallback chain:
+    // 1. Target index's override (user explicitly set for the new index)
+    // 2. Source index's override (copy the source's embedding config)
+    // 3. Profile's default embedding config
+    const embeddingOverride =
+      connectionStore.getEmbeddingOverride(profileId, params.targetIndexName) ??
+      connectionStore.getEmbeddingOverride(profileId, params.sourceIndexName) ??
+      connectionStore.getProfile(profileId)?.defaultEmbeddingConfig ??
+      null
 
     // Progress callback sends updates to renderer
     const onProgress = (progress: any) => {

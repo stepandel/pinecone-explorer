@@ -97,10 +97,23 @@ export function IndexesPanel() {
 
   // Handle paste action - opens config form with source index settings
   const handlePasteIndex = useCallback(() => {
-    if (copiedIndex) {
-      startCopyFromCollection(copiedIndex)
+    if (!copiedIndex) return
+
+    // Verify the copied index still exists in current list
+    const stillExists = indexes.some(idx => idx.name === copiedIndex.name)
+    if (!stillExists) {
+      // Clear stale clipboard
+      setCopiedIndex(null)
+      return
     }
-  }, [copiedIndex, startCopyFromCollection])
+
+    startCopyFromCollection(copiedIndex)
+  }, [copiedIndex, indexes, startCopyFromCollection])
+
+  // Clear copied index when profile changes
+  useEffect(() => {
+    setCopiedIndex(null)
+  }, [currentProfile?.id])
 
   // Listen for native context menu actions
   useEffect(() => {

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { usePinecone } from '../providers/PineconeProvider'
 import { useCreateIndexMutation } from '../hooks/usePineconeQueries'
 import { useCollection } from './CollectionContext'
-import { getEmbeddingFunctionById } from '../constants/embedding-functions'
+import { getEmbeddingFunctionById, getEmbeddingFunctionByModelStrict, DEFAULT_EMBEDDING_FUNCTION_ID } from '../constants/embedding-functions'
 
 // Clone progress type matching the dialog's expected format
 export interface CloneProgressState {
@@ -23,6 +23,10 @@ export interface DraftCollection {
   embeddingFunctionId?: string // Track selected embedding model
   // If cloning from an existing index, this will be set
   sourceCollection?: IndexInfo
+  // Metadata field containing text for embedding regeneration (default: '_text')
+  textField?: string
+  // Available metadata fields from source index (for copy mode)
+  availableTextFields?: string[]
 }
 
 // Legacy alias for backwards compatibility
@@ -59,14 +63,16 @@ interface DraftCollectionProviderProps {
 }
 
 function createInitialDraft(): DraftCollection {
+  const defaultFunc = getEmbeddingFunctionById(DEFAULT_EMBEDDING_FUNCTION_ID)
   return {
     name: '',
-    dimensionOverride: '',
+    dimensionOverride: String(defaultFunc?.defaultDimension || 1024),
     metric: 'cosine',
     serverlessSpec: {
       cloud: 'aws',
       region: 'us-east-1',
     },
+    embeddingFunctionId: DEFAULT_EMBEDDING_FUNCTION_ID,
   }
 }
 
@@ -116,8 +122,79 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
     setActiveCollection(null)
   }, [setActiveCollection])
 
-  const startCopyFromCollection = useCallback((index: IndexInfo) => {
+  const startCopyFromCollection = useCallback(async (index: IndexInfo) => {
     // Pre-fill with source index settings
+    let embeddingFunctionId: string | undefined
+    let availableTextFields: string[] = ['_text'] // Default fallback
+
+    // Try to get the source index's embedding config and find matching embedding function
+    if (currentProfile) {
+      try {
+        const sourceEmbeddingConfig = await window.electronAPI.profiles.getEmbeddingOverride(
+          currentProfile.id,
+          index.name
+        )
+        if (sourceEmbeddingConfig && sourceEmbeddingConfig.modelName) {
+          // Find matching embedding function by type and model name (logs warning if not found)
+          const matchingFunction = getEmbeddingFunctionByModelStrict(
+            sourceEmbeddingConfig.provider,
+            sourceEmbeddingConfig.modelName
+          )
+          if (matchingFunction) {
+            embeddingFunctionId = matchingFunction.id
+          }
+        }
+      } catch {
+        // Ignore errors fetching embedding config
+      }
+
+      // Fetch sample vectors to discover available metadata fields
+      try {
+        const sampleVectors = await window.electronAPI.pinecone.getAllVectors(
+          currentProfile.id,
+          index.name,
+          undefined, // default namespace
+          50 // sample size
+        )
+
+        // Extract unique string-valued metadata fields from all vectors
+        const fieldSet = new Set<string>()
+        sampleVectors.forEach(vector => {
+          if (vector.metadata) {
+            Object.entries(vector.metadata).forEach(([key, value]) => {
+              // Only include fields that have string values (suitable for embedding)
+              if (typeof value === 'string' && value.length > 0) {
+                fieldSet.add(key)
+              }
+            })
+          }
+        })
+
+        if (fieldSet.size > 0) {
+          // Sort fields, putting common text field names first
+          const priorityFields = ['_text', 'text', 'content', 'body', 'description']
+          availableTextFields = Array.from(fieldSet).sort((a, b) => {
+            const aIdx = priorityFields.indexOf(a)
+            const bIdx = priorityFields.indexOf(b)
+            if (aIdx >= 0 && bIdx >= 0) return aIdx - bIdx
+            if (aIdx >= 0) return -1
+            if (bIdx >= 0) return 1
+            return a.localeCompare(b)
+          })
+        }
+      } catch {
+        // Ignore errors fetching vectors - use default
+      }
+    }
+
+    // Fall back to default embedding function if no source config found
+    if (!embeddingFunctionId) {
+      embeddingFunctionId = DEFAULT_EMBEDDING_FUNCTION_ID
+    }
+
+    // Default to first available field (usually '_text' if it exists)
+    const defaultTextField = availableTextFields[0] || '_text'
+
     setDraftCollection({
       name: `${index.name}-copy`,
       dimensionOverride: String(index.dimension),
@@ -130,10 +207,13 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
         region: 'us-east-1',
       },
       sourceCollection: index,
+      embeddingFunctionId,
+      textField: defaultTextField,
+      availableTextFields,
     })
     setValidationErrors({})
     setActiveCollection(null)
-  }, [setActiveCollection])
+  }, [currentProfile, setActiveCollection])
 
   const updateDraft = useCallback((updates: Partial<DraftCollection>) => {
     setDraftCollection((prev) => {
@@ -241,6 +321,22 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
 
       // If this is a copy operation, clone vectors from source to target
       if (sourceCollection) {
+        // Verify source index still exists before cloning
+        try {
+          const currentIndexes = await window.electronAPI.pinecone.listIndexes(currentProfile.id)
+          const sourceExists = currentIndexes.some(idx => idx.name === sourceCollection.name)
+          if (!sourceExists) {
+            setValidationErrors({ _form: 'Source index no longer exists' })
+            return
+          }
+        } catch {
+          setValidationErrors({ _form: 'Failed to verify source index' })
+          return
+        }
+
+        // Capture textField before clearing draft
+        const textField = draftCollection.textField || '_text'
+
         // Show clone progress dialog
         setCloneProgress({
           phase: 'preparing',
@@ -259,6 +355,7 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
             sourceIndexName: sourceCollection.name,
             targetIndexName: newIndexName,
             regenerateEmbeddings: true,
+            textField,
           })
 
           if (result.success) {

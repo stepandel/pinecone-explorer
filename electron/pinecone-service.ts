@@ -21,7 +21,7 @@ import {
   CloneResult,
   EmbeddingConfig,
 } from './types'
-import { EmbeddingService } from './embedding-service'
+import { EmbeddingService, SparseVector } from './embedding-service'
 
 /**
  * Main Pinecone service class
@@ -640,48 +640,102 @@ class PineconeService {
         // Prepare vectors for upsert
         let vectorsToUpsert: Array<{
           id: string
-          values: number[]
+          values?: number[]
+          sparseValues?: SparseVector
           metadata?: Record<string, unknown>
         }>
 
         if (params.regenerateEmbeddings && embeddingConfig) {
           // Extract texts and regenerate embeddings
+          const textField = params.textField || '_text'
           const textsToEmbed: string[] = []
           const textIndices: number[] = []
 
           records.forEach((record, idx) => {
-            const text = (record.metadata as Record<string, unknown>)?._text as string | undefined
+            const text = (record.metadata as Record<string, unknown>)?.[textField] as string | undefined
             if (text) {
               textsToEmbed.push(text)
               textIndices.push(idx)
             }
           })
 
-          let newEmbeddings: number[][] = []
-          if (textsToEmbed.length > 0) {
-            // Use inputType: 'passage' for upsert operations
-            newEmbeddings = await this.embeddingService!.generateEmbeddings(
-              textsToEmbed,
-              { ...embeddingConfig, inputType: 'passage' }
-            )
+          // Check for vectors without text metadata that will be copied as-is
+          const vectorsWithoutText = records.length - textsToEmbed.length
+          if (vectorsWithoutText > 0) {
+            console.warn(`[Clone] ${vectorsWithoutText} vectors have no '${textField}' metadata, copying original embeddings`)
+
+            // Check for dimension mismatch - get target dimension from embedding config
+            const targetDimension = embeddingConfig.dimensions
+            const sourceDimension = records[0]?.values?.length
+
+            if (sourceDimension && targetDimension && sourceDimension !== targetDimension) {
+              throw new Error(
+                `Cannot clone: ${vectorsWithoutText} vectors have no '${textField}' metadata and their dimensions (${sourceDimension}) ` +
+                `don't match target model dimensions (${targetDimension}). All vectors must have '${textField}' metadata for embedding regeneration.`
+              )
+            }
           }
+
+          // Use generateEmbeddingsWithType to support both dense and sparse
+          const embeddingResult = textsToEmbed.length > 0
+            ? await this.embeddingService!.generateEmbeddingsWithType(
+                textsToEmbed,
+                { ...embeddingConfig, inputType: 'passage' }
+              )
+            : null
 
           vectorsToUpsert = records.map((record, idx) => {
             const embeddingIdx = textIndices.indexOf(idx)
-            const values = embeddingIdx >= 0 ? newEmbeddings[embeddingIdx] : record.values || []
-            return {
-              id: record.id,
-              values,
-              metadata: record.metadata as RecordMetadata | undefined,
+
+            // Build the vector object based on embedding type
+            if (embeddingIdx >= 0 && embeddingResult) {
+              if (embeddingResult.type === 'sparse') {
+                // Sparse embedding - use sparseValues, no dense values
+                return {
+                  id: record.id,
+                  sparseValues: embeddingResult.sparseValues[embeddingIdx],
+                  metadata: record.metadata as RecordMetadata | undefined,
+                }
+              } else {
+                // Dense embedding - use values
+                return {
+                  id: record.id,
+                  values: embeddingResult.values[embeddingIdx],
+                  metadata: record.metadata as RecordMetadata | undefined,
+                }
+              }
+            } else {
+              // No text to embed, copy original values (dense) or sparseValues
+              return {
+                id: record.id,
+                values: record.values || undefined,
+                sparseValues: record.sparseValues as SparseVector | undefined,
+                metadata: record.metadata as RecordMetadata | undefined,
+              }
             }
           })
         } else {
           // Copy vectors as-is
           vectorsToUpsert = records.map((record) => ({
             id: record.id,
-            values: record.values || [],
+            values: record.values || undefined,
+            sparseValues: record.sparseValues as SparseVector | undefined,
             metadata: record.metadata as RecordMetadata | undefined,
           }))
+        }
+
+        // Validate dimensions before first upsert
+        if (processedVectors === 0 && vectorsToUpsert.length > 0) {
+          const firstVectorWithValues = vectorsToUpsert.find(v => v.values && v.values.length > 0)
+          if (firstVectorWithValues?.values) {
+            const targetInfo = await this.client!.describeIndex(params.targetIndexName)
+            if (targetInfo.dimension && firstVectorWithValues.values.length !== targetInfo.dimension) {
+              throw new Error(
+                `Dimension mismatch: Generated embeddings have ${firstVectorWithValues.values.length} dimensions ` +
+                `but target index expects ${targetInfo.dimension} dimensions`
+              )
+            }
+          }
         }
 
         // Upsert to target

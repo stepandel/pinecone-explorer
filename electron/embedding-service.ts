@@ -17,6 +17,21 @@ export class EmbeddingCredentialsError extends Error {
 }
 
 /**
+ * Sparse vector representation
+ */
+export interface SparseVector {
+  indices: number[]
+  values: number[]
+}
+
+/**
+ * Result from embedding generation - either dense or sparse
+ */
+export type EmbeddingResult =
+  | { type: 'dense'; values: number[][] }
+  | { type: 'sparse'; sparseValues: SparseVector[] }
+
+/**
  * Service for generating embeddings using Pinecone Inference or OpenAI
  */
 export class EmbeddingService {
@@ -31,12 +46,23 @@ export class EmbeddingService {
   }
 
   /**
-   * Generate embeddings for an array of texts
+   * Check if a model generates sparse embeddings
+   */
+  isSparseModel(config: EmbeddingConfig): boolean {
+    const sparseModels = ['pinecone-sparse-english-v0']
+    return sparseModels.includes(config.modelName || '')
+  }
+
+  /**
+   * Generate embeddings for an array of texts (dense vectors only)
    */
   async generateEmbeddings(
     texts: string[],
     config: EmbeddingConfig
   ): Promise<number[][]> {
+    if (this.isSparseModel(config)) {
+      throw new Error('Use generateEmbeddingsWithType for sparse models')
+    }
     switch (config.provider) {
       case 'pinecone':
         return this.generatePineconeEmbeddings(texts, config)
@@ -45,6 +71,21 @@ export class EmbeddingService {
       default:
         throw new Error(`Unsupported embedding provider: ${config.provider}`)
     }
+  }
+
+  /**
+   * Generate embeddings with type information (supports both dense and sparse)
+   */
+  async generateEmbeddingsWithType(
+    texts: string[],
+    config: EmbeddingConfig
+  ): Promise<EmbeddingResult> {
+    if (this.isSparseModel(config)) {
+      return this.generatePineconeSparseEmbeddings(texts, config)
+    }
+
+    const values = await this.generateEmbeddings(texts, config)
+    return { type: 'dense', values }
   }
 
   /**
@@ -121,6 +162,49 @@ export class EmbeddingService {
       }
       return embedding.values
     })
+  }
+
+  /**
+   * Generate sparse embeddings using Pinecone Inference API
+   */
+  private async generatePineconeSparseEmbeddings(
+    texts: string[],
+    config: EmbeddingConfig
+  ): Promise<EmbeddingResult> {
+    if (!this.pineconeClient) {
+      throw new Error('Pinecone client not initialized. Please connect first.')
+    }
+
+    const modelName = config.modelName || 'pinecone-sparse-english-v0'
+    const inputType = config.inputType || 'passage'
+
+    const params: Record<string, unknown> = {
+      inputType,
+      truncate: 'END',
+    }
+
+    const response = await this.pineconeClient.inference.embed(
+      modelName,
+      texts,
+      params as Record<string, string>
+    )
+
+    // Extract sparse values from the response
+    const sparseValues: SparseVector[] = response.data.map(item => {
+      // The SDK returns sparseValues for sparse models
+      const embedding = item as unknown as {
+        sparseValues?: { indices: number[]; values: number[] }
+      }
+      if (!embedding.sparseValues) {
+        throw new Error('Pinecone inference returned empty sparse embedding values')
+      }
+      return {
+        indices: embedding.sparseValues.indices,
+        values: embedding.sparseValues.values,
+      }
+    })
+
+    return { type: 'sparse', sparseValues }
   }
 
   /**

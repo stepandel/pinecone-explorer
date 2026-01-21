@@ -235,6 +235,32 @@ export function IndexConfigView() {
           )}
         </div>
 
+        {/* Text Field - only shown when copying */}
+        {draftCollection.sourceCollection && (
+          <div className="space-y-1">
+            <label htmlFor="text-field" className="text-[11px] font-medium text-muted-foreground">
+              Embedding Text Field
+            </label>
+            <div className="relative">
+              <select
+                id="text-field"
+                value={draftCollection.textField || '_text'}
+                onChange={(e) => updateDraft({ textField: e.target.value })}
+                className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                style={inputStyle}
+              >
+                {(draftCollection.availableTextFields || ['_text']).map(field => (
+                  <option key={field} value={field}>{field}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Metadata field containing text for embedding regeneration
+            </p>
+          </div>
+        )}
+
         {/* Dimension - hidden for sparse models */}
         {!isSparseModel && (
           <div className="space-y-1">
