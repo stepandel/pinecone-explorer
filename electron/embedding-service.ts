@@ -142,9 +142,9 @@ export class EmbeddingService {
       truncate: 'END',
     }
 
-    // Only pass dimensions for models that support it (llama-text-embed-v2)
+    // Only pass dimension for models that support it (llama-text-embed-v2)
     if (modelName === 'llama-text-embed-v2' && config.dimensions) {
-      params.dimensions = config.dimensions
+      params.dimension = config.dimensions
     }
 
     const response = await this.pineconeClient.inference.embed(
