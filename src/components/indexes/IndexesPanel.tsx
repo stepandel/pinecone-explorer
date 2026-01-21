@@ -1,16 +1,127 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
+import { useDeleteIndexMutation } from '../../hooks/usePineconeQueries'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../ui/dialog'
+import { Button } from '../ui/button'
 
 export function IndexesPanel() {
-  const { indexes, indexesLoading, indexesError } = usePinecone()
+  const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useCollection()
   const { startCreation, draftCollection } = useDraftCollection()
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [indexToDelete, setIndexToDelete] = useState<string | null>(null)
+  const [confirmationInput, setConfirmationInput] = useState('')
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const deleteMutation = useDeleteIndexMutation(currentProfile?.id || '')
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; indexName: string } | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
 
   const handleIndexClick = (indexName: string) => {
     setActiveIndex(indexName)
   }
+
+  // Handle right-click context menu
+  const handleContextMenu = useCallback((e: React.MouseEvent, indexName: string) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, indexName })
+  }, [])
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null)
+      }
+    }
+
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [contextMenu])
+
+  // Handle delete action - opens confirmation dialog
+  const openDeleteDialog = useCallback((indexName: string) => {
+    setIndexToDelete(indexName)
+    setConfirmationInput('')
+    setDeleteError(null)
+    setDeleteDialogOpen(true)
+    setContextMenu(null)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!indexToDelete) return
+
+    // Verify the confirmation input matches the index name
+    if (confirmationInput !== indexToDelete) {
+      setDeleteError('Index name does not match')
+      return
+    }
+
+    try {
+      await deleteMutation.mutateAsync(indexToDelete)
+      // If we deleted the active index, clear selection
+      if (activeIndex === indexToDelete) {
+        setActiveIndex(null)
+      }
+      setDeleteDialogOpen(false)
+      setIndexToDelete(null)
+      setConfirmationInput('')
+      setDeleteError(null)
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete index')
+    }
+  }, [indexToDelete, confirmationInput, deleteMutation, activeIndex, setActiveIndex])
+
+  const handleCancelDelete = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setIndexToDelete(null)
+    setConfirmationInput('')
+    setDeleteError(null)
+  }, [])
+
+  // Listen for menu delete event
+  useEffect(() => {
+    const handleMenuDelete = () => {
+      if (activeIndex) {
+        openDeleteDialog(activeIndex)
+      }
+    }
+
+    window.addEventListener('menu:delete-collection', handleMenuDelete)
+    return () => window.removeEventListener('menu:delete-collection', handleMenuDelete)
+  }, [activeIndex, openDeleteDialog])
+
+  // Keyboard shortcut: Cmd+Delete or Cmd+Backspace to delete active index
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
+        // Only trigger if not in an input/textarea and we have an active index
+        const target = e.target as HTMLElement
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && activeIndex) {
+          e.preventDefault()
+          openDeleteDialog(activeIndex)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeIndex, openDeleteDialog])
 
   return (
     <aside
@@ -49,15 +160,16 @@ export function IndexesPanel() {
               const isActive = index.name === activeIndex
 
               return (
-                <button
+                <div
                   key={index.name}
-                  onClick={() => handleIndexClick(index.name)}
-                  className={`w-full px-2 py-1.5 text-left transition-colors duration-100 ${
+                  className={`w-full px-2 py-1.5 text-left transition-colors duration-100 cursor-pointer ${
                     isActive
                       ? 'bg-black/[0.08] dark:bg-white/[0.10]'
                       : 'hover:bg-black/[0.05] dark:hover:bg-white/[0.06]'
                   }`}
-                  title={`${index.name}\n${index.dimension}d · ${index.metric}`}
+                  onClick={() => handleIndexClick(index.name)}
+                  onContextMenu={(e) => handleContextMenu(e, index.name)}
+                  title={`${index.name}\n${index.dimension ? `${index.dimension}d · ` : ''}${index.metric}`}
                 >
                   <div
                     className={`text-[11px] truncate ${
@@ -69,9 +181,9 @@ export function IndexesPanel() {
                     {index.name}
                   </div>
                   <div className="text-[9px] text-muted-foreground truncate">
-                    {index.dimension}d
+                    {index.dimension ? `${index.dimension}d` : 'sparse'}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -90,6 +202,78 @@ export function IndexesPanel() {
           <span>New</span>
         </button>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 min-w-[160px] bg-popover border border-border rounded-md shadow-md py-1"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            className="w-full px-3 py-1.5 text-left text-[12px] text-destructive hover:bg-destructive/10 transition-colors"
+            onClick={() => openDeleteDialog(contextMenu.indexName)}
+          >
+            Delete Index
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => !open && handleCancelDelete()}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Delete Index</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This action cannot be undone. All vectors in this index will be permanently deleted.
+                </p>
+                <p>
+                  To confirm, type <span className="font-mono font-semibold text-foreground bg-muted px-1 py-0.5 rounded">{indexToDelete}</span> below:
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <input
+              type="text"
+              value={confirmationInput}
+              onChange={(e) => {
+                setConfirmationInput(e.target.value)
+                setDeleteError(null)
+              }}
+              placeholder="Enter index name to confirm"
+              className="w-full h-9 px-3 text-sm rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && confirmationInput === indexToDelete) {
+                  handleConfirmDelete()
+                }
+              }}
+            />
+            {deleteError && (
+              <p className="mt-2 text-sm text-destructive">{deleteError}</p>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={handleCancelDelete}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending || confirmationInput !== indexToDelete}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete Index'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }
