@@ -3,7 +3,7 @@ import { useCollection } from '../../context/CollectionContext'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { usePanel } from '../../context/PanelContext'
 import { usePinecone } from '../../providers/PineconeProvider'
-import { IndexesPanel, INDEXES_PANEL_WIDTH } from '../indexes/IndexesPanel'
+import { IndexesPanel } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
 import { IndexConfigView } from '../indexes/IndexConfigView'
 import VectorsView from '../vectors/VectorsView'
@@ -20,6 +20,8 @@ export function MainContent() {
   const { draftCollection } = useDraftCollection()
   const { currentProfile } = usePinecone()
   const {
+    indexesPanelWidth,
+    setIndexesPanelWidth,
     leftPanelOpen,
     leftPanelWidth,
     setLeftPanelWidth,
@@ -42,6 +44,7 @@ export function MainContent() {
   const [draftUpdateHandler, setDraftUpdateHandler] = useState<((updates: { id?: string; metadata?: Record<string, unknown> }) => void) | null>(null)
 
   // Resize state
+  const [isResizingIndexes, setIsResizingIndexes] = useState(false)
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const [isResizingRight, setIsResizingRight] = useState(false)
 
@@ -60,25 +63,29 @@ export function MainContent() {
 
   // Handle mouse move for resizing
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isResizingLeft) {
-      // Adjust for the fixed IndexesPanel width
-      const newWidth = Math.max(180, Math.min(400, e.clientX - INDEXES_PANEL_WIDTH))
+    if (isResizingIndexes) {
+      const newWidth = Math.max(60, Math.min(240, e.clientX))
+      setIndexesPanelWidth(newWidth)
+    } else if (isResizingLeft) {
+      // Adjust for the IndexesPanel width
+      const newWidth = Math.max(180, Math.min(400, e.clientX - indexesPanelWidth))
       setLeftPanelWidth(newWidth)
     } else if (isResizingRight) {
       const newWidth = Math.max(250, Math.min(600, window.innerWidth - e.clientX))
       setRightPanelWidth(newWidth)
     }
-  }, [isResizingLeft, isResizingRight, setLeftPanelWidth, setRightPanelWidth])
+  }, [isResizingIndexes, isResizingLeft, isResizingRight, indexesPanelWidth, setIndexesPanelWidth, setLeftPanelWidth, setRightPanelWidth])
 
   // Handle mouse up to stop resizing
   const handleMouseUp = useCallback(() => {
+    setIsResizingIndexes(false)
     setIsResizingLeft(false)
     setIsResizingRight(false)
   }, [])
 
   // Add/remove global event listeners for resize
   useEffect(() => {
-    if (isResizingLeft || isResizingRight) {
+    if (isResizingIndexes || isResizingLeft || isResizingRight) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
       document.body.style.cursor = 'col-resize'
@@ -90,11 +97,11 @@ export function MainContent() {
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-  }, [isResizingLeft, isResizingRight, handleMouseMove, handleMouseUp])
+  }, [isResizingIndexes, isResizingLeft, isResizingRight, handleMouseMove, handleMouseUp])
 
   // Calculate main content padding based on open panels
-  // Always account for fixed IndexesPanel, plus the namespaces panel if open
-  const leftPadding = INDEXES_PANEL_WIDTH + (leftPanelOpen ? leftPanelWidth : 0)
+  // Always account for IndexesPanel, plus the namespaces panel if open
+  const leftPadding = indexesPanelWidth + (leftPanelOpen ? leftPanelWidth : 0)
   const rightPadding = rightPanelOpen ? rightPanelWidth : 0
 
   // Determine what to show in the main area
@@ -102,12 +109,20 @@ export function MainContent() {
 
   return (
     <main className="flex-1 relative overflow-hidden bg-content">
-      {/* Fixed IndexesPanel - always visible */}
+      {/* IndexesPanel - always visible, resizable */}
       <div
         className="absolute top-0 left-0 h-full z-30"
-        style={{ width: `${INDEXES_PANEL_WIDTH}px` }}
+        style={{ width: `${indexesPanelWidth}px` }}
       >
         <IndexesPanel />
+        {/* Resize handle */}
+        <div
+          className="absolute top-0 right-0 w-[5px] h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            setIsResizingIndexes(true)
+          }}
+        />
       </div>
 
       {/* Main content area */}
@@ -162,7 +177,7 @@ export function MainContent() {
           leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          left: `${INDEXES_PANEL_WIDTH}px`,
+          left: `${indexesPanelWidth}px`,
           width: `${leftPanelWidth}px`,
         }}
       >

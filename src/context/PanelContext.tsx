@@ -1,6 +1,10 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 
 interface PanelContextType {
+  // Indexes panel (fixed, resizable, not collapsible)
+  indexesPanelWidth: number
+  setIndexesPanelWidth: (width: number) => void
+
   // Left panel (NamespacesPanel) state
   leftPanelOpen: boolean
   setLeftPanelOpen: (open: boolean) => void
@@ -30,6 +34,7 @@ interface PanelContextType {
 const PanelContext = createContext<PanelContextType | undefined>(undefined)
 
 export function PanelProvider({ children }: { children: ReactNode }) {
+  const [indexesPanelWidth, setIndexesPanelWidth] = useState(73)
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [leftPanelWidth, setLeftPanelWidth] = useState(220)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
@@ -101,6 +106,8 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   return (
     <PanelContext.Provider
       value={{
+        indexesPanelWidth,
+        setIndexesPanelWidth,
         leftPanelOpen,
         setLeftPanelOpen,
         leftPanelWidth,

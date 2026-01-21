@@ -1,8 +1,6 @@
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useCollection } from '../../context/CollectionContext'
 
-const INDEXES_PANEL_WIDTH = 73 // ~1/3 of NamespacesPanel default width (220px)
-
 export function IndexesPanel() {
   const { indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useCollection()
@@ -13,9 +11,8 @@ export function IndexesPanel() {
 
   return (
     <aside
-      className="h-full flex flex-col flex-shrink-0"
+      className="h-full w-full flex flex-col flex-shrink-0"
       style={{
-        width: `${INDEXES_PANEL_WIDTH}px`,
         background: 'var(--sidebar)',
         borderRight: '1px solid var(--border)',
       }}
@@ -80,5 +77,3 @@ export function IndexesPanel() {
     </aside>
   )
 }
-
-export { INDEXES_PANEL_WIDTH }
