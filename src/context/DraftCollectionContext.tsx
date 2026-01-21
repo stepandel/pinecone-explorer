@@ -152,18 +152,49 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
         },
       }
 
+      // Check if this is a Pinecone-hosted embedding model (integrated inference)
+      const isPineconeModel = embeddingConfig?.type === 'pinecone'
+
       // For sparse indexes: set vectorType, omit dimension
-      // For dense indexes: set dimension
+      // For dense indexes with Pinecone model: use integrated inference (no dimension needed)
+      // For dense indexes with other models: set dimension
       if (isSparseModel) {
         params.vectorType = 'sparse'
+      } else if (isPineconeModel && embeddingConfig) {
+        // Use integrated inference - Pinecone will handle embeddings
+        params.embed = {
+          model: embeddingConfig.modelName,
+          fieldMap: { text: '_text' }, // Map the _text field for embedding
+          metric: draftCollection.metric || 'cosine',
+        }
       } else {
+        // Standard index - we'll generate embeddings client-side
         params.dimension = dimension
       }
 
       await createMutation.mutateAsync(params)
 
-      // Success: clear draft and select new index
+      // Success: save embedding config override for this index
       const newIndexName = draftCollection.name.trim()
+
+      // Always save the embedding config locally (for client-side embedding fallback)
+      if (draftCollection.embeddingFunctionId && embeddingConfig) {
+        const embeddingOverride: EmbeddingConfig = {
+          provider: embeddingConfig.type as EmbeddingProviderType,
+          modelName: embeddingConfig.modelName,
+          ...(embeddingConfig.defaultDimension && !isSparseModel && {
+            dimensions: dimension || embeddingConfig.defaultDimension
+          }),
+        }
+
+        await window.electronAPI.profiles.setEmbeddingOverride(
+          currentProfile.id,
+          newIndexName,
+          embeddingOverride
+        )
+      }
+
+      // Clear draft and select new index
       setDraftCollection(null)
       setValidationErrors({})
       setActiveCollection(newIndexName)

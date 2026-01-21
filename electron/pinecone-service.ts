@@ -478,6 +478,33 @@ class PineconeService {
 
     const isSparse = params.vectorType === 'sparse'
 
+    // If embed config is provided, use createIndexForModel for integrated inference
+    if (params.embed) {
+      // Extract cloud and region from serverless spec
+      const spec = params.spec as { serverless?: { cloud: string; region: string } }
+      if (!spec.serverless) {
+        throw new Error('Integrated inference indexes require serverless spec')
+      }
+
+      await this.client.createIndexForModel({
+        name: params.name,
+        cloud: spec.serverless.cloud as 'aws' | 'gcp' | 'azure',
+        region: spec.serverless.region,
+        embed: {
+          model: params.embed.model,
+          fieldMap: params.embed.fieldMap,
+          metric: params.embed.metric || params.metric,
+        },
+        deletionProtection: params.deletionProtection,
+        waitUntilReady: true,
+      })
+
+      // Clear cache to pick up new index
+      this.indexCache.delete(params.name)
+      return
+    }
+
+    // Standard index creation (without integrated inference)
     // Build the create index request
     // For sparse indexes: omit dimension, set vectorType
     // For dense indexes: require dimension

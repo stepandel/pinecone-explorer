@@ -217,7 +217,7 @@ export interface ListVectorsResult {
  */
 export interface CreateIndexParams {
   name: string
-  dimension?: number // Required for dense indexes, omit for sparse
+  dimension?: number // Required for dense indexes without integrated inference, omit for sparse
   metric?: 'cosine' | 'euclidean' | 'dotproduct'
   vectorType?: 'dense' | 'sparse' // Default is 'dense'
   spec: {
@@ -235,6 +235,12 @@ export interface CreateIndexParams {
     }
   }
   deletionProtection?: 'enabled' | 'disabled'
+  // Integrated inference configuration (for Pinecone-hosted embedding models)
+  embed?: {
+    model: string // e.g., 'multilingual-e5-large', 'llama-text-embed-v2'
+    fieldMap: { text: string } // Maps record field to text for embedding
+    metric?: 'cosine' | 'euclidean' | 'dotproduct'
+  }
 }
 
 /**
