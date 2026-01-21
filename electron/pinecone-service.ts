@@ -48,8 +48,9 @@ class PineconeService {
       // Test connection by listing indexes
       await this.client.listIndexes()
 
-      // Initialize embedding service
+      // Initialize embedding service and pass Pinecone client
       this.embeddingService = new EmbeddingService()
+      this.embeddingService.setPineconeClient(this.client)
 
       // Store profile on successful connection
       this.profile = profile
@@ -229,9 +230,10 @@ class PineconeService {
         )
       }
 
+      // Use inputType: 'query' for search operations
       const embeddings = await this.embeddingService!.generateEmbeddings(
         [params.queryText],
-        embeddingConfig
+        { ...embeddingConfig, inputType: 'query' }
       )
       queryVector = embeddings[0]
     }
@@ -299,9 +301,10 @@ class PineconeService {
         throw new Error('No embedding configuration found. Please configure an embedding provider.')
       }
 
+      // Use inputType: 'passage' for upsert operations
       const embeddings = await this.embeddingService!.generateEmbeddings(
         [params.text],
-        embeddingConfig
+        { ...embeddingConfig, inputType: 'passage' }
       )
       values = embeddings[0]
     }
@@ -342,9 +345,10 @@ class PineconeService {
         throw new Error('No embedding configuration found. Please configure an embedding provider.')
       }
 
+      // Use inputType: 'passage' for upsert operations
       const embeddings = await this.embeddingService!.generateEmbeddings(
         [params.text],
-        embeddingConfig
+        { ...embeddingConfig, inputType: 'passage' }
       )
       values = embeddings[0]
     }
@@ -420,9 +424,10 @@ class PineconeService {
 
           let embeddings: number[][] = []
           if (textsToEmbed.length > 0) {
+            // Use inputType: 'passage' for upsert operations
             embeddings = await this.embeddingService!.generateEmbeddings(
               textsToEmbed,
-              embeddingConfig
+              { ...embeddingConfig, inputType: 'passage' }
             )
           }
 
@@ -608,9 +613,10 @@ class PineconeService {
 
           let newEmbeddings: number[][] = []
           if (textsToEmbed.length > 0) {
+            // Use inputType: 'passage' for upsert operations
             newEmbeddings = await this.embeddingService!.generateEmbeddings(
               textsToEmbed,
-              embeddingConfig
+              { ...embeddingConfig, inputType: 'passage' }
             )
           }
 

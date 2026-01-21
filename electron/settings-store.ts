@@ -6,15 +6,6 @@ import { getEncryptionKey } from './secure-key-manager'
 
 export interface ApiKeys {
   OPENAI_API_KEY?: string
-  COHERE_API_KEY?: string
-  GEMINI_API_KEY?: string
-  JINA_API_KEY?: string
-  MISTRAL_API_KEY?: string
-  VOYAGE_API_KEY?: string
-  TOGETHER_API_KEY?: string
-  CLOUDFLARE_ACCOUNT_ID?: string
-  CLOUDFLARE_API_KEY?: string
-  MORPH_API_KEY?: string
 }
 
 export type Theme = 'light' | 'dark' | 'system'

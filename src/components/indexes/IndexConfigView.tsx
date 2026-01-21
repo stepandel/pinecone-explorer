@@ -1,21 +1,18 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ChevronDown, Info } from 'lucide-react'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { useCollection } from '../../context/CollectionContext'
-import { EMBEDDING_FUNCTIONS, EMBEDDING_FUNCTION_GROUPS, getEmbeddingFunctionById } from '../../constants/embedding-functions'
+import {
+  EMBEDDING_FUNCTIONS,
+  EMBEDDING_FUNCTION_GROUPS,
+  getEmbeddingFunctionById,
+  DEFAULT_EMBEDDING_FUNCTION_ID,
+  type DistanceMetric,
+  type EmbeddingFunctionConfig
+} from '../../constants/embedding-functions'
 
 const inputClassName = "w-full h-6 text-[11px] px-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
-
-// Common dimension values
-const COMMON_DIMENSIONS = [
-  { value: '384', label: '384 (MiniLM, Cohere Light)' },
-  { value: '512', label: '512 (Voyage Lite)' },
-  { value: '768', label: '768 (Gemini 004, BGE, MPNet)' },
-  { value: '1024', label: '1024 (Cohere v3, Jina, Mistral)' },
-  { value: '1536', label: '1536 (OpenAI 3-Small, Cohere v4)' },
-  { value: '3072', label: '3072 (OpenAI 3-Large, Gemini 001)' },
-]
 
 // Cloud regions for serverless indexes
 const CLOUD_REGIONS = {
@@ -30,21 +27,57 @@ export function IndexConfigView() {
   const { draftCollection, updateDraft, cancelCreation, saveDraft, isCreating, validationErrors } = useDraftCollection()
   const { setActiveIndex } = useCollection()
 
-  // Embedding function selection
-  const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>('')
+  // Embedding function selection - default to Pinecone's llama-text-embed-v2
+  const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>(DEFAULT_EMBEDDING_FUNCTION_ID)
 
   // Cloud and region selection
   const [cloud, setCloud] = useState<CloudProvider>('aws')
   const [region, setRegion] = useState('us-east-1')
 
-  // Handle embedding function change - auto-fill dimension
+  // Get the selected embedding function config
+  const selectedEmbedding = useMemo(() =>
+    getEmbeddingFunctionById(selectedEmbeddingId),
+    [selectedEmbeddingId]
+  )
+
+  // Get available dimensions for the selected embedding
+  const availableDimensions = useMemo(() => {
+    if (!selectedEmbedding) return []
+    if (selectedEmbedding.availableDimensions) {
+      return selectedEmbedding.availableDimensions
+    }
+    return [selectedEmbedding.defaultDimension]
+  }, [selectedEmbedding])
+
+  // Get supported metrics for the selected embedding
+  const supportedMetrics = useMemo(() => {
+    if (!selectedEmbedding) return ['cosine', 'euclidean', 'dotproduct'] as DistanceMetric[]
+    return selectedEmbedding.supportedMetrics
+  }, [selectedEmbedding])
+
+  // Initialize defaults on mount
+  useEffect(() => {
+    if (selectedEmbedding) {
+      // Set default dimension
+      if (!draftCollection?.dimensionOverride) {
+        updateDraft({ dimensionOverride: String(selectedEmbedding.defaultDimension) })
+      }
+      // Set default metric to first supported
+      if (!draftCollection?.metric || !selectedEmbedding.supportedMetrics.includes(draftCollection.metric as DistanceMetric)) {
+        updateDraft({ metric: selectedEmbedding.supportedMetrics[0] })
+      }
+    }
+  }, []) // Run only on mount
+
+  // Handle embedding function change
   const handleEmbeddingChange = useCallback((embeddingId: string) => {
     setSelectedEmbeddingId(embeddingId)
-    if (embeddingId) {
-      const ef = getEmbeddingFunctionById(embeddingId)
-      if (ef?.dimensions) {
-        updateDraft({ dimensionOverride: String(ef.dimensions) })
-      }
+    const ef = getEmbeddingFunctionById(embeddingId)
+    if (ef) {
+      // Update dimension to the default for this model
+      updateDraft({ dimensionOverride: String(ef.defaultDimension) })
+      // Update metric to first supported metric for this model
+      updateDraft({ metric: ef.supportedMetrics[0] })
     }
   }, [updateDraft])
 
@@ -126,7 +159,7 @@ export function IndexConfigView() {
         {/* Embedding Function */}
         <div className="space-y-1">
           <label className="text-[11px] font-medium text-muted-foreground">
-            Embedding Function
+            Embedding Model
           </label>
           <div className="relative">
             <select
@@ -135,12 +168,12 @@ export function IndexConfigView() {
               className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
               style={inputStyle}
             >
-              <option value="">Select embedding function...</option>
+              <option value="">Select embedding model...</option>
               {EMBEDDING_FUNCTION_GROUPS.map(group => (
                 <optgroup key={group} label={group}>
                   {EMBEDDING_FUNCTIONS.filter(ef => ef.group === group).map(ef => (
                     <option key={ef.id} value={ef.id}>
-                      {ef.label} {ef.dimensions ? `(${ef.dimensions}d)` : ''}
+                      {ef.label}
                     </option>
                   ))}
                 </optgroup>
@@ -148,9 +181,17 @@ export function IndexConfigView() {
             </select>
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            Optional: auto-fills dimension based on selection
-          </p>
+          {/* Vector type info */}
+          {selectedEmbedding && (
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Info className="h-3 w-3" />
+              <span>
+                Creates <span className="font-medium text-foreground">{selectedEmbedding.vectorType}</span> vectors
+                {selectedEmbedding.type === 'pinecone' && ' (no additional API key needed)'}
+                {selectedEmbedding.type === 'openai' && ' (requires OpenAI API key)'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Dimension */}
@@ -160,33 +201,27 @@ export function IndexConfigView() {
           </label>
           <div className="relative">
             <select
-              value={COMMON_DIMENSIONS.some(d => d.value === draftCollection.dimensionOverride) ? draftCollection.dimensionOverride : 'custom'}
-              onChange={(e) => {
-                if (e.target.value !== 'custom') {
-                  updateDraft({ dimensionOverride: e.target.value })
-                }
-              }}
+              value={draftCollection.dimensionOverride || ''}
+              onChange={(e) => updateDraft({ dimensionOverride: e.target.value })}
               className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
               style={inputStyle}
+              disabled={availableDimensions.length <= 1}
             >
-              <option value="">Select dimension...</option>
-              {COMMON_DIMENSIONS.map(dim => (
-                <option key={dim.value} value={dim.value}>{dim.label}</option>
+              {availableDimensions.map(dim => (
+                <option key={dim} value={String(dim)}>{dim}</option>
               ))}
-              <option value="custom">Custom...</option>
             </select>
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
           </div>
-          {/* Show custom input if custom is selected or value doesn't match common dimensions */}
-          {(!COMMON_DIMENSIONS.some(d => d.value === draftCollection.dimensionOverride) && draftCollection.dimensionOverride !== '') && (
-            <input
-              type="number"
-              value={draftCollection.dimensionOverride || ''}
-              onChange={(e) => updateDraft({ dimensionOverride: e.target.value })}
-              placeholder="Enter custom dimension"
-              className={`${inputClassName} mt-1`}
-              style={inputStyle}
-            />
+          {availableDimensions.length <= 1 && (
+            <p className="text-[10px] text-muted-foreground">
+              Fixed dimension for this model
+            </p>
+          )}
+          {availableDimensions.length > 1 && (
+            <p className="text-[10px] text-muted-foreground">
+              {selectedEmbedding?.label} supports multiple dimensions
+            </p>
           )}
         </div>
 
@@ -196,20 +231,31 @@ export function IndexConfigView() {
             Distance Metric
           </label>
           <div className="flex gap-3">
-            {(['cosine', 'euclidean', 'dotproduct'] as const).map((metric) => (
-              <label key={metric} className="flex items-center gap-1 cursor-pointer">
-                <input
-                  type="radio"
-                  name="metric"
-                  value={metric}
-                  checked={(draftCollection.metric || 'cosine') === metric}
-                  onChange={() => updateDraft({ metric })}
-                  className="h-3 w-3"
-                />
-                <span className="text-[10px] text-foreground capitalize">{metric}</span>
-              </label>
-            ))}
+            {(['cosine', 'euclidean', 'dotproduct'] as const).map((metric) => {
+              const isSupported = supportedMetrics.includes(metric)
+              return (
+                <label
+                  key={metric}
+                  className={`flex items-center gap-1 ${isSupported ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
+                  title={isSupported ? undefined : `Not supported by ${selectedEmbedding?.label || 'this model'}`}
+                >
+                  <input
+                    type="radio"
+                    name="metric"
+                    value={metric}
+                    checked={(draftCollection.metric || 'cosine') === metric}
+                    onChange={() => updateDraft({ metric })}
+                    disabled={!isSupported}
+                    className="h-3 w-3"
+                  />
+                  <span className="text-[10px] text-foreground capitalize">{metric}</span>
+                </label>
+              )
+            })}
           </div>
+          <p className="text-[10px] text-muted-foreground">
+            {selectedEmbedding?.label} supports: {supportedMetrics.join(', ')}
+          </p>
         </div>
 
         {/* Cloud Provider */}

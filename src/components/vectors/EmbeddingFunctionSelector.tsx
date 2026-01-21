@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
-import { EMBEDDING_FUNCTIONS, EMBEDDING_FUNCTION_GROUPS } from '../../constants/embedding-functions'
+import { EMBEDDING_FUNCTIONS, EMBEDDING_FUNCTION_GROUPS, DEFAULT_EMBEDDING_FUNCTION_ID, getEmbeddingFunctionById } from '../../constants/embedding-functions'
 
 interface EmbeddingFunctionSelectorProps {
   collectionName: string
@@ -50,7 +50,7 @@ export function EmbeddingFunctionSelector({
       await onSave({
         provider: selectedEF.type as EmbeddingProviderType,
         modelName: selectedEF.modelName,
-        url: selectedEF.url,
+        dimensions: selectedEF.defaultDimension,
       })
       setOpen(false)
     } finally {
@@ -116,7 +116,7 @@ export function EmbeddingFunctionSelector({
                   <optgroup key={group} label={group}>
                     {EMBEDDING_FUNCTIONS.filter(ef => ef.group === group).map(ef => (
                       <option key={ef.id} value={ef.id}>
-                        {ef.label} {ef.dimensions ? `(${ef.dimensions}d)` : ''}
+                        {ef.label} ({ef.defaultDimension}d)
                       </option>
                     ))}
                   </optgroup>
@@ -128,8 +128,9 @@ export function EmbeddingFunctionSelector({
 
           {/* Selected info */}
           {(() => {
-            const displayEF = selectedEF || serverFunction || EMBEDDING_FUNCTIONS.find(ef => ef.id === 'default')!
-            const hasDimensionMismatch = selectedEF && embeddingDimension && selectedEF.dimensions && selectedEF.dimensions !== embeddingDimension
+            const defaultEF = getEmbeddingFunctionById(DEFAULT_EMBEDDING_FUNCTION_ID)!
+            const displayEF = selectedEF || serverFunction || defaultEF
+            const hasDimensionMismatch = selectedEF && embeddingDimension && selectedEF.defaultDimension !== embeddingDimension
 
             // Determine container styling based on state
             let containerClass = 'bg-black/[0.03] dark:bg-white/[0.04] ring-1 ring-black/[0.04] dark:ring-white/[0.06] shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]'
@@ -159,7 +160,7 @@ export function EmbeddingFunctionSelector({
                 )}
                 <p className="text-muted-foreground"><span className="text-foreground/60">Provider:</span> {displayEF.type}</p>
                 <p className="text-muted-foreground"><span className="text-foreground/60">Model:</span> {displayEF.modelName}</p>
-                <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {displayEF.dimensions ?? 'variable'}</p>
+                <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {displayEF.availableDimensions ? displayEF.availableDimensions.join(', ') : displayEF.defaultDimension}</p>
                 {embeddingDimension && (
                   <p className="text-muted-foreground pt-1 border-t border-black/5 dark:border-white/5 mt-1">
                     <span className="text-foreground/60">Index:</span> {embeddingDimension}d
