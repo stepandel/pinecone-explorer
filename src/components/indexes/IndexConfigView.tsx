@@ -15,9 +15,11 @@ const inputClassName = "w-full h-6 text-[11px] px-1.5 rounded-md border border-i
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
 
 // Cloud regions for serverless indexes
+// Source: https://docs.pinecone.io/troubleshooting/available-cloud-regions
+// Note: Starter plan is limited to AWS us-east-1 only
 const CLOUD_REGIONS = {
   aws: ['us-east-1', 'us-west-2', 'eu-west-1'],
-  gcp: ['us-central1', 'europe-west1', 'asia-southeast1'],
+  gcp: ['us-central1', 'europe-west4'],
   azure: ['eastus2'],
 } as const
 
@@ -30,9 +32,13 @@ export function IndexConfigView() {
   // Embedding function selection - default to Pinecone's llama-text-embed-v2
   const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>(DEFAULT_EMBEDDING_FUNCTION_ID)
 
-  // Cloud and region selection
-  const [cloud, setCloud] = useState<CloudProvider>('aws')
-  const [region, setRegion] = useState('us-east-1')
+  // Cloud and region selection - initialize from draft if available
+  const [cloud, setCloud] = useState<CloudProvider>(
+    (draftCollection?.serverlessSpec?.cloud as CloudProvider) || 'aws'
+  )
+  const [region, setRegion] = useState(
+    draftCollection?.serverlessSpec?.region || 'us-east-1'
+  )
 
   // Get the selected embedding function config
   const selectedEmbedding = useMemo(() =>
@@ -89,29 +95,36 @@ export function IndexConfigView() {
     }
   }, [updateDraft])
 
-  // Handle cloud change - update region to first available
+  // Handle cloud change - update region to first available and sync to draft
   const handleCloudChange = useCallback((newCloud: CloudProvider) => {
+    const newRegion = CLOUD_REGIONS[newCloud][0]
     setCloud(newCloud)
-    setRegion(CLOUD_REGIONS[newCloud][0])
-  }, [])
+    setRegion(newRegion)
+    // Sync to draft immediately
+    updateDraft({
+      serverlessSpec: {
+        cloud: newCloud,
+        region: newRegion,
+      },
+    })
+  }, [updateDraft])
 
-  // Handle save with spec
-  const handleSave = useCallback(async () => {
-    if (!draftCollection) return
-
-    // Update draft with serverless spec before saving
+  // Handle region change - sync to draft
+  const handleRegionChange = useCallback((newRegion: string) => {
+    setRegion(newRegion)
     updateDraft({
       serverlessSpec: {
         cloud,
-        region,
+        region: newRegion,
       },
     })
+  }, [cloud, updateDraft])
 
-    // Small delay to ensure state is updated
-    setTimeout(() => {
-      saveDraft()
-    }, 0)
-  }, [draftCollection, cloud, region, updateDraft, saveDraft])
+  // Handle save - serverlessSpec is already synced via handleCloudChange/handleRegionChange
+  const handleSave = useCallback(async () => {
+    if (!draftCollection) return
+    saveDraft()
+  }, [draftCollection, saveDraft])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -296,7 +309,7 @@ export function IndexConfigView() {
           <div className="relative">
             <select
               value={region}
-              onChange={(e) => setRegion(e.target.value)}
+              onChange={(e) => handleRegionChange(e.target.value)}
               className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
               style={inputStyle}
             >

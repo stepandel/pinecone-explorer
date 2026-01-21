@@ -31,6 +31,56 @@ settingsStore.injectIntoProcessEnv()
 // Track active clone operations per profile for cancellation
 const activeCloneOperations: Map<string, AbortController> = new Map()
 
+/**
+ * Parse Pinecone API errors and return user-friendly messages
+ */
+function parsePineconeError(error: unknown, context?: { cloud?: string; region?: string }): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const lowerMessage = message.toLowerCase()
+
+  const cloud = context?.cloud?.toUpperCase() || ''
+  const region = context?.region || ''
+
+  // Cloud/Region/Plan related errors
+  if (lowerMessage.includes('region') || lowerMessage.includes('not available') || lowerMessage.includes('not supported') || lowerMessage.includes('cloud')) {
+    // Non-AWS cloud on Starter plan (GCP and Azure require Standard+)
+    if (context?.cloud && context.cloud !== 'aws') {
+      return `${cloud} is not available on the Starter plan. The free Starter plan only supports AWS (us-east-1 region). To use ${cloud}, upgrade to a Standard or Enterprise plan.`
+    }
+
+    // AWS but non-us-east-1 region on Starter
+    if (context?.cloud === 'aws' && context?.region && context.region !== 'us-east-1') {
+      return `Region "${region}" is not available on the Starter plan. The free Starter plan only supports AWS us-east-1. Upgrade to Standard or Enterprise for access to additional regions.`
+    }
+
+    // Generic region/cloud unavailability - include original message for context
+    return `${message}\n\nNote: The free Starter plan only supports AWS us-east-1. Other clouds and regions require Standard or Enterprise plans. See: https://docs.pinecone.io/troubleshooting/available-cloud-regions`
+  }
+
+  // Quota/limit errors
+  if (lowerMessage.includes('quota') || lowerMessage.includes('limit') || lowerMessage.includes('exceeded')) {
+    return `Account limit reached. ${message}. You may need to upgrade your plan or delete unused indexes.`
+  }
+
+  // Index name errors
+  if (lowerMessage.includes('index name') || lowerMessage.includes('invalid name')) {
+    return `Invalid index name. Index names must be lowercase, alphanumeric, and may contain hyphens. Maximum 45 characters.`
+  }
+
+  // Already exists
+  if (lowerMessage.includes('already exists')) {
+    return `An index with this name already exists. Please choose a different name.`
+  }
+
+  // Authentication errors
+  if (lowerMessage.includes('unauthorized') || lowerMessage.includes('api key') || lowerMessage.includes('authentication')) {
+    return `Authentication failed. Please check your Pinecone API key.`
+  }
+
+  // Return original message if no specific pattern matched
+  return message
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 process.env.DIST = path.join(__dirname, '../dist')
@@ -219,7 +269,12 @@ ipcMain.handle('pinecone:createIndex', async (_event, profileId: string, params:
     await service.createIndex(params)
     return { success: true }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create index'
+    // Extract cloud/region from serverless spec for better error messages
+    const serverlessSpec = params.spec?.serverless
+    const message = parsePineconeError(error, {
+      cloud: serverlessSpec?.cloud,
+      region: serverlessSpec?.region,
+    })
     return { success: false, error: message }
   }
 })
