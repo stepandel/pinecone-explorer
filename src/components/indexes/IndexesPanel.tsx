@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useCollection } from '../../context/CollectionContext'
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 export function IndexesPanel() {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useCollection()
-  const { startCreation, draftCollection } = useDraftCollection()
+  const { startCreation, startCopyFromCollection, draftCollection } = useDraftCollection()
 
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -27,33 +27,18 @@ export function IndexesPanel() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const deleteMutation = useDeleteIndexMutation(currentProfile?.id || '')
 
-  // Context menu state
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; indexName: string } | null>(null)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
+  // Copy/paste state
+  const [copiedIndex, setCopiedIndex] = useState<IndexInfo | null>(null)
 
   const handleIndexClick = (indexName: string) => {
     setActiveIndex(indexName)
   }
 
-  // Handle right-click context menu
+  // Handle right-click - show native macOS context menu
   const handleContextMenu = useCallback((e: React.MouseEvent, indexName: string) => {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, indexName })
-  }, [])
-
-  // Close context menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-        setContextMenu(null)
-      }
-    }
-
-    if (contextMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [contextMenu])
+    window.electronAPI.contextMenu.showIndexMenu(indexName, { hasCopiedIndex: copiedIndex !== null })
+  }, [copiedIndex])
 
   // Handle delete action - opens confirmation dialog
   const openDeleteDialog = useCallback((indexName: string) => {
@@ -61,7 +46,6 @@ export function IndexesPanel() {
     setConfirmationInput('')
     setDeleteError(null)
     setDeleteDialogOpen(true)
-    setContextMenu(null)
   }, [])
 
   const handleConfirmDelete = useCallback(async () => {
@@ -95,7 +79,36 @@ export function IndexesPanel() {
     setDeleteError(null)
   }, [])
 
-  // Listen for menu delete event
+  // Handle copy action
+  const handleCopyIndex = useCallback((indexName: string) => {
+    const index = indexes.find(i => i.name === indexName)
+    if (index) {
+      setCopiedIndex(index)
+    }
+  }, [indexes])
+
+  // Handle paste action
+  const handlePasteIndex = useCallback(() => {
+    if (copiedIndex) {
+      startCopyFromCollection(copiedIndex)
+    }
+  }, [copiedIndex, startCopyFromCollection])
+
+  // Listen for native context menu actions
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.contextMenu.onAction((data) => {
+      if (data.action === 'delete' && data.indexName) {
+        openDeleteDialog(data.indexName)
+      } else if (data.action === 'copy' && data.indexName) {
+        handleCopyIndex(data.indexName)
+      } else if (data.action === 'paste') {
+        handlePasteIndex()
+      }
+    })
+    return unsubscribe
+  }, [openDeleteDialog, handleCopyIndex, handlePasteIndex])
+
+  // Listen for menu delete event (from app menu bar)
   useEffect(() => {
     const handleMenuDelete = () => {
       if (activeIndex) {
@@ -203,22 +216,6 @@ export function IndexesPanel() {
           <span>New</span>
         </button>
       </div>
-
-      {/* Context Menu */}
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="fixed z-50 min-w-[160px] bg-popover border border-border rounded-md shadow-md py-1"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-        >
-          <button
-            className="w-full px-3 py-1.5 text-left text-[12px] text-destructive hover:bg-destructive/10 transition-colors"
-            onClick={() => openDeleteDialog(contextMenu.indexName)}
-          >
-            Delete Index
-          </button>
-        </div>
-      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={(open) => !open && handleCancelDelete()}>
