@@ -367,9 +367,20 @@ ipcMain.on('context-menu:show-index', (event, indexName: string, options?: { has
 ipcMain.on('context-menu:show-index-panel', (event, options?: { hasCopiedIndex?: boolean }) => {
   const template: MenuItemConstructorOptions[] = [
     {
+      label: 'Copy Index',
+      enabled: false,
+      click: () => {}
+    },
+    {
       label: 'Paste Index',
       enabled: options?.hasCopiedIndex ?? false,
       click: () => event.sender.send('context-menu:action', { action: 'paste', indexName: '' })
+    },
+    { type: 'separator' },
+    {
+      label: 'Delete Index',
+      enabled: false,
+      click: () => {}
     }
   ]
   const menu = Menu.buildFromTemplate(template)

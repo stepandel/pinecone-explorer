@@ -34,10 +34,17 @@ export function IndexesPanel() {
     setActiveIndex(indexName)
   }
 
-  // Handle right-click - show native macOS context menu
-  const handleContextMenu = useCallback((e: React.MouseEvent, indexName: string) => {
+  // Handle right-click on index item - show native macOS context menu
+  const handleIndexContextMenu = useCallback((e: React.MouseEvent, indexName: string) => {
     e.preventDefault()
+    e.stopPropagation()
     window.electronAPI.contextMenu.showIndexMenu(indexName, { hasCopiedIndex: copiedIndex !== null })
+  }, [copiedIndex])
+
+  // Handle right-click on panel background - show paste menu
+  const handlePanelContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    window.electronAPI.contextMenu.showIndexPanelMenu({ hasCopiedIndex: copiedIndex !== null })
   }, [copiedIndex])
 
   // Handle delete action - opens confirmation dialog
@@ -144,6 +151,7 @@ export function IndexesPanel() {
         background: 'var(--sidebar)',
         borderRight: '1px solid var(--border)',
       }}
+      onContextMenu={handlePanelContextMenu}
     >
       {/* Header */}
       <div className="px-2 py-2 border-b border-border">
@@ -182,7 +190,7 @@ export function IndexesPanel() {
                       : 'hover:bg-black/[0.05] dark:hover:bg-white/[0.06]'
                   }`}
                   onClick={() => handleIndexClick(index.name)}
-                  onContextMenu={(e) => handleContextMenu(e, index.name)}
+                  onContextMenu={(e) => handleIndexContextMenu(e, index.name)}
                   title={`${index.name}\n${index.dimension ? `${index.dimension}d · ` : ''}${index.metric}`}
                 >
                   <div
