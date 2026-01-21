@@ -1,9 +1,12 @@
+import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useCollection } from '../../context/CollectionContext'
+import { useDraftCollection } from '../../context/DraftCollectionContext'
 
 export function IndexesPanel() {
   const { indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useCollection()
+  const { startCreation, draftCollection } = useDraftCollection()
 
   const handleIndexClick = (indexName: string) => {
     setActiveIndex(indexName)
@@ -73,6 +76,19 @@ export function IndexesPanel() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Footer with Create button */}
+      <div className="px-2 py-2 border-t border-border">
+        <button
+          onClick={startCreation}
+          disabled={draftCollection !== null}
+          className="w-full h-6 flex items-center justify-center gap-1 text-[10px] rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Create new index"
+        >
+          <Plus className="h-3 w-3" />
+          <span>New</span>
+        </button>
       </div>
     </aside>
   )

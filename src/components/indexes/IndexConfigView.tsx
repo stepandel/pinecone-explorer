@@ -2,9 +2,20 @@ import { useState, useEffect, useCallback } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
 import { useCollection } from '../../context/CollectionContext'
+import { EMBEDDING_FUNCTIONS, EMBEDDING_FUNCTION_GROUPS, getEmbeddingFunctionById } from '../../constants/embedding-functions'
 
 const inputClassName = "w-full h-6 text-[11px] px-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
+
+// Common dimension values
+const COMMON_DIMENSIONS = [
+  { value: '384', label: '384 (MiniLM, Cohere Light)' },
+  { value: '512', label: '512 (Voyage Lite)' },
+  { value: '768', label: '768 (Gemini 004, BGE, MPNet)' },
+  { value: '1024', label: '1024 (Cohere v3, Jina, Mistral)' },
+  { value: '1536', label: '1536 (OpenAI 3-Small, Cohere v4)' },
+  { value: '3072', label: '3072 (OpenAI 3-Large, Gemini 001)' },
+]
 
 // Cloud regions for serverless indexes
 const CLOUD_REGIONS = {
@@ -19,9 +30,23 @@ export function IndexConfigView() {
   const { draftCollection, updateDraft, cancelCreation, saveDraft, isCreating, validationErrors } = useDraftCollection()
   const { setActiveIndex } = useCollection()
 
+  // Embedding function selection
+  const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>('')
+
   // Cloud and region selection
   const [cloud, setCloud] = useState<CloudProvider>('aws')
   const [region, setRegion] = useState('us-east-1')
+
+  // Handle embedding function change - auto-fill dimension
+  const handleEmbeddingChange = useCallback((embeddingId: string) => {
+    setSelectedEmbeddingId(embeddingId)
+    if (embeddingId) {
+      const ef = getEmbeddingFunctionById(embeddingId)
+      if (ef?.dimensions) {
+        updateDraft({ dimensionOverride: String(ef.dimensions) })
+      }
+    }
+  }, [updateDraft])
 
   // Handle cloud change - update region to first available
   const handleCloudChange = useCallback((newCloud: CloudProvider) => {
@@ -98,23 +123,71 @@ export function IndexConfigView() {
           {validationErrors.name && <p className="text-[10px] text-destructive">{validationErrors.name}</p>}
         </div>
 
+        {/* Embedding Function */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-medium text-muted-foreground">
+            Embedding Function
+          </label>
+          <div className="relative">
+            <select
+              value={selectedEmbeddingId}
+              onChange={(e) => handleEmbeddingChange(e.target.value)}
+              className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+              style={inputStyle}
+            >
+              <option value="">Select embedding function...</option>
+              {EMBEDDING_FUNCTION_GROUPS.map(group => (
+                <optgroup key={group} label={group}>
+                  {EMBEDDING_FUNCTIONS.filter(ef => ef.group === group).map(ef => (
+                    <option key={ef.id} value={ef.id}>
+                      {ef.label} {ef.dimensions ? `(${ef.dimensions}d)` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Optional: auto-fills dimension based on selection
+          </p>
+        </div>
+
         {/* Dimension */}
         <div className="space-y-1">
-          <label htmlFor="dimension" className="text-[11px] font-medium text-muted-foreground">
+          <label className="text-[11px] font-medium text-muted-foreground">
             Dimension
           </label>
-          <input
-            id="dimension"
-            type="number"
-            value={draftCollection.dimensionOverride || ''}
-            onChange={(e) => updateDraft({ dimensionOverride: e.target.value })}
-            placeholder="1536"
-            className={inputClassName}
-            style={inputStyle}
-          />
-          <p className="text-[10px] text-muted-foreground">
-            Common: 1536 (OpenAI), 768 (Cohere), 384 (MiniLM)
-          </p>
+          <div className="relative">
+            <select
+              value={COMMON_DIMENSIONS.some(d => d.value === draftCollection.dimensionOverride) ? draftCollection.dimensionOverride : 'custom'}
+              onChange={(e) => {
+                if (e.target.value !== 'custom') {
+                  updateDraft({ dimensionOverride: e.target.value })
+                }
+              }}
+              className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+              style={inputStyle}
+            >
+              <option value="">Select dimension...</option>
+              {COMMON_DIMENSIONS.map(dim => (
+                <option key={dim.value} value={dim.value}>{dim.label}</option>
+              ))}
+              <option value="custom">Custom...</option>
+            </select>
+            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+          </div>
+          {/* Show custom input if custom is selected or value doesn't match common dimensions */}
+          {(!COMMON_DIMENSIONS.some(d => d.value === draftCollection.dimensionOverride) && draftCollection.dimensionOverride !== '') && (
+            <input
+              type="number"
+              value={draftCollection.dimensionOverride || ''}
+              onChange={(e) => updateDraft({ dimensionOverride: e.target.value })}
+              placeholder="Enter custom dimension"
+              className={`${inputClassName} mt-1`}
+              style={inputStyle}
+            />
+          )}
         </div>
 
         {/* Metric */}
