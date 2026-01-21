@@ -12,7 +12,7 @@ export interface EmbeddingFunctionConfig {
   modelName: string
   vectorType: VectorType
   supportedMetrics: DistanceMetric[]
-  defaultDimension: number
+  defaultDimension?: number // Not applicable for sparse vectors
   availableDimensions?: number[] // For models with variable dimensions
   group: string // For UI grouping
 }
@@ -38,6 +38,18 @@ export const EMBEDDING_FUNCTIONS: EmbeddingFunctionConfig[] = [
     vectorType: 'dense',
     supportedMetrics: ['cosine', 'euclidean'],
     defaultDimension: 1024,
+    group: 'Pinecone',
+  },
+
+  // Pinecone Inference - Sparse model
+  {
+    id: 'pinecone-sparse-english-v0',
+    label: 'Sparse English v0',
+    type: 'pinecone',
+    modelName: 'pinecone-sparse-english-v0',
+    vectorType: 'sparse',
+    supportedMetrics: ['dotproduct'],
+    // No defaultDimension - sparse vectors have variable dimensions
     group: 'Pinecone',
   },
 

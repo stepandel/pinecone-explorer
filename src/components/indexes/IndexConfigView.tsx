@@ -40,14 +40,17 @@ export function IndexConfigView() {
     [selectedEmbeddingId]
   )
 
-  // Get available dimensions for the selected embedding
+  // Check if selected model is sparse
+  const isSparseModel = selectedEmbedding?.vectorType === 'sparse'
+
+  // Get available dimensions for the selected embedding (empty for sparse)
   const availableDimensions = useMemo(() => {
-    if (!selectedEmbedding) return []
+    if (!selectedEmbedding || isSparseModel) return []
     if (selectedEmbedding.availableDimensions) {
       return selectedEmbedding.availableDimensions
     }
-    return [selectedEmbedding.defaultDimension]
-  }, [selectedEmbedding])
+    return selectedEmbedding.defaultDimension ? [selectedEmbedding.defaultDimension] : []
+  }, [selectedEmbedding, isSparseModel])
 
   // Get supported metrics for the selected embedding
   const supportedMetrics = useMemo(() => {
@@ -58,8 +61,8 @@ export function IndexConfigView() {
   // Initialize defaults on mount
   useEffect(() => {
     if (selectedEmbedding) {
-      // Set default dimension
-      if (!draftCollection?.dimensionOverride) {
+      // Set default dimension (only for dense models)
+      if (!draftCollection?.dimensionOverride && selectedEmbedding.defaultDimension) {
         updateDraft({ dimensionOverride: String(selectedEmbedding.defaultDimension) })
       }
       // Set default metric to first supported
@@ -74,8 +77,13 @@ export function IndexConfigView() {
     setSelectedEmbeddingId(embeddingId)
     const ef = getEmbeddingFunctionById(embeddingId)
     if (ef) {
-      // Update dimension to the default for this model
-      updateDraft({ dimensionOverride: String(ef.defaultDimension) })
+      // Update dimension to the default for this model (only for dense)
+      if (ef.defaultDimension) {
+        updateDraft({ dimensionOverride: String(ef.defaultDimension) })
+      } else {
+        // Clear dimension for sparse models
+        updateDraft({ dimensionOverride: '' })
+      }
       // Update metric to first supported metric for this model
       updateDraft({ metric: ef.supportedMetrics[0] })
     }
@@ -194,36 +202,38 @@ export function IndexConfigView() {
           )}
         </div>
 
-        {/* Dimension */}
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-muted-foreground">
-            Dimension
-          </label>
-          <div className="relative">
-            <select
-              value={draftCollection.dimensionOverride || ''}
-              onChange={(e) => updateDraft({ dimensionOverride: e.target.value })}
-              className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
-              style={inputStyle}
-              disabled={availableDimensions.length <= 1}
-            >
-              {availableDimensions.map(dim => (
-                <option key={dim} value={String(dim)}>{dim}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+        {/* Dimension - hidden for sparse models */}
+        {!isSparseModel && (
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">
+              Dimension
+            </label>
+            <div className="relative">
+              <select
+                value={draftCollection.dimensionOverride || ''}
+                onChange={(e) => updateDraft({ dimensionOverride: e.target.value })}
+                className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                style={inputStyle}
+                disabled={availableDimensions.length <= 1}
+              >
+                {availableDimensions.map(dim => (
+                  <option key={dim} value={String(dim)}>{dim}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+            </div>
+            {availableDimensions.length <= 1 && (
+              <p className="text-[10px] text-muted-foreground">
+                Fixed dimension for this model
+              </p>
+            )}
+            {availableDimensions.length > 1 && (
+              <p className="text-[10px] text-muted-foreground">
+                {selectedEmbedding?.label} supports multiple dimensions
+              </p>
+            )}
           </div>
-          {availableDimensions.length <= 1 && (
-            <p className="text-[10px] text-muted-foreground">
-              Fixed dimension for this model
-            </p>
-          )}
-          {availableDimensions.length > 1 && (
-            <p className="text-[10px] text-muted-foreground">
-              {selectedEmbedding?.label} supports multiple dimensions
-            </p>
-          )}
-        </div>
+        )}
 
         {/* Metric */}
         <div className="space-y-1">

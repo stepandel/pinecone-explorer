@@ -50,7 +50,7 @@ export function EmbeddingFunctionSelector({
       await onSave({
         provider: selectedEF.type as EmbeddingProviderType,
         modelName: selectedEF.modelName,
-        dimensions: selectedEF.defaultDimension,
+        ...(selectedEF.defaultDimension && { dimensions: selectedEF.defaultDimension }),
       })
       setOpen(false)
     } finally {
@@ -116,7 +116,7 @@ export function EmbeddingFunctionSelector({
                   <optgroup key={group} label={group}>
                     {EMBEDDING_FUNCTIONS.filter(ef => ef.group === group).map(ef => (
                       <option key={ef.id} value={ef.id}>
-                        {ef.label} ({ef.defaultDimension}d)
+                        {ef.label} {ef.defaultDimension ? `(${ef.defaultDimension}d)` : '(sparse)'}
                       </option>
                     ))}
                   </optgroup>
@@ -130,7 +130,12 @@ export function EmbeddingFunctionSelector({
           {(() => {
             const defaultEF = getEmbeddingFunctionById(DEFAULT_EMBEDDING_FUNCTION_ID)!
             const displayEF = selectedEF || serverFunction || defaultEF
-            const hasDimensionMismatch = selectedEF && embeddingDimension && selectedEF.defaultDimension !== embeddingDimension
+            // Dimension mismatch only applies to dense models with fixed dimensions
+            const hasDimensionMismatch = selectedEF &&
+              selectedEF.vectorType === 'dense' &&
+              embeddingDimension &&
+              selectedEF.defaultDimension &&
+              selectedEF.defaultDimension !== embeddingDimension
 
             // Determine container styling based on state
             let containerClass = 'bg-black/[0.03] dark:bg-white/[0.04] ring-1 ring-black/[0.04] dark:ring-white/[0.06] shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]'
@@ -160,7 +165,10 @@ export function EmbeddingFunctionSelector({
                 )}
                 <p className="text-muted-foreground"><span className="text-foreground/60">Provider:</span> {displayEF.type}</p>
                 <p className="text-muted-foreground"><span className="text-foreground/60">Model:</span> {displayEF.modelName}</p>
-                <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {displayEF.availableDimensions ? displayEF.availableDimensions.join(', ') : displayEF.defaultDimension}</p>
+                <p className="text-muted-foreground"><span className="text-foreground/60">Type:</span> {displayEF.vectorType}</p>
+                {displayEF.vectorType === 'dense' && (
+                  <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {displayEF.availableDimensions ? displayEF.availableDimensions.join(', ') : displayEF.defaultDimension}</p>
+                )}
                 {embeddingDimension && (
                   <p className="text-muted-foreground pt-1 border-t border-black/5 dark:border-white/5 mt-1">
                     <span className="text-foreground/60">Index:</span> {embeddingDimension}d
