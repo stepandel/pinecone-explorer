@@ -276,23 +276,11 @@ export function DraftCollectionProvider({ children }: DraftCollectionProviderPro
         },
       }
 
-      // Check if this is a Pinecone-hosted embedding model (integrated inference)
-      const isPineconeModel = embeddingConfig?.type === 'pinecone'
-
       // For sparse indexes: set vectorType, omit dimension
-      // For dense indexes with Pinecone model: use integrated inference (no dimension needed)
-      // For dense indexes with other models: set dimension
+      // For dense indexes: set dimension explicitly (we always generate embeddings client-side)
       if (isSparseModel) {
         params.vectorType = 'sparse'
-      } else if (isPineconeModel && embeddingConfig) {
-        // Use integrated inference - Pinecone will handle embeddings
-        params.embed = {
-          model: embeddingConfig.modelName,
-          fieldMap: { text: '_text' }, // Map the _text field for embedding
-          metric: draftCollection.metric || 'cosine',
-        }
       } else {
-        // Standard index - we'll generate embeddings client-side
         params.dimension = dimension
       }
 
