@@ -205,6 +205,7 @@ export function MainContent() {
           <VectorDetailPanel
             vector={selectedVector}
             collectionName={activeIndex}
+            namespace={activeNamespace ?? undefined}
             profileId={currentProfile.id}
             isDraft={isSelectedDraft}
             isFirstVector={isFirstVector}
