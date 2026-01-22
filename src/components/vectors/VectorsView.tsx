@@ -917,7 +917,7 @@ export default function VectorsView({
         {/* Row 1: Collection name and count */}
         <div className="px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-            <h1 className="text-lg font-semibold text-foreground truncate">{collectionName}</h1>
+            <h1 className="text-lg font-semibold text-foreground truncate">{namespace || '(default)'}</h1>
             <div className="flex-shrink-0">
               <EmbeddingFunctionSelector
                 collectionName={collectionName}
