@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
-import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation } from '../../hooks/usePineconeQueries'
+import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import VectorsTable from './VectorsTable'
@@ -107,6 +107,13 @@ export default function VectorsView({
     collectionName
   )
 
+  // Query vectors mutation (for semantic search)
+  const queryMutation = useQueryVectorsMutation(currentProfile?.id || '')
+
+  // Search results state
+  const [searchResults, setSearchResults] = useState<LocalVectorRecord[] | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+
   // Clipboard context
   const { clipboard, copyVectors, hasCopiedVectors } = useClipboard()
 
@@ -160,7 +167,80 @@ export default function VectorsView({
     setMarkedForDeletion(new Set())
     setDraftVectors([])
     setDraftError(null)
+    setSearchResults(null)
+    setIsSearching(false)
   }, [collectionName])
+
+  // Handle search execution
+  const handleSearch = useCallback(async () => {
+    const searchRow = filterRows.find(r => r.type === 'search' && r.searchValue?.trim())
+    const queryText = searchRow?.searchValue?.trim()
+
+    if (!queryText) {
+      // Clear search results if no query
+      setSearchResults(null)
+      return
+    }
+
+    // Build metadata filter from filter rows
+    const metadataRows = filterRows.filter(
+      r => r.type === 'metadata' && r.metadataKey?.trim() && r.metadataValue?.trim()
+    )
+
+    const parseFilterValue = (value: string, operator: string): string | number | string[] | number[] => {
+      const trimmed = value.trim()
+      if (operator === '$in' || operator === '$nin') {
+        const items = trimmed.split(',').map(s => s.trim()).filter(Boolean)
+        const asNumbers = items.map(Number)
+        if (asNumbers.every(n => !isNaN(n))) return asNumbers
+        return items
+      }
+      if (['$gt', '$gte', '$lt', '$lte'].includes(operator)) {
+        const num = Number(trimmed)
+        if (!isNaN(num)) return num
+      }
+      if (operator === '$eq' || operator === '$ne') {
+        const num = Number(trimmed)
+        if (!isNaN(num) && trimmed !== '') return num
+      }
+      return trimmed
+    }
+
+    const metadataFilter = metadataRows.length > 0
+      ? metadataRows.reduce((acc, row) => ({
+          ...acc,
+          [row.metadataKey!]: {
+            [row.operator || '$eq']: parseFilterValue(row.metadataValue!, row.operator || '$eq')
+          },
+        }), {})
+      : undefined
+
+    setIsSearching(true)
+    try {
+      const result = await queryMutation.mutateAsync({
+        indexName: collectionName,
+        namespace,
+        queryText,
+        topK: nResults || 10,
+        filter: metadataFilter,
+        includeValues: true,
+        includeMetadata: true,
+      })
+
+      // Convert query results to LocalVectorRecord format
+      const results: LocalVectorRecord[] = result.matches.map(match => ({
+        id: match.id,
+        metadata: match.metadata || null,
+        embedding: match.values || null,
+      }))
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Search failed:', error)
+      setSearchResults(null)
+    } finally {
+      setIsSearching(false)
+    }
+  }, [filterRows, collectionName, namespace, nResults, queryMutation])
 
   // Build search params from filter rows
   const searchParams = useMemo(() => {
@@ -249,14 +329,16 @@ export default function VectorsView({
   }, [filterRows])
 
   // Apply client-side ID filter (case-insensitive "includes" match)
+  // Use search results if available, otherwise use raw vectors
   const vectors = useMemo(() => {
+    const baseVectors = searchResults !== null ? searchResults : rawVectors
     if (!idFilterValue) {
-      return rawVectors
+      return baseVectors
     }
-    return rawVectors.filter((vec: LocalVectorRecord) =>
+    return baseVectors.filter((vec: LocalVectorRecord) =>
       vec.id.toLowerCase().includes(idFilterValue)
     )
-  }, [rawVectors, idFilterValue])
+  }, [rawVectors, searchResults, idFilterValue])
 
   // Extract unique metadata fields from vectors (needed for draft creation)
   const metadataFields = useMemo(() => {
@@ -274,6 +356,10 @@ export default function VectorsView({
     setFilterRows(prev => prev.map(row =>
       row.id === id ? { ...row, ...updates } : row
     ))
+    // Clear search results if search value is cleared
+    if ('searchValue' in updates && !updates.searchValue?.trim()) {
+      setSearchResults(null)
+    }
   }, [])
 
   const handleAddFilterRow = useCallback(() => {
@@ -645,6 +731,7 @@ export default function VectorsView({
   const handleClearAllFilters = useCallback(() => {
     setFilterRows([createDefaultFilterRow()])
     setNResults(10)
+    setSearchResults(null)
   }, [])
 
   // Ref for focusing search input
@@ -860,6 +947,7 @@ export default function VectorsView({
               onChange={handleFilterRowChange}
               onAdd={handleAddFilterRow}
               onRemove={handleRemoveFilterRow}
+              onSearch={handleSearch}
               nResults={nResults}
               onNResultsChange={setNResults}
               metadataFields={metadataFields}
@@ -877,7 +965,7 @@ export default function VectorsView({
       >
         <VectorsTable
           vectors={vectors}
-          loading={loading}
+          loading={loading || isSearching}
           error={error ? (error as Error).message : null}
           hasActiveFilters={hasActiveFilters}
           selectedVectorIds={selectedVectorIds}

@@ -8,6 +8,7 @@ interface FilterRowProps {
   onChange: (id: string, updates: Partial<FilterRowType>) => void
   onAdd: () => void
   onRemove: (id: string) => void
+  onSearch?: () => void
   nResults?: number
   onNResultsChange?: (n: number) => void
   metadataFields?: string[]
@@ -35,6 +36,7 @@ export function FilterRow({
   onChange,
   onAdd,
   onRemove,
+  onSearch,
   nResults,
   onNResultsChange,
   metadataFields = [],
@@ -116,6 +118,12 @@ export function FilterRow({
           type="text"
           value={row.searchValue || ''}
           onChange={(e) => onChange(row.id, { searchValue: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && onSearch) {
+              e.preventDefault()
+              onSearch()
+            }
+          }}
           placeholder="Search query..."
           className={`flex-1 ${inputClassName}`}
           style={inputStyle}
