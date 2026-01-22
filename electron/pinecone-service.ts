@@ -558,7 +558,8 @@ class PineconeService {
   }
 
   /**
-   * Clone vectors from one index/namespace to another
+   * Clone vectors from one index/namespace to another.
+   * If no sourceNamespace is specified, copies all namespaces.
    */
   async cloneIndex(
     params: CloneIndexParams,
@@ -579,29 +580,118 @@ class PineconeService {
       }
 
       const sourceStats = await this.getIndexStats(params.sourceIndexName)
-      const sourceNamespace = params.sourceNamespace || ''
-      const totalVectors = sourceStats.namespaces[sourceNamespace]?.vectorCount || 0
+      const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.sourceIndexName)
+
+      // Determine which namespaces to copy
+      const namespacesToCopy: string[] = params.sourceNamespace !== undefined
+        ? [params.sourceNamespace]
+        : Object.keys(sourceStats.namespaces)
+
+      const totalVectors = namespacesToCopy.reduce(
+        (sum, ns) => sum + (sourceStats.namespaces[ns]?.vectorCount || 0),
+        0
+      )
 
       if (totalVectors === 0) {
         onProgress({ phase: 'complete', totalVectors: 0, processedVectors: 0, message: 'Source is empty, nothing to clone.' })
         return { success: true, totalVectors: 0, copiedVectors: 0 }
       }
 
-      // Phase 2: Copy vectors
-      const sourceNs = this.getNamespace(params.sourceIndexName, sourceNamespace)
-      const targetNs = this.getNamespace(params.targetIndexName, params.targetNamespace)
-      const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.sourceIndexName)
-
+      // Phase 2: Copy vectors from each namespace
       let processedVectors = 0
-      let paginationToken: string | undefined
       let dimensionValidated = false
 
-      do {
+      for (const sourceNamespace of namespacesToCopy) {
         if (signal?.aborted) {
           return { success: false, totalVectors, copiedVectors: processedVectors, error: 'Operation cancelled' }
         }
 
-        onProgress({ phase: 'copying', totalVectors, processedVectors, message: `Copying vectors... ${processedVectors}/${totalVectors}` })
+        // Target namespace: use specified targetNamespace if copying single namespace, otherwise preserve source namespace
+        const targetNamespace = params.sourceNamespace !== undefined
+          ? (params.targetNamespace ?? sourceNamespace)
+          : sourceNamespace
+
+        const nsLabel = sourceNamespace || '(default)'
+        const result = await this.cloneNamespace({
+          sourceIndexName: params.sourceIndexName,
+          sourceNamespace,
+          targetIndexName: params.targetIndexName,
+          targetNamespace,
+          regenerateEmbeddings: params.regenerateEmbeddings,
+          textField: params.textField,
+          embeddingConfig,
+          validateDimensions: !dimensionValidated,
+          onProgress: (copied) => {
+            onProgress({
+              phase: 'copying',
+              totalVectors,
+              processedVectors: processedVectors + copied,
+              message: `Copying ${nsLabel}... ${processedVectors + copied}/${totalVectors}`
+            })
+          },
+          signal,
+        })
+
+        processedVectors += result.copiedVectors
+        if (result.copiedVectors > 0) dimensionValidated = true
+
+        if (!result.success) {
+          return { success: false, totalVectors, copiedVectors: processedVectors, error: result.error }
+        }
+      }
+
+      // Phase 3: Complete
+      onProgress({ phase: 'complete', totalVectors, processedVectors, message: `Copied ${processedVectors} vectors` })
+      return { success: true, totalVectors, copiedVectors: processedVectors }
+
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to clone index'
+      onProgress({ phase: 'error', totalVectors: 0, processedVectors: 0, message })
+      return { success: false, totalVectors: 0, copiedVectors: 0, error: message }
+    }
+  }
+
+  /**
+   * Clone vectors from one namespace to another.
+   * Can be used independently or as part of cloneIndex.
+   */
+  async cloneNamespace(params: {
+    sourceIndexName: string
+    sourceNamespace: string
+    targetIndexName: string
+    targetNamespace: string
+    regenerateEmbeddings?: boolean
+    textField?: string
+    embeddingConfig?: EmbeddingConfig | null
+    validateDimensions?: boolean
+    onProgress?: (copiedSoFar: number) => void
+    signal?: AbortSignal
+  }): Promise<{ success: boolean; copiedVectors: number; error?: string }> {
+    const {
+      sourceIndexName,
+      sourceNamespace,
+      targetIndexName,
+      targetNamespace,
+      regenerateEmbeddings,
+      textField,
+      embeddingConfig,
+      validateDimensions = true,
+      onProgress,
+      signal,
+    } = params
+
+    const sourceNs = this.getNamespace(sourceIndexName, sourceNamespace)
+    const targetNs = this.getNamespace(targetIndexName, targetNamespace)
+
+    let copiedVectors = 0
+    let dimensionValidated = !validateDimensions
+    let paginationToken: string | undefined
+
+    try {
+      do {
+        if (signal?.aborted) {
+          return { success: false, copiedVectors, error: 'Operation cancelled' }
+        }
 
         const listResult = await sourceNs.listPaginated({ limit: PineconeService.BATCH_SIZE, paginationToken })
         const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
@@ -615,30 +705,28 @@ class PineconeService {
 
         const vectorsToUpsert = await this.prepareCloneVectors(
           records,
-          params.regenerateEmbeddings,
+          regenerateEmbeddings,
           embeddingConfig,
-          params.textField
+          textField
         )
 
-        // Validate dimensions on first batch
+        // Validate dimensions on first batch if requested
         if (!dimensionValidated && vectorsToUpsert.length > 0) {
-          await this.validateCloneDimensions(vectorsToUpsert, params.targetIndexName)
+          await this.validateCloneDimensions(vectorsToUpsert, targetIndexName)
           dimensionValidated = true
         }
 
         await targetNs.upsert(vectorsToUpsert as PineconeRecord[])
-        processedVectors += vectorsToUpsert.length
+        copiedVectors += vectorsToUpsert.length
+        onProgress?.(copiedVectors)
 
       } while (paginationToken)
 
-      // Phase 3: Complete
-      onProgress({ phase: 'complete', totalVectors, processedVectors, message: `Copied ${processedVectors} vectors` })
-      return { success: true, totalVectors, copiedVectors: processedVectors }
+      return { success: true, copiedVectors }
 
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to clone index'
-      onProgress({ phase: 'error', totalVectors: 0, processedVectors: 0, message })
-      return { success: false, totalVectors: 0, copiedVectors: 0, error: message }
+      const message = error instanceof Error ? error.message : 'Failed to clone namespace'
+      return { success: false, copiedVectors, error: message }
     }
   }
 
