@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
-import { useCollection } from '../../context/CollectionContext'
+import { useSelection } from '../../context/SelectionContext'
 import { useIndexStatsQuery } from '../../hooks/usePineconeQueries'
 import { Button } from '../ui/button'
 
@@ -14,7 +14,7 @@ interface NamespaceInfo {
 
 export function NamespacesPanel() {
   const { currentProfile } = usePinecone()
-  const { activeIndex, activeNamespace, setActiveNamespace } = useCollection()
+  const { activeIndex, activeNamespace, setActiveNamespace } = useSelection()
   const [searchTerm, setSearchTerm] = useState('')
 
   // Fetch namespaces (from index stats)

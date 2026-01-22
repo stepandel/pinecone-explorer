@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react'
 import { usePinecone } from '../providers/PineconeProvider'
 import { useCreateIndexMutation } from '../hooks/usePineconeQueries'
-import { useCollection } from './CollectionContext'
+import { useSelection } from './SelectionContext'
 import { getEmbeddingFunctionById, getEmbeddingFunctionByModelStrict, DEFAULT_EMBEDDING_FUNCTION_ID } from '../constants/embedding-functions'
 
 export interface CloneProgressState {
@@ -134,7 +134,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
   const [cloneProgressOpen, setCloneProgressOpen] = useState(false)
 
   const { currentProfile, refreshIndexes } = usePinecone()
-  const { setActiveCollection } = useCollection()
+  const { setActiveIndex } = useSelection()
   const createMutation = useCreateIndexMutation(currentProfile?.id || '')
 
   // Listen for clone progress updates
@@ -163,8 +163,8 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
   const startCreation = useCallback(() => {
     setDraftIndex(createInitialDraft())
     setValidationErrors({})
-    setActiveCollection(null)
-  }, [setActiveCollection])
+    setActiveIndex(null)
+  }, [setActiveIndex])
 
   const startCopyFromIndex = useCallback(async (index: IndexInfo) => {
     let embeddingFunctionId = DEFAULT_EMBEDDING_FUNCTION_ID
@@ -211,8 +211,8 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
       availableTextFields,
     })
     setValidationErrors({})
-    setActiveCollection(null)
-  }, [currentProfile, setActiveCollection])
+    setActiveIndex(null)
+  }, [currentProfile, setActiveIndex])
 
   const updateDraft = useCallback((updates: Partial<DraftIndex>) => {
     setDraftIndex(prev => prev ? { ...prev, ...updates } : prev)
@@ -277,7 +277,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
       } else {
         setDraftIndex(null)
         setValidationErrors({})
-        setActiveCollection(newIndexName)
+        setActiveIndex(newIndexName)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create index'
@@ -285,7 +285,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsCreating(false)
     }
-  }, [draftIndex, currentProfile, createMutation, setActiveCollection, refreshIndexes])
+  }, [draftIndex, currentProfile, createMutation, setActiveIndex, refreshIndexes])
 
   // Helper for clone operation (kept inside provider for access to state setters)
   const handleCloneOperation = async (newIndexName: string, draft: DraftIndex, profileId: string) => {
@@ -332,7 +332,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
           message: `Copied ${result.copiedVectors} vectors`,
         })
         refreshIndexes()
-        setActiveCollection(newIndexName)
+        setActiveIndex(newIndexName)
       } else {
         setCloneProgress({
           phase: 'error',
@@ -389,11 +389,3 @@ export function useDraftIndex() {
   }
   return context
 }
-
-// Backwards compatibility aliases
-/** @deprecated Use DraftIndex instead */
-export type DraftCollection = DraftIndex
-/** @deprecated Use useDraftIndex instead */
-export const useDraftCollection = useDraftIndex
-/** @deprecated Use DraftIndexProvider instead */
-export const DraftCollectionProvider = DraftIndexProvider

@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { usePanel } from '../context/PanelContext'
-import { useCollection } from '../context/CollectionContext'
+import { useSelection } from '../context/SelectionContext'
 import { useDraftIndex } from '../context/DraftIndexContext'
 
 /**
@@ -9,7 +9,7 @@ import { useDraftIndex } from '../context/DraftIndexContext'
  */
 export function useMenuHandlers() {
   const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } = usePanel()
-  const { activeCollection } = useCollection()
+  const { activeIndex } = useSelection()
   const { startCreation } = useDraftIndex()
 
   // View menu handlers
@@ -38,31 +38,31 @@ export function useMenuHandlers() {
 
   const handleDuplicateIndex = useCallback(() => {
     // Dispatch event to duplicate the active index
-    if (activeCollection) {
+    if (activeIndex) {
       window.dispatchEvent(new CustomEvent('menu:duplicate-collection'))
     }
-  }, [activeCollection])
+  }, [activeIndex])
 
   const handleRenameIndex = useCallback(() => {
     // Dispatch event to start renaming
-    if (activeCollection) {
+    if (activeIndex) {
       window.dispatchEvent(new CustomEvent('menu:rename-collection'))
     }
-  }, [activeCollection])
+  }, [activeIndex])
 
   const handleDeleteIndex = useCallback(() => {
     // Dispatch event to delete the active index
-    if (activeCollection) {
+    if (activeIndex) {
       window.dispatchEvent(new CustomEvent('menu:delete-collection'))
     }
-  }, [activeCollection])
+  }, [activeIndex])
 
   const handleCopyIndex = useCallback(() => {
     // Dispatch event to copy the active index
-    if (activeCollection) {
+    if (activeIndex) {
       window.dispatchEvent(new CustomEvent('menu:copy-collection'))
     }
-  }, [activeCollection])
+  }, [activeIndex])
 
   const handlePasteIndex = useCallback(() => {
     // Dispatch event to paste index
@@ -72,10 +72,10 @@ export function useMenuHandlers() {
   // Vector menu handlers (formerly document)
   const handleNewVector = useCallback(() => {
     // Dispatch event for DocumentsView to create a new vector
-    if (activeCollection) {
+    if (activeIndex) {
       window.dispatchEvent(new CustomEvent('menu:new-document'))
     }
-  }, [activeCollection])
+  }, [activeIndex])
 
   const handleEditVector = useCallback(() => {
     // Dispatch event for DocumentsView to edit the selected vector

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useCollection } from '../../context/CollectionContext'
+import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { usePanel } from '../../context/PanelContext'
 import { usePinecone } from '../../providers/PineconeProvider'
@@ -16,7 +16,7 @@ interface VectorRecord {
 }
 
 export function MainContent() {
-  const { activeIndex, activeNamespace } = useCollection()
+  const { activeIndex, activeNamespace } = useSelection()
   const { draftIndex } = useDraftIndex()
   const { currentProfile } = usePinecone()
   const {

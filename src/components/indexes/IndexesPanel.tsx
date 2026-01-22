@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
-import { useCollection } from '../../context/CollectionContext'
+import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useDeleteIndexMutation } from '../../hooks/usePineconeQueries'
 import {
@@ -18,7 +18,7 @@ import { CloneNamespaceProgressDialog } from '../namespaces/CloneNamespaceProgre
 
 export function IndexesPanel() {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
-  const { activeIndex, setActiveIndex } = useCollection()
+  const { activeIndex, setActiveIndex } = useSelection()
   const { startCreation, startCopyFromIndex, draftIndex, cloneProgress, cloneProgressOpen, setCloneProgressOpen, cancelClone } = useDraftIndex()
 
   // Delete state

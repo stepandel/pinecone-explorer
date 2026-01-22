@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { usePinecone } from '../providers/PineconeProvider'
-import { useCollection } from './CollectionContext'
+import { useSelection } from './SelectionContext'
 
 interface EmbeddingContextType {
   // Client-side override (persisted per profile/index)
@@ -24,7 +24,7 @@ const EmbeddingContext = createContext<EmbeddingContextType | undefined>(undefin
 
 export function EmbeddingProvider({ children }: { children: ReactNode }) {
   const { currentProfile } = usePinecone()
-  const { activeCollection } = useCollection()
+  const { activeIndex } = useSelection()
 
   const [clientOverride, setClientOverride] = useState<EmbeddingConfig | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -32,7 +32,7 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
   // Fetch client override when index changes
   useEffect(() => {
     const fetchOverride = async () => {
-      if (!currentProfile?.id || !activeCollection) {
+      if (!currentProfile?.id || !activeIndex) {
         setClientOverride(null)
         return
       }
@@ -41,7 +41,7 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
       try {
         const override = await window.electronAPI.profiles.getEmbeddingOverride(
           currentProfile.id,
-          activeCollection
+          activeIndex
         )
         setClientOverride(override)
       } catch (err) {
@@ -53,28 +53,28 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
     }
 
     fetchOverride()
-  }, [currentProfile?.id, activeCollection])
+  }, [currentProfile?.id, activeIndex])
 
   const setOverride = useCallback(async (override: EmbeddingConfig) => {
-    if (!currentProfile?.id || !activeCollection) return
+    if (!currentProfile?.id || !activeIndex) return
 
     await window.electronAPI.profiles.setEmbeddingOverride(
       currentProfile.id,
-      activeCollection,
+      activeIndex,
       override
     )
     setClientOverride(override)
-  }, [currentProfile?.id, activeCollection])
+  }, [currentProfile?.id, activeIndex])
 
   const clearOverride = useCallback(async () => {
-    if (!currentProfile?.id || !activeCollection) return
+    if (!currentProfile?.id || !activeIndex) return
 
     await window.electronAPI.profiles.clearEmbeddingOverride(
       currentProfile.id,
-      activeCollection
+      activeIndex
     )
     setClientOverride(null)
-  }, [currentProfile?.id, activeCollection])
+  }, [currentProfile?.id, activeIndex])
 
   // Determine active config - use client override or profile default
   const defaultConfig = currentProfile?.defaultEmbeddingConfig || null

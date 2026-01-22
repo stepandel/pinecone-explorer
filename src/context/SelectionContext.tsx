@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react'
 
-interface CollectionContextValue {
+interface SelectionContextValue {
   // Index selection (Pinecone indexes)
   activeIndex: string | null
   setActiveIndex: (indexName: string | null) => void
@@ -11,19 +11,11 @@ interface CollectionContextValue {
 
   // Combined selection helper
   selectIndexAndNamespace: (indexName: string | null, namespace?: string | null) => void
-
-  // Legacy alias for backwards compatibility
-  activeCollection: string | null
-  setActiveCollection: (collectionName: string | null) => void
 }
 
-const CollectionContext = createContext<CollectionContextValue | null>(null)
+const SelectionContext = createContext<SelectionContextValue | null>(null)
 
-interface CollectionProviderProps {
-  children: ReactNode
-}
-
-export function CollectionProvider({ children }: CollectionProviderProps) {
+export function SelectionProvider({ children }: { children: ReactNode }) {
   const [activeIndex, setActiveIndexState] = useState<string | null>(null)
   const [activeNamespace, setActiveNamespaceState] = useState<string | null>(null)
 
@@ -31,7 +23,6 @@ export function CollectionProvider({ children }: CollectionProviderProps) {
   const setActiveIndex = useCallback((indexName: string | null) => {
     setActiveIndexState((prevIndex) => {
       if (prevIndex !== indexName) {
-        // Clear namespace when index changes
         setActiveNamespaceState(null)
       }
       return indexName
@@ -48,32 +39,25 @@ export function CollectionProvider({ children }: CollectionProviderProps) {
     setActiveNamespaceState(namespace)
   }, [])
 
-  // Legacy aliases - map to namespace for backwards compatibility
-  const activeCollection = activeNamespace
-  const setActiveCollection = setActiveNamespace
-
-  const value: CollectionContextValue = {
+  const value = useMemo<SelectionContextValue>(() => ({
     activeIndex,
     setActiveIndex,
     activeNamespace,
     setActiveNamespace,
     selectIndexAndNamespace,
-    // Legacy
-    activeCollection,
-    setActiveCollection,
-  }
+  }), [activeIndex, setActiveIndex, activeNamespace, setActiveNamespace, selectIndexAndNamespace])
 
   return (
-    <CollectionContext.Provider value={value}>
+    <SelectionContext.Provider value={value}>
       {children}
-    </CollectionContext.Provider>
+    </SelectionContext.Provider>
   )
 }
 
-export function useCollection() {
-  const context = useContext(CollectionContext)
+export function useSelection() {
+  const context = useContext(SelectionContext)
   if (!context) {
-    throw new Error('useCollection must be used within a CollectionProvider')
+    throw new Error('useSelection must be used within a SelectionProvider')
   }
   return context
 }
