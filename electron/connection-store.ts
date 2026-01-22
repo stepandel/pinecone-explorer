@@ -206,6 +206,36 @@ export class ConnectionStore {
       getStore().set('profiles', profiles)
     }
   }
+
+  /**
+   * Get text field override for a specific profile and index
+   * Returns the metadata field name used for text embedding, or null if not set
+   */
+  getTextFieldOverride(profileId: string, indexName: string): string | null {
+    const key = `${profileId}:${indexName}`
+    const overrides = getStore().get('textFieldOverrides', {}) as Record<string, string>
+    return overrides[key] ?? null
+  }
+
+  /**
+   * Set text field override for a specific profile and index
+   */
+  setTextFieldOverride(profileId: string, indexName: string, textField: string): void {
+    const key = `${profileId}:${indexName}`
+    const overrides = getStore().get('textFieldOverrides', {}) as Record<string, string>
+    overrides[key] = textField
+    getStore().set('textFieldOverrides', overrides)
+  }
+
+  /**
+   * Clear text field override for a specific profile and index
+   */
+  clearTextFieldOverride(profileId: string, indexName: string): void {
+    const key = `${profileId}:${indexName}`
+    const overrides = getStore().get('textFieldOverrides', {}) as Record<string, string>
+    delete overrides[key]
+    getStore().set('textFieldOverrides', overrides)
+  }
 }
 
 export const connectionStore = new ConnectionStore()

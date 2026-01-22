@@ -418,8 +418,8 @@ class PineconeService {
     embeddingConfigOverride?: EmbeddingConfig
   ): Promise<void> {
     const metadata: Record<string, unknown> = { ...params.metadata }
-    // Use the text field from index's embed config, or default to '_text'
-    const textField = this.getTextFieldForIndex(params.indexName)
+    // Use params.textField if provided, otherwise fall back to index's embed config or '_text'
+    const textField = params.textField || this.getTextFieldForIndex(params.indexName)
     if (params.text) metadata[textField] = params.text
 
     let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
@@ -453,8 +453,8 @@ class PineconeService {
     const ns = this.getNamespace(params.indexName, params.namespace)
 
     const metadata: Record<string, unknown> = { ...params.metadata }
-    // Use the text field from index's embed config, or default to '_text'
-    const textField = this.getTextFieldForIndex(params.indexName)
+    // Use params.textField if provided, otherwise fall back to index's embed config or '_text'
+    const textField = params.textField || this.getTextFieldForIndex(params.indexName)
     if (params.text) metadata[textField] = params.text
 
     let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
@@ -509,8 +509,8 @@ class PineconeService {
     const errors: string[] = []
     let upsertedCount = 0
     const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
-    // Use the text field from index's embed config, or default to '_text'
-    const textField = this.getTextFieldForIndex(params.indexName)
+    // Use params.textField if provided, otherwise fall back to index's embed config or '_text'
+    const textField = params.textField || this.getTextFieldForIndex(params.indexName)
 
     for (let i = 0; i < params.vectors.length; i += PineconeService.BATCH_SIZE) {
       const batch = params.vectors.slice(i, i + PineconeService.BATCH_SIZE)

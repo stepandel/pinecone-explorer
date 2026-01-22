@@ -16,12 +16,20 @@ interface EmbeddingContextType {
     config: EmbeddingConfig | null
   }
 
-  // Text field to use for embedding (from index's fieldMap.text or '_text')
+  // Text field to use for embedding
+  // Priority: index embed fieldMap > client override > default '_text'
   textField: string
+
+  // Client-side text field override (for indexes without integrated inference)
+  clientTextFieldOverride: string | null
 
   // Actions (disabled when using integrated inference)
   setOverride: (override: EmbeddingConfig) => Promise<void>
   clearOverride: () => Promise<void>
+
+  // Text field actions
+  setTextFieldOverride: (textField: string) => Promise<void>
+  clearTextFieldOverride: () => Promise<void>
 
   // Whether override is allowed (false for integrated inference indexes)
   canOverride: boolean
@@ -50,6 +58,7 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
   const { activeIndex } = useSelection()
 
   const [clientOverride, setClientOverride] = useState<EmbeddingConfig | null>(null)
+  const [clientTextFieldOverride, setClientTextFieldOverrideState] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   // Fetch indexes to get embed config for active index
@@ -64,36 +73,39 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
   // Index's embed config (null if not an integrated inference index)
   const indexEmbedConfig = currentIndexInfo?.embed || null
 
-  // Text field to use (from index's fieldMap.text or '_text')
-  const textField = indexEmbedConfig?.fieldMap?.text || '_text'
+  // Text field to use - priority: index embed fieldMap > client override > default '_text'
+  const textField = indexEmbedConfig?.fieldMap?.text || clientTextFieldOverride || '_text'
 
   // Whether override is allowed (not allowed for integrated inference indexes)
   const canOverride = !indexEmbedConfig
 
-  // Fetch client override when index changes
+  // Fetch client overrides when index changes
   useEffect(() => {
-    const fetchOverride = async () => {
+    const fetchOverrides = async () => {
       if (!currentProfile?.id || !activeIndex) {
         setClientOverride(null)
+        setClientTextFieldOverrideState(null)
         return
       }
 
       setIsLoading(true)
       try {
-        const override = await window.electronAPI.profiles.getEmbeddingOverride(
-          currentProfile.id,
-          activeIndex
-        )
-        setClientOverride(override)
+        const [embeddingOverride, textFieldOverride] = await Promise.all([
+          window.electronAPI.profiles.getEmbeddingOverride(currentProfile.id, activeIndex),
+          window.electronAPI.profiles.getTextFieldOverride(currentProfile.id, activeIndex),
+        ])
+        setClientOverride(embeddingOverride)
+        setClientTextFieldOverrideState(textFieldOverride)
       } catch (err) {
-        console.error('Failed to fetch embedding override:', err)
+        console.error('Failed to fetch overrides:', err)
         setClientOverride(null)
+        setClientTextFieldOverrideState(null)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchOverride()
+    fetchOverrides()
   }, [currentProfile?.id, activeIndex])
 
   const setOverride = useCallback(async (override: EmbeddingConfig) => {
@@ -116,6 +128,28 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
       activeIndex
     )
     setClientOverride(null)
+  }, [currentProfile?.id, activeIndex])
+
+  const setTextFieldOverride = useCallback(async (textFieldValue: string) => {
+    // Don't allow override for integrated inference indexes
+    if (!currentProfile?.id || !activeIndex || !canOverride) return
+
+    await window.electronAPI.profiles.setTextFieldOverride(
+      currentProfile.id,
+      activeIndex,
+      textFieldValue
+    )
+    setClientTextFieldOverrideState(textFieldValue)
+  }, [currentProfile?.id, activeIndex, canOverride])
+
+  const clearTextFieldOverride = useCallback(async () => {
+    if (!currentProfile?.id || !activeIndex) return
+
+    await window.electronAPI.profiles.clearTextFieldOverride(
+      currentProfile.id,
+      activeIndex
+    )
+    setClientTextFieldOverrideState(null)
   }, [currentProfile?.id, activeIndex])
 
   // Determine active config - priority: index embed > client override > profile default
@@ -141,8 +175,11 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
         clientOverride,
         activeConfig,
         textField,
+        clientTextFieldOverride,
         setOverride,
         clearOverride,
+        setTextFieldOverride,
+        clearTextFieldOverride,
         canOverride,
         isLoading,
       }}

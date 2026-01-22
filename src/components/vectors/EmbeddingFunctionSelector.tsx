@@ -12,10 +12,14 @@ interface EmbeddingFunctionSelectorProps {
   onSave: (override: EmbeddingConfig) => Promise<void>
   onClear: () => Promise<void>
   embeddingDimension?: number | null
-  // New props for integrated inference support
+  // Integrated inference support
   indexEmbedConfig?: IndexEmbedConfig | null  // Index's embed config (if integrated inference)
-  textField?: string                           // Text field used for embedding
+  textField?: string                           // Effective text field used for embedding
   canOverride?: boolean                        // Whether override is allowed (false for integrated inference)
+  // Text field configuration
+  clientTextFieldOverride?: string | null      // Client-side text field override
+  onTextFieldSave?: (textField: string) => Promise<void>
+  onTextFieldClear?: () => Promise<void>
 }
 
 export function EmbeddingFunctionSelector({
@@ -28,13 +32,22 @@ export function EmbeddingFunctionSelector({
   indexEmbedConfig,
   textField = '_text',
   canOverride = true,
+  clientTextFieldOverride,
+  onTextFieldSave,
+  onTextFieldClear,
 }: EmbeddingFunctionSelectorProps) {
   const [open, setOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string>('')
+  const [textFieldInput, setTextFieldInput] = useState(clientTextFieldOverride || '')
   const [saving, setSaving] = useState(false)
 
   // Check if using integrated inference
   const hasIntegratedInference = !!indexEmbedConfig
+
+  // Sync text field input when override changes
+  useEffect(() => {
+    setTextFieldInput(clientTextFieldOverride || '')
+  }, [clientTextFieldOverride, open])
 
   // Set initial selection based on current override
   useEffect(() => {
@@ -53,16 +66,27 @@ export function EmbeddingFunctionSelector({
   const serverFunction = EMBEDDING_FUNCTIONS.find(ef => ef.modelName === serverConfig?.config?.model_name)
 
   const handleSave = async () => {
-    if (!selectedEF || !canOverride) return
+    if (!canOverride) return
 
     setSaving(true)
     try {
-      await onSave({
-        provider: selectedEF.type as EmbeddingProviderType,
-        modelName: selectedEF.modelName,
-        vectorType: selectedEF.vectorType,
-        ...(selectedEF.defaultDimension && { dimensions: selectedEF.defaultDimension }),
-      })
+      // Save embedding config if selected
+      if (selectedEF) {
+        await onSave({
+          provider: selectedEF.type as EmbeddingProviderType,
+          modelName: selectedEF.modelName,
+          vectorType: selectedEF.vectorType,
+          ...(selectedEF.defaultDimension && { dimensions: selectedEF.defaultDimension }),
+        })
+      }
+      // Save text field if changed
+      const trimmedTextField = textFieldInput.trim()
+      if (trimmedTextField && trimmedTextField !== '_text' && onTextFieldSave) {
+        await onTextFieldSave(trimmedTextField)
+      } else if (!trimmedTextField && clientTextFieldOverride && onTextFieldClear) {
+        // Clear if empty and there was an override
+        await onTextFieldClear()
+      }
       setOpen(false)
     } finally {
       setSaving(false)
@@ -74,11 +98,20 @@ export function EmbeddingFunctionSelector({
     setSaving(true)
     try {
       await onClear()
+      if (onTextFieldClear) {
+        await onTextFieldClear()
+      }
+      setTextFieldInput('')
       setOpen(false)
     } finally {
       setSaving(false)
     }
   }
+
+  // Check if there are any changes to save
+  const hasEmbeddingChange = selectedEF !== undefined && selectedEF !== null
+  const hasTextFieldChange = textFieldInput.trim() !== (clientTextFieldOverride || '') && textFieldInput.trim() !== ''
+  const canSave = hasEmbeddingChange || hasTextFieldChange
 
   // For integrated inference, show a read-only display
   if (hasIntegratedInference) {
@@ -202,6 +235,22 @@ export function EmbeddingFunctionSelector({
             </div>
           </div>
 
+          {/* Text Field Input */}
+          <div className="px-1 space-y-1.5">
+            <Label htmlFor="text-field" className="text-[11px] font-normal">Text Field</Label>
+            <input
+              id="text-field"
+              type="text"
+              value={textFieldInput}
+              onChange={(e) => setTextFieldInput(e.target.value)}
+              placeholder="_text"
+              className="w-full h-[22px] rounded-[5px] border-none bg-white/10 dark:bg-white/5 px-2 text-[13px] text-foreground shadow-[0_0.5px_1px_rgba(0,0,0,0.1),inset_0_0.5px_0.5px_rgba(255,255,255,0.1)] ring-1 ring-black/10 dark:ring-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground/50"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Metadata field containing text for embeddings
+            </p>
+          </div>
+
           {/* Selected info */}
           {(() => {
             const defaultEF = getEmbeddingFunctionById(DEFAULT_EMBEDDING_FUNCTION_ID)!
@@ -257,7 +306,7 @@ export function EmbeddingFunctionSelector({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 mt-3 pt-3">
-          {currentOverride && (
+          {(currentOverride || clientTextFieldOverride) && (
             <Button
               variant="ghost"
               size="sm"
@@ -265,14 +314,14 @@ export function EmbeddingFunctionSelector({
               onClick={handleClear}
               disabled={saving}
             >
-              Clear
+              Clear All
             </Button>
           )}
           <Button
             size="sm"
             className="h-7 text-[12px] px-3"
             onClick={handleSave}
-            disabled={!selectedEF || saving}
+            disabled={!canSave || saving}
           >
             {saving ? 'Saving...' : 'Apply'}
           </Button>

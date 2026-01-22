@@ -133,22 +133,27 @@ export default function VectorsView({
 
   // Embedding function override state
   const [embeddingOverride, setEmbeddingOverride] = useState<EmbeddingConfig | null>(null)
+  const [textFieldOverride, setTextFieldOverride] = useState<string | null>(null)
 
-  // Fetch embedding override when collection changes
+  // Compute effective text field: index embed > client override > default '_text'
+  const effectiveTextField = currentIndex?.embed?.fieldMap?.text || textFieldOverride || '_text'
+
+  // Fetch embedding and text field overrides when collection changes
   useEffect(() => {
-    const fetchOverride = async () => {
+    const fetchOverrides = async () => {
       if (!currentProfile?.id || !collectionName) return
       try {
-        const override = await window.electronAPI.profiles.getEmbeddingOverride(
-          currentProfile.id,
-          collectionName
-        )
-        setEmbeddingOverride(override)
+        const [embeddingOvr, textFieldOvr] = await Promise.all([
+          window.electronAPI.profiles.getEmbeddingOverride(currentProfile.id, collectionName),
+          window.electronAPI.profiles.getTextFieldOverride(currentProfile.id, collectionName),
+        ])
+        setEmbeddingOverride(embeddingOvr)
+        setTextFieldOverride(textFieldOvr)
       } catch (err) {
-        console.error('Failed to fetch embedding override:', err)
+        console.error('Failed to fetch overrides:', err)
       }
     }
-    fetchOverride()
+    fetchOverrides()
   }, [currentProfile?.id, collectionName])
 
   const handleSaveOverride = useCallback(async (override: EmbeddingConfig) => {
@@ -168,6 +173,25 @@ export default function VectorsView({
       collectionName
     )
     setEmbeddingOverride(null)
+  }, [currentProfile?.id, collectionName])
+
+  const handleSaveTextFieldOverride = useCallback(async (textField: string) => {
+    if (!currentProfile?.id) return
+    await window.electronAPI.profiles.setTextFieldOverride(
+      currentProfile.id,
+      collectionName,
+      textField
+    )
+    setTextFieldOverride(textField)
+  }, [currentProfile?.id, collectionName])
+
+  const handleClearTextFieldOverride = useCallback(async () => {
+    if (!currentProfile?.id) return
+    await window.electronAPI.profiles.clearTextFieldOverride(
+      currentProfile.id,
+      collectionName
+    )
+    setTextFieldOverride(null)
   }, [currentProfile?.id, collectionName])
 
   // Reset filters and deletion marks when collection changes
@@ -882,8 +906,11 @@ export default function VectorsView({
                 onClear={handleClearOverride}
                 embeddingDimension={currentIndex?.dimension ?? null}
                 indexEmbedConfig={currentIndex?.embed ?? null}
-                textField={currentIndex?.embed?.fieldMap?.text ?? '_text'}
+                textField={effectiveTextField}
                 canOverride={!currentIndex?.embed}
+                clientTextFieldOverride={textFieldOverride}
+                onTextFieldSave={handleSaveTextFieldOverride}
+                onTextFieldClear={handleClearTextFieldOverride}
               />
             </div>
           </div>
@@ -938,7 +965,7 @@ export default function VectorsView({
           onVectorUpdate={handleInlineVectorUpdate}
           onVectorContextMenu={handleVectorContextMenu}
           onTableContextMenu={handleTableContextMenu}
-          embeddingTextField={currentIndex?.embed?.fieldMap?.text}
+          embeddingTextField={effectiveTextField}
         />
       </div>
 

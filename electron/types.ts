@@ -50,6 +50,10 @@ export interface ConnectionProfile {
 
   // Per-index embedding overrides
   embeddingOverrides?: Record<string, EmbeddingConfig>
+
+  // Per-index text field overrides (metadata field containing text for embedding)
+  // Default is '_text' if not specified
+  textFieldOverrides?: Record<string, string>
 }
 
 /**
@@ -168,6 +172,7 @@ export interface CreateVectorParams {
   text?: string // Or provide text to generate embedding
   metadata?: Record<string, unknown>
   generateEmbedding?: boolean // If true, generate embedding from text
+  textField?: string // Metadata field to store text (default: '_text')
 }
 
 /**
@@ -181,6 +186,7 @@ export interface UpdateVectorParams {
   metadata?: Record<string, unknown> // New metadata (merged with existing)
   text?: string // New text to store in metadata
   regenerateEmbedding?: boolean // If true, regenerate embedding from text
+  textField?: string // Metadata field to store text (default: '_text')
 }
 
 /**
@@ -272,6 +278,7 @@ export interface BatchImportParams {
     values?: number[]
   }>
   generateEmbeddings?: boolean
+  textField?: string // Metadata field to store text (default: '_text')
 }
 
 /**

@@ -35,6 +35,8 @@ declare global {
     lastUsed?: number
     defaultEmbeddingConfig?: EmbeddingConfig
     embeddingOverrides?: Record<string, EmbeddingConfig>
+    // Per-index text field overrides (metadata field containing text for embedding)
+    textFieldOverrides?: Record<string, string>
   }
 
   interface IndexInfo {
@@ -118,6 +120,7 @@ declare global {
     text?: string
     metadata?: Record<string, unknown>
     generateEmbedding?: boolean
+    textField?: string // Metadata field to store text (default: '_text')
   }
 
   interface UpdateVectorParams {
@@ -128,6 +131,7 @@ declare global {
     metadata?: Record<string, unknown>
     text?: string
     regenerateEmbedding?: boolean
+    textField?: string // Metadata field to store text (default: '_text')
   }
 
   interface DeleteVectorsParams {
@@ -148,6 +152,7 @@ declare global {
       values?: number[]
     }>
     generateEmbeddings?: boolean
+    textField?: string // Metadata field to store text (default: '_text')
   }
 
   interface BatchImportResult {
@@ -269,6 +274,9 @@ declare global {
       getEmbeddingOverride: (profileId: string, indexName: string) => Promise<EmbeddingConfig | null>
       setEmbeddingOverride: (profileId: string, indexName: string, override: EmbeddingConfig) => Promise<void>
       clearEmbeddingOverride: (profileId: string, indexName: string) => Promise<void>
+      getTextFieldOverride: (profileId: string, indexName: string) => Promise<string | null>
+      setTextFieldOverride: (profileId: string, indexName: string, textField: string) => Promise<void>
+      clearTextFieldOverride: (profileId: string, indexName: string) => Promise<void>
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>
