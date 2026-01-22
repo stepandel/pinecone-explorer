@@ -347,16 +347,11 @@ ipcMain.handle('pinecone:cancelClone', async (_event, profileId: string) => {
 // ============================================================================
 
 // Index context menu (replacing collection menu)
-ipcMain.on('context-menu:show-index', (event, indexName: string, options?: { hasCopiedIndex?: boolean }) => {
+ipcMain.on('context-menu:show-index', (event, indexName: string) => {
   const template: MenuItemConstructorOptions[] = [
     {
-      label: 'Copy Index',
-      click: () => event.sender.send('context-menu:action', { action: 'copy', indexName })
-    },
-    {
-      label: 'Paste Index',
-      enabled: options?.hasCopiedIndex ?? false,
-      click: () => event.sender.send('context-menu:action', { action: 'paste', indexName })
+      label: 'Duplicate Index',
+      click: () => event.sender.send('context-menu:action', { action: 'duplicate', indexName })
     },
     { type: 'separator' },
     {
@@ -371,17 +366,12 @@ ipcMain.on('context-menu:show-index', (event, indexName: string, options?: { has
   }
 })
 
-ipcMain.on('context-menu:show-index-panel', (event, options?: { hasCopiedIndex?: boolean }) => {
+ipcMain.on('context-menu:show-index-panel', (event) => {
   const template: MenuItemConstructorOptions[] = [
     {
-      label: 'Copy Index',
+      label: 'Duplicate Index',
       enabled: false,
       click: () => {}
-    },
-    {
-      label: 'Paste Index',
-      enabled: options?.hasCopiedIndex ?? false,
-      click: () => event.sender.send('context-menu:action', { action: 'paste', indexName: '' })
     },
     { type: 'separator' },
     {

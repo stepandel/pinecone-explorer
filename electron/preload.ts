@@ -136,11 +136,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   contextMenu: {
-    showIndexMenu: (indexName: string, options?: { hasCopiedIndex?: boolean }): void => {
-      ipcRenderer.send('context-menu:show-index', indexName, options)
+    showIndexMenu: (indexName: string): void => {
+      ipcRenderer.send('context-menu:show-index', indexName)
     },
-    showIndexPanelMenu: (options?: { hasCopiedIndex?: boolean }): void => {
-      ipcRenderer.send('context-menu:show-index-panel', options)
+    showIndexPanelMenu: (): void => {
+      ipcRenderer.send('context-menu:show-index-panel')
     },
     onAction: (callback: (action: { action: string; indexName?: string }) => void): (() => void) => {
       const handler = (_event: any, data: { action: string; indexName?: string }) => callback(data)

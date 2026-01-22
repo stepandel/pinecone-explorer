@@ -143,7 +143,6 @@ class PineconeService {
     texts: string[],
     config: EmbeddingConfig
   ): Promise<EmbeddingResult | null> {
-    console.log('generateBatchEmbeddings', texts, config)
     if (texts.length === 0) return null
     return this.embeddingService!.generateEmbeddings(
       texts,

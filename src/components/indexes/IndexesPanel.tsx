@@ -28,9 +28,6 @@ export function IndexesPanel() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const deleteMutation = useDeleteIndexMutation(currentProfile?.id || '')
 
-  // Copy/paste state
-  const [copiedIndex, setCopiedIndex] = useState<IndexInfo | null>(null)
-
   const handleIndexClick = (indexName: string) => {
     setActiveIndex(indexName)
   }
@@ -39,14 +36,14 @@ export function IndexesPanel() {
   const handleIndexContextMenu = useCallback((e: React.MouseEvent, indexName: string) => {
     e.preventDefault()
     e.stopPropagation()
-    window.electronAPI.contextMenu.showIndexMenu(indexName, { hasCopiedIndex: copiedIndex !== null })
-  }, [copiedIndex])
+    window.electronAPI.contextMenu.showIndexMenu(indexName)
+  }, [])
 
-  // Handle right-click on panel background - show paste menu
+  // Handle right-click on panel background
   const handlePanelContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    window.electronAPI.contextMenu.showIndexPanelMenu({ hasCopiedIndex: copiedIndex !== null })
-  }, [copiedIndex])
+    window.electronAPI.contextMenu.showIndexPanelMenu()
+  }, [])
 
   // Handle delete action - opens confirmation dialog
   const openDeleteDialog = useCallback((indexName: string) => {
@@ -87,47 +84,25 @@ export function IndexesPanel() {
     setDeleteError(null)
   }, [])
 
-  // Handle copy action
-  const handleCopyIndex = useCallback((indexName: string) => {
+  // Handle duplicate action - opens config form with source index settings
+  const handleDuplicateIndex = useCallback((indexName: string) => {
     const index = indexes.find(i => i.name === indexName)
     if (index) {
-      setCopiedIndex(index)
+      startCopyFromIndex(index)
     }
-  }, [indexes])
-
-  // Handle paste action - opens config form with source index settings
-  const handlePasteIndex = useCallback(() => {
-    if (!copiedIndex) return
-
-    // Verify the copied index still exists in current list
-    const stillExists = indexes.some(idx => idx.name === copiedIndex.name)
-    if (!stillExists) {
-      // Clear stale clipboard
-      setCopiedIndex(null)
-      return
-    }
-
-    startCopyFromIndex(copiedIndex)
-  }, [copiedIndex, indexes, startCopyFromIndex])
-
-  // Clear copied index when profile changes
-  useEffect(() => {
-    setCopiedIndex(null)
-  }, [currentProfile?.id])
+  }, [indexes, startCopyFromIndex])
 
   // Listen for native context menu actions
   useEffect(() => {
     const unsubscribe = window.electronAPI.contextMenu.onAction((data) => {
       if (data.action === 'delete' && data.indexName) {
         openDeleteDialog(data.indexName)
-      } else if (data.action === 'copy' && data.indexName) {
-        handleCopyIndex(data.indexName)
-      } else if (data.action === 'paste') {
-        handlePasteIndex()
+      } else if (data.action === 'duplicate' && data.indexName) {
+        handleDuplicateIndex(data.indexName)
       }
     })
     return unsubscribe
-  }, [openDeleteDialog, handleCopyIndex, handlePasteIndex])
+  }, [openDeleteDialog, handleDuplicateIndex])
 
   // Listen for menu delete event (from app menu bar)
   useEffect(() => {

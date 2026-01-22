@@ -219,8 +219,8 @@ declare global {
       cancelClone: (profileId: string) => Promise<void>
     }
     contextMenu: {
-      showIndexMenu: (indexName: string, options?: { hasCopiedIndex?: boolean }) => void
-      showIndexPanelMenu: (options?: { hasCopiedIndex?: boolean }) => void
+      showIndexMenu: (indexName: string) => void
+      showIndexPanelMenu: () => void
       onAction: (callback: (action: { action: string; indexName: string }) => void) => () => void
       showVectorMenu: (vectorId: string, options?: { hasCopiedVectors?: boolean }) => void
       showVectorsPanelMenu: (options?: { hasCopiedVectors?: boolean }) => void
