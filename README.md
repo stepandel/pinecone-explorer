@@ -1,12 +1,12 @@
 <div align="center">
 
 ```
- ██████╗██╗  ██╗██████╗  ██████╗ ███╗   ███╗ █████╗
-██╔════╝██║  ██║██╔══██╗██╔═══██╗████╗ ████║██╔══██╗
-██║     ███████║██████╔╝██║   ██║██╔████╔██║███████║
-██║     ██╔══██║██╔══██╗██║   ██║██║╚██╔╝██║██╔══██║
-╚██████╗██║  ██║██║  ██║╚██████╔╝██║ ╚═╝ ██║██║  ██║
- ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝
+██████╗ ██╗███╗   ██╗███████╗ ██████╗ ██████╗ ███╗   ██╗███████╗
+██╔══██╗██║████╗  ██║██╔════╝██╔════╝██╔═══██╗████╗  ██║██╔════╝
+██████╔╝██║██╔██╗ ██║█████╗  ██║     ██║   ██║██╔██╗ ██║█████╗
+██╔═══╝ ██║██║╚██╗██║██╔══╝  ██║     ██║   ██║██║╚██╗██║██╔══╝
+██║     ██║██║ ╚████║███████╗╚██████╗╚██████╔╝██║ ╚████║███████╗
+╚═╝     ╚═╝╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝
 
 ███████╗██╗  ██╗██████╗ ██╗      ██████╗ ██████╗ ███████╗██████╗
 ██╔════╝╚██╗██╔╝██╔══██╗██║     ██╔═══██╗██╔══██╗██╔════╝██╔══██╗
@@ -16,24 +16,25 @@
 ╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
 ```
 
-A desktop application for exploring and managing ChromaDB vector databases. Built with Electron and React.
+A desktop application for exploring and managing Pinecone vector databases. Built with Electron and React.
 
-![Chroma Explorer](assets/screenshot.png)
+![Pinecone Explorer](assets/screenshot.png)
 
 </div>
 
 ## Features
 
-- **Multi-Profile Connections** - Connect to local, remote, or Chroma Cloud databases with saved profiles
-- **Collection Management** - Create, copy, delete, and configure collections with custom embedding functions
-- **Document Operations** - Browse, search, create, edit, and delete documents with batch support
-- **Semantic Search** - Query documents using natural language with 13+ embedding providers
-- **Metadata Filtering** - Filter documents with flexible query syntax
+- **Multi-Profile Connections** - Connect to Pinecone indexes with saved profiles
+- **Index Management** - Create, configure, and delete indexes with custom settings
+- **Record Operations** - Browse, search, create, edit, and delete records with batch support
+- **Semantic Search** - Query records using natural language with 13+ embedding providers
+- **Metadata Filtering** - Filter records with flexible query syntax
 - **Resizable Layout** - Adjustable multi-panel interface with sidebar, table, and detail views
 
 ## Supported Embedding Providers
 
-OpenAI, Cohere, Google Gemini, Ollama, HuggingFace Server, Mistral, Voyage AI, Together AI, Jina, Cloudflare Workers AI, Morph, Chroma Cloud Qwen, Sentence Transformer
+- **Pinecone Inference** - Llama Text Embed v2, Multilingual E5 Large, Sparse English v0
+- **OpenAI** - text-embedding-3-small, text-embedding-3-large
 
 ## Tech Stack
 
@@ -41,16 +42,16 @@ OpenAI, Cohere, Google Gemini, Ollama, HuggingFace Server, Mistral, Voyage AI, T
 - **Frontend**: React, TypeScript, Tailwind CSS
 - **Data**: TanStack Query, TanStack Table
 - **UI**: Radix UI components, Lucide icons
-- **Database**: ChromaDB SDK
+- **Database**: Pinecone SDK
 
 ## Project Structure
 
 ```
-├── electron/           # Main process (IPC handlers, ChromaDB service, window management)
+├── electron/           # Main process (IPC handlers, Pinecone service, window management)
 ├── src/
 │   ├── windows/       # Window components (Setup, Connection, Settings)
-│   ├── components/    # UI components (collections, documents, modals)
-│   ├── context/       # React contexts (ChromaDB, Collections, Documents)
+│   ├── components/    # UI components (indexes, records, modals)
+│   ├── context/       # React contexts (Pinecone, Indexes, Records)
 │   ├── hooks/         # Custom hooks
 │   └── providers/     # Context providers
 ```
@@ -70,7 +71,7 @@ pnpm build
 
 ## Configuration
 
-API keys for embedding providers can be configured in **Settings** (Cmd+,). Keys are stored encrypted at rest.
+API keys for embedding providers can be configured in **Settings** (Cmd+,). Keys are stored securely in the system keychain.
 
 ## License
 
