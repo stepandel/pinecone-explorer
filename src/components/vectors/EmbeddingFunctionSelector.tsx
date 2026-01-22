@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Lock } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
@@ -12,6 +12,10 @@ interface EmbeddingFunctionSelectorProps {
   onSave: (override: EmbeddingConfig) => Promise<void>
   onClear: () => Promise<void>
   embeddingDimension?: number | null
+  // New props for integrated inference support
+  indexEmbedConfig?: IndexEmbedConfig | null  // Index's embed config (if integrated inference)
+  textField?: string                           // Text field used for embedding
+  canOverride?: boolean                        // Whether override is allowed (false for integrated inference)
 }
 
 export function EmbeddingFunctionSelector({
@@ -21,10 +25,16 @@ export function EmbeddingFunctionSelector({
   onSave,
   onClear,
   embeddingDimension,
+  indexEmbedConfig,
+  textField = '_text',
+  canOverride = true,
 }: EmbeddingFunctionSelectorProps) {
   const [open, setOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string>('')
   const [saving, setSaving] = useState(false)
+
+  // Check if using integrated inference
+  const hasIntegratedInference = !!indexEmbedConfig
 
   // Set initial selection based on current override
   useEffect(() => {
@@ -43,7 +53,7 @@ export function EmbeddingFunctionSelector({
   const serverFunction = EMBEDDING_FUNCTIONS.find(ef => ef.modelName === serverConfig?.config?.model_name)
 
   const handleSave = async () => {
-    if (!selectedEF) return
+    if (!selectedEF || !canOverride) return
 
     setSaving(true)
     try {
@@ -60,6 +70,7 @@ export function EmbeddingFunctionSelector({
   }
 
   const handleClear = async () => {
+    if (!canOverride) return
     setSaving(true)
     try {
       await onClear()
@@ -69,6 +80,70 @@ export function EmbeddingFunctionSelector({
     }
   }
 
+  // For integrated inference, show a read-only display
+  if (hasIntegratedInference) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            data-embedding-selector
+            className="text-xs px-2 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
+            title="Using index's integrated inference"
+          >
+            <Lock className="h-2.5 w-2.5" />
+            {indexEmbedConfig.model}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-3" align="start">
+          {/* Header */}
+          <div className="px-1 mb-3">
+            <h4 className="font-medium text-[13px] text-foreground">Integrated Inference</h4>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              This index uses Pinecone's integrated inference. Embedding configuration is managed by the index.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {/* Index embed config info - read only */}
+            <div className="mx-1 text-[11px] px-2.5 py-2 rounded-[5px] space-y-0.5 bg-emerald-500/8 dark:bg-emerald-500/10 ring-1 ring-emerald-500/20 dark:ring-emerald-500/25 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.1)]">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Lock className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="font-medium text-[10px] text-emerald-700 dark:text-emerald-400">
+                  Index Configuration
+                </span>
+              </div>
+              <p className="text-muted-foreground"><span className="text-foreground/60">Provider:</span> pinecone</p>
+              <p className="text-muted-foreground"><span className="text-foreground/60">Model:</span> {indexEmbedConfig.model}</p>
+              <p className="text-muted-foreground"><span className="text-foreground/60">Type:</span> {indexEmbedConfig.vectorType || 'dense'}</p>
+              {indexEmbedConfig.dimension && (
+                <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {indexEmbedConfig.dimension}</p>
+              )}
+              {indexEmbedConfig.metric && (
+                <p className="text-muted-foreground"><span className="text-foreground/60">Metric:</span> {indexEmbedConfig.metric}</p>
+              )}
+              <p className="text-muted-foreground pt-1 border-t border-emerald-500/10 dark:border-emerald-500/15 mt-1">
+                <span className="text-foreground/60">Text field:</span> {textField}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer - just a close button */}
+          <div className="flex justify-end gap-2 mt-3 pt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[12px] px-2.5"
+              onClick={() => setOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
+  // Standard editable selector for non-integrated inference indexes
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>

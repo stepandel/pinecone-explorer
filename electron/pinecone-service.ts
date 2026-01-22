@@ -2,6 +2,7 @@ import { Pinecone, Index, RecordMetadata, PineconeRecord } from '@pinecone-datab
 import {
   ConnectionProfile,
   IndexInfo,
+  IndexEmbedConfig,
   IndexStats,
   VectorRecord,
   QueryVectorsParams,
@@ -33,6 +34,7 @@ class PineconeService {
   private embeddingService: EmbeddingService | null = null
   private profile: ConnectionProfile | null = null
   private indexCache: Map<string, Index<RecordMetadata>> = new Map()
+  private indexInfoCache: Map<string, IndexInfo> = new Map()
 
   getProfile(): ConnectionProfile | null {
     return this.profile
@@ -73,6 +75,7 @@ class PineconeService {
     this.embeddingService = null
     this.profile = null
     this.indexCache.clear()
+    this.indexInfoCache.clear()
   }
 
   /**
@@ -99,17 +102,66 @@ class PineconeService {
   }
 
   /**
-   * Get embedding config for an index
+   * Convert index embed config (from Pinecone API) to our EmbeddingConfig format
+   */
+  private convertIndexEmbedToConfig(embed: IndexEmbedConfig): EmbeddingConfig {
+    return {
+      provider: 'pinecone',
+      modelName: embed.model,
+      vectorType: embed.vectorType || 'dense',
+      dimensions: embed.dimension,
+      // inputType will be set at call time ('query' for search, 'passage' for upsert)
+    }
+  }
+
+  /**
+   * Get the text field name for embedding from an index's embed config
+   * Returns the fieldMap.text value or '_text' as default
+   */
+  getTextFieldForIndex(indexName: string): string {
+    const indexInfo = this.indexInfoCache.get(indexName)
+    return indexInfo?.embed?.fieldMap?.text || '_text'
+  }
+
+  /**
+   * Get embedding config for an index.
+   * Priority chain:
+   * 1. Index's embed config from API (authoritative - cannot be overridden)
+   * 2. Per-index client override (only for indexes WITHOUT integrated inference)
+   * 3. Profile default (fallback for indexes without integrated inference)
+   * 4. None
    */
   private getEmbeddingConfig(indexName: string): EmbeddingConfig | undefined {
+    // Check if index has integrated inference (embed config from API)
+    const indexInfo = this.indexInfoCache.get(indexName)
+    if (indexInfo?.embed) {
+      // Index has integrated inference - this is authoritative, no override allowed
+      return this.convertIndexEmbedToConfig(indexInfo.embed)
+    }
+
     if (!this.profile) return undefined
 
-    // Check for index-specific override first
+    // Check for index-specific override
     const override = this.profile.embeddingOverrides?.[indexName]
     if (override) return override
 
     // Fall back to default config
     return this.profile.defaultEmbeddingConfig
+  }
+
+  /**
+   * Check if an index has integrated inference (embed config from API)
+   */
+  hasIntegratedInference(indexName: string): boolean {
+    const indexInfo = this.indexInfoCache.get(indexName)
+    return !!indexInfo?.embed
+  }
+
+  /**
+   * Get index info from cache
+   */
+  getIndexInfo(indexName: string): IndexInfo | undefined {
+    return this.indexInfoCache.get(indexName)
   }
 
   /**
@@ -161,30 +213,66 @@ class PineconeService {
     const response = await this.client.listIndexes()
     const indexes = response.indexes || []
 
-    return indexes.map((idx) => ({
-      name: idx.name,
-      dimension: idx.dimension,
-      metric: idx.metric as 'cosine' | 'euclidean' | 'dotproduct',
-      host: idx.host,
-      status: {
-        ready: idx.status?.ready ?? false,
-        state: idx.status?.state ?? 'unknown',
-      },
-      spec: {
-        serverless: idx.spec?.serverless ? {
-          cloud: idx.spec.serverless.cloud as 'aws' | 'gcp' | 'azure',
-          region: idx.spec.serverless.region,
-        } : undefined,
-        pod: idx.spec?.pod ? {
-          environment: idx.spec.pod.environment,
-          podType: idx.spec.pod.podType,
-          pods: idx.spec.pod.pods,
-          replicas: idx.spec.pod.replicas,
-          shards: idx.spec.pod.shards,
-        } : undefined,
-      },
-      deletionProtection: idx.deletionProtection as 'enabled' | 'disabled' | undefined,
-    }))
+    const indexInfoList = indexes.map((idx) => {
+      // Map embed config from API if present (for integrated inference indexes)
+      // The Pinecone SDK returns `embed` on IndexModel for indexes created with integrated inference
+      const apiEmbed = (idx as { embed?: {
+        model?: string
+        metric?: string
+        dimension?: number
+        vectorType?: string
+        fieldMap?: { text?: string }
+        readParameters?: Record<string, unknown>
+        writeParameters?: Record<string, unknown>
+      } }).embed
+
+      const embed: IndexEmbedConfig | undefined = apiEmbed?.model ? {
+        model: apiEmbed.model,
+        metric: apiEmbed.metric as 'cosine' | 'euclidean' | 'dotproduct' | undefined,
+        dimension: apiEmbed.dimension,
+        vectorType: apiEmbed.vectorType as 'dense' | 'sparse' | undefined,
+        fieldMap: apiEmbed.fieldMap?.text ? { text: apiEmbed.fieldMap.text } : undefined,
+        readParameters: apiEmbed.readParameters,
+        writeParameters: apiEmbed.writeParameters,
+      } : undefined
+
+      const indexInfo: IndexInfo = {
+        name: idx.name,
+        dimension: idx.dimension,
+        metric: idx.metric as 'cosine' | 'euclidean' | 'dotproduct',
+        host: idx.host,
+        status: {
+          ready: idx.status?.ready ?? false,
+          state: idx.status?.state ?? 'unknown',
+        },
+        spec: {
+          serverless: idx.spec?.serverless ? {
+            cloud: idx.spec.serverless.cloud as 'aws' | 'gcp' | 'azure',
+            region: idx.spec.serverless.region,
+          } : undefined,
+          pod: idx.spec?.pod ? {
+            environment: idx.spec.pod.environment,
+            podType: idx.spec.pod.podType,
+            pods: idx.spec.pod.pods,
+            replicas: idx.spec.pod.replicas,
+            shards: idx.spec.pod.shards,
+          } : undefined,
+        },
+        deletionProtection: idx.deletionProtection as 'enabled' | 'disabled' | undefined,
+        vectorType: (idx as { vectorType?: string }).vectorType as 'dense' | 'sparse' | undefined,
+        embed,
+      }
+
+      return indexInfo
+    })
+
+    // Update the index info cache with the latest data
+    this.indexInfoCache.clear()
+    for (const info of indexInfoList) {
+      this.indexInfoCache.set(info.name, info)
+    }
+
+    return indexInfoList
   }
 
   /**
@@ -330,7 +418,9 @@ class PineconeService {
     embeddingConfigOverride?: EmbeddingConfig
   ): Promise<void> {
     const metadata: Record<string, unknown> = { ...params.metadata }
-    if (params.text) metadata._text = params.text
+    // Use the text field from index's embed config, or default to '_text'
+    const textField = this.getTextFieldForIndex(params.indexName)
+    if (params.text) metadata[textField] = params.text
 
     let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
 
@@ -363,7 +453,9 @@ class PineconeService {
     const ns = this.getNamespace(params.indexName, params.namespace)
 
     const metadata: Record<string, unknown> = { ...params.metadata }
-    if (params.text) metadata._text = params.text
+    // Use the text field from index's embed config, or default to '_text'
+    const textField = this.getTextFieldForIndex(params.indexName)
+    if (params.text) metadata[textField] = params.text
 
     let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
 
@@ -417,12 +509,14 @@ class PineconeService {
     const errors: string[] = []
     let upsertedCount = 0
     const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+    // Use the text field from index's embed config, or default to '_text'
+    const textField = this.getTextFieldForIndex(params.indexName)
 
     for (let i = 0; i < params.vectors.length; i += PineconeService.BATCH_SIZE) {
       const batch = params.vectors.slice(i, i + PineconeService.BATCH_SIZE)
 
       try {
-        const vectorsToUpsert = await this.prepareBatchVectors(batch, params.generateEmbeddings, embeddingConfig)
+        const vectorsToUpsert = await this.prepareBatchVectors(batch, params.generateEmbeddings, embeddingConfig, textField)
 
         if (vectorsToUpsert.length > 0) {
           await this.upsertVectors({
@@ -449,7 +543,8 @@ class PineconeService {
   private async prepareBatchVectors(
     batch: Array<{ id: string; text?: string; values?: number[]; metadata?: Record<string, unknown> }>,
     generateEmbeddings?: boolean,
-    embeddingConfig?: EmbeddingConfig
+    embeddingConfig?: EmbeddingConfig,
+    textField: string = '_text'
   ): Promise<Array<{ id: string; values?: number[]; sparseValues?: SparseVector; metadata?: Record<string, unknown> }>> {
     if (!generateEmbeddings || !embeddingConfig) {
       return batch.filter(v => v.values).map(v => ({
@@ -465,7 +560,7 @@ class PineconeService {
     let embeddingIndex = 0
     return batch.map(v => {
       const metadata: Record<string, unknown> = { ...v.metadata }
-      if (v.text) metadata._text = v.text
+      if (v.text) metadata[textField] = v.text
 
       if (v.values) {
         return { id: v.id, values: v.values, metadata }

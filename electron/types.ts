@@ -8,6 +8,19 @@ export type EmbeddingProviderType =
   | 'openai'
 
 /**
+ * Index-level embedding configuration from Pinecone API (for integrated inference indexes)
+ */
+export interface IndexEmbedConfig {
+  model: string                              // e.g., 'llama-text-embed-v2', 'multilingual-e5-large'
+  metric?: 'cosine' | 'euclidean' | 'dotproduct'
+  dimension?: number
+  vectorType?: 'dense' | 'sparse'
+  fieldMap?: { text: string }                // Maps record field name to text for embedding
+  readParameters?: Record<string, unknown>
+  writeParameters?: Record<string, unknown>
+}
+
+/**
  * Configuration for embedding generation
  */
 export interface EmbeddingConfig {
@@ -65,6 +78,8 @@ export interface IndexInfo {
     }
   }
   deletionProtection?: 'enabled' | 'disabled'
+  vectorType?: 'dense' | 'sparse'            // Index vector type from API
+  embed?: IndexEmbedConfig                    // Integrated inference config (if enabled)
 }
 
 /**

@@ -969,6 +969,9 @@ export default function VectorsView({
                 onSave={handleSaveOverride}
                 onClear={handleClearOverride}
                 embeddingDimension={currentIndex?.dimension ?? null}
+                indexEmbedConfig={currentIndex?.embed ?? null}
+                textField={currentIndex?.embed?.fieldMap?.text ?? '_text'}
+                canOverride={!currentIndex?.embed}
               />
             </div>
           </div>

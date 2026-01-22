@@ -5,6 +5,19 @@ declare global {
     | 'pinecone'
     | 'openai'
 
+  /**
+   * Index-level embedding configuration from Pinecone API (for integrated inference indexes)
+   */
+  interface IndexEmbedConfig {
+    model: string                              // e.g., 'llama-text-embed-v2', 'multilingual-e5-large'
+    metric?: 'cosine' | 'euclidean' | 'dotproduct'
+    dimension?: number
+    vectorType?: 'dense' | 'sparse'
+    fieldMap?: { text: string }                // Maps record field name to text for embedding
+    readParameters?: Record<string, unknown>
+    writeParameters?: Record<string, unknown>
+  }
+
   interface EmbeddingConfig {
     provider: EmbeddingProviderType
     modelName: string
@@ -47,6 +60,8 @@ declare global {
       }
     }
     deletionProtection?: 'enabled' | 'disabled'
+    vectorType?: 'dense' | 'sparse'            // Index vector type from API
+    embed?: IndexEmbedConfig                    // Integrated inference config (if enabled)
   }
 
   interface IndexStats {
