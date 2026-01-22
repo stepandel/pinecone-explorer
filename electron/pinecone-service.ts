@@ -27,6 +27,8 @@ import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-ser
  * Main Pinecone service class
  */
 class PineconeService {
+  private static readonly BATCH_SIZE = 100
+
   private client: Pinecone | null = null
   private embeddingService: EmbeddingService | null = null
   private profile: ConnectionProfile | null = null
@@ -111,6 +113,44 @@ class PineconeService {
   }
 
   /**
+   * Get namespace reference for an index
+   */
+  private getNamespace(indexName: string, namespace?: string) {
+    const index = this.getIndex(indexName)
+    return namespace ? index.namespace(namespace) : index
+  }
+
+  /**
+   * Generate embedding for a single text and return as values or sparseValues
+   */
+  private async generateSingleEmbedding(
+    text: string,
+    config: EmbeddingConfig
+  ): Promise<{ values?: number[]; sparseValues?: SparseVector }> {
+    const result = await this.embeddingService!.generateEmbeddings(
+      [text],
+      { ...config, inputType: 'passage' }
+    )
+    return result.type === 'dense'
+      ? { values: result.values[0] }
+      : { sparseValues: result.sparseValues[0] }
+  }
+
+  /**
+   * Generate embeddings for multiple texts and return indexed results
+   */
+  private async generateBatchEmbeddings(
+    texts: string[],
+    config: EmbeddingConfig
+  ): Promise<EmbeddingResult | null> {
+    if (texts.length === 0) return null
+    return this.embeddingService!.generateEmbeddings(
+      texts,
+      { ...config, inputType: 'passage' }
+    )
+  }
+
+  /**
    * List all indexes
    */
   async listIndexes(): Promise<IndexInfo[]> {
@@ -173,8 +213,7 @@ class PineconeService {
    * List vectors in an index (paginated)
    */
   async listVectors(params: ListVectorsParams): Promise<ListVectorsResult> {
-    const index = this.getIndex(params.indexName)
-    const ns = params.namespace ? index.namespace(params.namespace) : index
+    const ns = this.getNamespace(params.indexName, params.namespace)
 
     const response = await ns.listPaginated({
       prefix: params.prefix,
@@ -194,8 +233,7 @@ class PineconeService {
    * Fetch vectors by ID
    */
   async fetchVectors(params: FetchVectorsParams): Promise<VectorRecord[]> {
-    const index = this.getIndex(params.indexName)
-    const ns = params.namespace ? index.namespace(params.namespace) : index
+    const ns = this.getNamespace(params.indexName, params.namespace)
 
     const response = await ns.fetch(params.ids)
 
@@ -216,9 +254,7 @@ class PineconeService {
     params: QueryVectorsParams,
     embeddingConfigOverride?: EmbeddingConfig
   ): Promise<QueryResult> {
-    const index = this.getIndex(params.indexName)
-    const ns = params.namespace ? index.namespace(params.namespace) : index
-
+    const ns = this.getNamespace(params.indexName, params.namespace)
     let queryVector = params.vector
 
     // If queryText is provided, generate embedding
@@ -273,17 +309,12 @@ class PineconeService {
    * Upsert vectors
    */
   async upsertVectors(params: UpsertVectorsParams): Promise<void> {
-    const index = this.getIndex(params.indexName)
-    const ns = params.namespace ? index.namespace(params.namespace) : index
+    const ns = this.getNamespace(params.indexName, params.namespace)
 
-    // Pinecone has a limit of 100 vectors per upsert
-    const BATCH_SIZE = 100
-    const vectors = params.vectors
-
-    for (let i = 0; i < vectors.length; i += BATCH_SIZE) {
-      const batch = vectors.slice(i, i + BATCH_SIZE).map(v => ({
+    for (let i = 0; i < params.vectors.length; i += PineconeService.BATCH_SIZE) {
+      const batch = params.vectors.slice(i, i + PineconeService.BATCH_SIZE).map(v => ({
         id: v.id,
-        values: v.values || [], // Empty array for sparse-only vectors
+        values: v.values || [],
         metadata: v.metadata as RecordMetadata | undefined,
         sparseValues: v.sparseValues,
       }))
@@ -298,43 +329,27 @@ class PineconeService {
     params: CreateVectorParams,
     embeddingConfigOverride?: EmbeddingConfig
   ): Promise<void> {
-    let values = params.values
-
-    // Build metadata, including text if provided
     const metadata: Record<string, unknown> = { ...params.metadata }
-    if (params.text) {
-      metadata._text = params.text
-    }
+    if (params.text) metadata._text = params.text
 
-    let sparseValues: SparseVector | undefined
+    let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
 
-    // Generate embedding if requested
     if (params.generateEmbedding && params.text) {
-      const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
-      if (!embeddingConfig) {
+      const config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+      if (!config) {
         throw new Error('No embedding configuration found. Please configure an embedding provider.')
       }
-
-      // Use inputType: 'passage' for upsert operations
-      const embeddingResult = await this.embeddingService!.generateEmbeddings(
-        [params.text],
-        { ...embeddingConfig, inputType: 'passage' }
-      )
-      if (embeddingResult.type === 'dense') {
-        values = embeddingResult.values[0]
-      } else {
-        sparseValues = embeddingResult.sparseValues[0]
-      }
+      embedding = await this.generateSingleEmbedding(params.text, config)
     }
 
-    if (!values && !sparseValues) {
+    if (!embedding.values && !embedding.sparseValues) {
       throw new Error('Either values or text with generateEmbedding must be provided.')
     }
 
     await this.upsertVectors({
       indexName: params.indexName,
       namespace: params.namespace,
-      vectors: [{ id: params.id, values, sparseValues, metadata }],
+      vectors: [{ id: params.id, ...embedding, metadata }],
     })
   }
 
@@ -345,43 +360,27 @@ class PineconeService {
     params: UpdateVectorParams,
     embeddingConfigOverride?: EmbeddingConfig
   ): Promise<void> {
-    const index = this.getIndex(params.indexName)
-    const ns = params.namespace ? index.namespace(params.namespace) : index
+    const ns = this.getNamespace(params.indexName, params.namespace)
 
-    let values = params.values
-    let sparseValues: SparseVector | undefined
+    const metadata: Record<string, unknown> = { ...params.metadata }
+    if (params.text) metadata._text = params.text
 
-    // Regenerate embedding if requested
+    let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
+
     if (params.regenerateEmbedding && params.text) {
-      const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
-      if (!embeddingConfig) {
+      const config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+      if (!config) {
         throw new Error('No embedding configuration found. Please configure an embedding provider.')
       }
-
-      // Use inputType: 'passage' for upsert operations
-      const embeddingResult = await this.embeddingService!.generateEmbeddings(
-        [params.text],
-        { ...embeddingConfig, inputType: 'passage' }
-      )
-      if (embeddingResult.type === 'dense') {
-        values = embeddingResult.values[0]
-      } else {
-        sparseValues = embeddingResult.sparseValues[0]
-      }
+      embedding = await this.generateSingleEmbedding(params.text, config)
     }
 
-    // Build metadata update
-    const metadata: Record<string, unknown> = { ...params.metadata }
-    if (params.text) {
-      metadata._text = params.text
-    }
-
-    // Use update for metadata-only changes, upsert for value changes
-    if (values || sparseValues) {
+    // Use upsert for value changes, update for metadata-only changes
+    if (embedding.values || embedding.sparseValues) {
       await ns.upsert([{
         id: params.id,
-        values: values || [], // Empty array for sparse-only vectors
-        sparseValues,
+        values: embedding.values || [],
+        sparseValues: embedding.sparseValues,
         metadata: Object.keys(metadata).length > 0 ? metadata as RecordMetadata : undefined,
       }])
     } else if (Object.keys(metadata).length > 0) {
@@ -396,15 +395,13 @@ class PineconeService {
    * Delete vectors
    */
   async deleteVectors(params: DeleteVectorsParams): Promise<void> {
-    const index = this.getIndex(params.indexName)
-    const ns = params.namespace ? index.namespace(params.namespace) : index
+    const ns = this.getNamespace(params.indexName, params.namespace)
 
     if (params.deleteAll) {
       await ns.deleteAll()
     } else if (params.ids && params.ids.length > 0) {
       await ns.deleteMany(params.ids)
     } else if (params.filter) {
-      // Note: deleteMany with filter requires serverless indexes
       await ns.deleteMany({ filter: params.filter })
     }
   }
@@ -417,63 +414,15 @@ class PineconeService {
     embeddingConfigOverride?: EmbeddingConfig,
     onProgress?: (current: number, total: number) => void
   ): Promise<BatchImportResult> {
-    const BATCH_SIZE = 100
     const errors: string[] = []
     let upsertedCount = 0
-
     const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
 
-    // Process in batches
-    for (let i = 0; i < params.vectors.length; i += BATCH_SIZE) {
-      const batch = params.vectors.slice(i, i + BATCH_SIZE)
+    for (let i = 0; i < params.vectors.length; i += PineconeService.BATCH_SIZE) {
+      const batch = params.vectors.slice(i, i + PineconeService.BATCH_SIZE)
 
       try {
-        let vectorsToUpsert: Array<{
-          id: string
-          values?: number[]
-          sparseValues?: SparseVector
-          metadata?: Record<string, unknown>
-        }> = []
-
-        if (params.generateEmbeddings && embeddingConfig) {
-          // Generate embeddings for texts
-          const textsToEmbed = batch
-            .filter((v) => v.text && !v.values)
-            .map((v) => v.text!)
-
-          let embeddingResult: EmbeddingResult | null = null
-          if (textsToEmbed.length > 0) {
-            // Use inputType: 'passage' for upsert operations
-            embeddingResult = await this.embeddingService!.generateEmbeddings(
-              textsToEmbed,
-              { ...embeddingConfig, inputType: 'passage' }
-            )
-          }
-
-          let embeddingIndex = 0
-          vectorsToUpsert = batch.map((v) => {
-            const metadata: Record<string, unknown> = { ...v.metadata }
-            if (v.text) metadata._text = v.text
-
-            if (v.values) {
-              return { id: v.id, values: v.values, metadata }
-            } else if (embeddingResult?.type === 'dense') {
-              return { id: v.id, values: embeddingResult.values[embeddingIndex++], metadata }
-            } else if (embeddingResult?.type === 'sparse') {
-              return { id: v.id, sparseValues: embeddingResult.sparseValues[embeddingIndex++], metadata }
-            }
-            return { id: v.id, metadata }
-          })
-        } else {
-          // Use provided values directly
-          vectorsToUpsert = batch
-            .filter((v) => v.values)
-            .map((v) => ({
-              id: v.id,
-              values: v.values!,
-              metadata: v.metadata,
-            }))
-        }
+        const vectorsToUpsert = await this.prepareBatchVectors(batch, params.generateEmbeddings, embeddingConfig)
 
         if (vectorsToUpsert.length > 0) {
           await this.upsertVectors({
@@ -484,14 +433,49 @@ class PineconeService {
           upsertedCount += vectorsToUpsert.length
         }
 
-        onProgress?.(Math.min(i + BATCH_SIZE, params.vectors.length), params.vectors.length)
+        onProgress?.(Math.min(i + PineconeService.BATCH_SIZE, params.vectors.length), params.vectors.length)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
-        errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${message}`)
+        errors.push(`Batch ${Math.floor(i / PineconeService.BATCH_SIZE) + 1}: ${message}`)
       }
     }
 
     return { upsertedCount, errors }
+  }
+
+  /**
+   * Prepare a batch of vectors for upsert, optionally generating embeddings
+   */
+  private async prepareBatchVectors(
+    batch: Array<{ id: string; text?: string; values?: number[]; metadata?: Record<string, unknown> }>,
+    generateEmbeddings?: boolean,
+    embeddingConfig?: EmbeddingConfig
+  ): Promise<Array<{ id: string; values?: number[]; sparseValues?: SparseVector; metadata?: Record<string, unknown> }>> {
+    if (!generateEmbeddings || !embeddingConfig) {
+      return batch.filter(v => v.values).map(v => ({
+        id: v.id,
+        values: v.values!,
+        metadata: v.metadata,
+      }))
+    }
+
+    const textsToEmbed = batch.filter(v => v.text && !v.values).map(v => v.text!)
+    const embeddingResult = await this.generateBatchEmbeddings(textsToEmbed, embeddingConfig)
+
+    let embeddingIndex = 0
+    return batch.map(v => {
+      const metadata: Record<string, unknown> = { ...v.metadata }
+      if (v.text) metadata._text = v.text
+
+      if (v.values) {
+        return { id: v.id, values: v.values, metadata }
+      } else if (embeddingResult?.type === 'dense') {
+        return { id: v.id, values: embeddingResult.values[embeddingIndex++], metadata }
+      } else if (embeddingResult?.type === 'sparse') {
+        return { id: v.id, sparseValues: embeddingResult.sparseValues[embeddingIndex++], metadata }
+      }
+      return { id: v.id, metadata }
+    })
   }
 
   /**
@@ -586,16 +570,9 @@ class PineconeService {
       throw new Error('Pinecone client not connected. Please connect first.')
     }
 
-    const BATCH_SIZE = 100
-
     try {
-      // Phase 1: Get source index stats
-      onProgress({
-        phase: 'creating',
-        totalVectors: 0,
-        processedVectors: 0,
-        message: 'Analyzing source index...',
-      })
+      // Phase 1: Analyze source
+      onProgress({ phase: 'creating', totalVectors: 0, processedVectors: 0, message: 'Analyzing source index...' })
 
       if (signal?.aborted) {
         return { success: false, totalVectors: 0, copiedVectors: 0, error: 'Operation cancelled' }
@@ -606,243 +583,179 @@ class PineconeService {
       const totalVectors = sourceStats.namespaces[sourceNamespace]?.vectorCount || 0
 
       if (totalVectors === 0) {
-        onProgress({
-          phase: 'complete',
-          totalVectors: 0,
-          processedVectors: 0,
-          message: 'Source is empty, nothing to clone.',
-        })
+        onProgress({ phase: 'complete', totalVectors: 0, processedVectors: 0, message: 'Source is empty, nothing to clone.' })
         return { success: true, totalVectors: 0, copiedVectors: 0 }
       }
 
-      // Phase 2: Copy vectors in batches
+      // Phase 2: Copy vectors
+      const sourceNs = this.getNamespace(params.sourceIndexName, sourceNamespace)
+      const targetNs = this.getNamespace(params.targetIndexName, params.targetNamespace)
+      const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.sourceIndexName)
+
       let processedVectors = 0
       let paginationToken: string | undefined
-
-      const sourceIndex = this.getIndex(params.sourceIndexName)
-      const sourceNs = sourceNamespace ? sourceIndex.namespace(sourceNamespace) : sourceIndex
-
-      const targetIndex = this.getIndex(params.targetIndexName)
-      const targetNs = params.targetNamespace
-        ? targetIndex.namespace(params.targetNamespace)
-        : targetIndex
-
-      const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.sourceIndexName)
+      let dimensionValidated = false
 
       do {
         if (signal?.aborted) {
-          return {
-            success: false,
-            totalVectors,
-            copiedVectors: processedVectors,
-            error: 'Operation cancelled',
-          }
+          return { success: false, totalVectors, copiedVectors: processedVectors, error: 'Operation cancelled' }
         }
 
-        onProgress({
-          phase: 'copying',
-          totalVectors,
-          processedVectors,
-          message: `Copying vectors... ${processedVectors}/${totalVectors}`,
-        })
+        onProgress({ phase: 'copying', totalVectors, processedVectors, message: `Copying vectors... ${processedVectors}/${totalVectors}` })
 
-        // List vector IDs
-        const listResult = await sourceNs.listPaginated({
-          limit: BATCH_SIZE,
-          paginationToken,
-        })
-
-        const ids = listResult.vectors?.map((v) => v.id || '').filter(Boolean) || []
+        const listResult = await sourceNs.listPaginated({ limit: PineconeService.BATCH_SIZE, paginationToken })
+        const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
         paginationToken = listResult.pagination?.next
 
         if (ids.length === 0) break
 
-        // Fetch full vectors
         const fetchResult = await sourceNs.fetch(ids)
         const records = Object.values(fetchResult.records || {})
-
         if (records.length === 0) continue
 
-        // Prepare vectors for upsert
-        let vectorsToUpsert: Array<{
-          id: string
-          values?: number[]
-          sparseValues?: SparseVector
-          metadata?: Record<string, unknown>
-        }>
+        const vectorsToUpsert = await this.prepareCloneVectors(
+          records,
+          params.regenerateEmbeddings,
+          embeddingConfig,
+          params.textField
+        )
 
-        if (params.regenerateEmbeddings && embeddingConfig) {
-          // Extract texts and regenerate embeddings
-          const textField = params.textField || '_text'
-          const textsToEmbed: string[] = []
-          const textIndices: number[] = []
-
-          records.forEach((record, idx) => {
-            const text = (record.metadata as Record<string, unknown>)?.[textField] as string | undefined
-            if (text) {
-              textsToEmbed.push(text)
-              textIndices.push(idx)
-            }
-          })
-
-          // Check for vectors without text metadata that will be copied as-is
-          const vectorsWithoutText = records.length - textsToEmbed.length
-          if (vectorsWithoutText > 0) {
-            console.warn(`[Clone] ${vectorsWithoutText} vectors have no '${textField}' metadata, copying original embeddings`)
-
-            // Check for dimension mismatch - get target dimension from embedding config
-            const targetDimension = embeddingConfig.dimensions
-            const sourceDimension = records[0]?.values?.length
-
-            if (sourceDimension && targetDimension && sourceDimension !== targetDimension) {
-              throw new Error(
-                `Cannot clone: ${vectorsWithoutText} vectors have no '${textField}' metadata and their dimensions (${sourceDimension}) ` +
-                `don't match target model dimensions (${targetDimension}). All vectors must have '${textField}' metadata for embedding regeneration.`
-              )
-            }
-          }
-
-          // Generate embeddings (supports both dense and sparse)
-          const embeddingResult = textsToEmbed.length > 0
-            ? await this.embeddingService!.generateEmbeddings(
-                textsToEmbed,
-                { ...embeddingConfig, inputType: 'passage' }
-              )
-            : null
-
-          vectorsToUpsert = records.map((record, idx) => {
-            const embeddingIdx = textIndices.indexOf(idx)
-
-            // Build the vector object based on embedding type
-            if (embeddingIdx >= 0 && embeddingResult) {
-              if (embeddingResult.type === 'sparse') {
-                // Sparse embedding - use sparseValues, no dense values
-                return {
-                  id: record.id,
-                  sparseValues: embeddingResult.sparseValues[embeddingIdx],
-                  metadata: record.metadata as RecordMetadata | undefined,
-                }
-              } else {
-                // Dense embedding - use values
-                return {
-                  id: record.id,
-                  values: embeddingResult.values[embeddingIdx],
-                  metadata: record.metadata as RecordMetadata | undefined,
-                }
-              }
-            } else {
-              // No text to embed, copy original values (dense) or sparseValues
-              return {
-                id: record.id,
-                values: record.values || undefined,
-                sparseValues: record.sparseValues as SparseVector | undefined,
-                metadata: record.metadata as RecordMetadata | undefined,
-              }
-            }
-          })
-        } else {
-          // Copy vectors as-is
-          vectorsToUpsert = records.map((record) => ({
-            id: record.id,
-            values: record.values || undefined,
-            sparseValues: record.sparseValues as SparseVector | undefined,
-            metadata: record.metadata as RecordMetadata | undefined,
-          }))
+        // Validate dimensions on first batch
+        if (!dimensionValidated && vectorsToUpsert.length > 0) {
+          await this.validateCloneDimensions(vectorsToUpsert, params.targetIndexName)
+          dimensionValidated = true
         }
 
-        // Validate dimensions before first upsert
-        if (processedVectors === 0 && vectorsToUpsert.length > 0) {
-          const firstVectorWithValues = vectorsToUpsert.find(v => v.values && v.values.length > 0)
-          if (firstVectorWithValues?.values) {
-            const targetInfo = await this.client!.describeIndex(params.targetIndexName)
-            if (targetInfo.dimension && firstVectorWithValues.values.length !== targetInfo.dimension) {
-              throw new Error(
-                `Dimension mismatch: Generated embeddings have ${firstVectorWithValues.values.length} dimensions ` +
-                `but target index expects ${targetInfo.dimension} dimensions`
-              )
-            }
-          }
-        }
-
-        // Upsert to target
         await targetNs.upsert(vectorsToUpsert as PineconeRecord[])
         processedVectors += vectorsToUpsert.length
 
       } while (paginationToken)
 
       // Phase 3: Complete
-      onProgress({
-        phase: 'complete',
-        totalVectors,
-        processedVectors,
-        message: `Copied ${processedVectors} vectors`,
-      })
-
-      return {
-        success: true,
-        totalVectors,
-        copiedVectors: processedVectors,
-      }
+      onProgress({ phase: 'complete', totalVectors, processedVectors, message: `Copied ${processedVectors} vectors` })
+      return { success: true, totalVectors, copiedVectors: processedVectors }
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to clone index'
+      onProgress({ phase: 'error', totalVectors: 0, processedVectors: 0, message })
+      return { success: false, totalVectors: 0, copiedVectors: 0, error: message }
+    }
+  }
 
-      onProgress({
-        phase: 'error',
-        totalVectors: 0,
-        processedVectors: 0,
-        message,
-      })
+  /**
+   * Prepare vectors for cloning, optionally regenerating embeddings
+   */
+  private async prepareCloneVectors(
+    records: Array<{ id: string; values?: number[]; sparseValues?: unknown; metadata?: unknown }>,
+    regenerateEmbeddings?: boolean,
+    embeddingConfig?: EmbeddingConfig | null,
+    textField: string = '_text'
+  ): Promise<Array<{ id: string; values?: number[]; sparseValues?: SparseVector; metadata?: Record<string, unknown> }>> {
+    if (!regenerateEmbeddings || !embeddingConfig) {
+      return records.map(record => ({
+        id: record.id,
+        values: record.values || undefined,
+        sparseValues: record.sparseValues as SparseVector | undefined,
+        metadata: record.metadata as Record<string, unknown> | undefined,
+      }))
+    }
+
+    // Extract texts for embedding generation
+    const textsToEmbed: string[] = []
+    const textIndices: number[] = []
+
+    records.forEach((record, idx) => {
+      const text = (record.metadata as Record<string, unknown>)?.[textField] as string | undefined
+      if (text) {
+        textsToEmbed.push(text)
+        textIndices.push(idx)
+      }
+    })
+
+    // Validate dimension compatibility for vectors without text
+    const vectorsWithoutText = records.length - textsToEmbed.length
+    if (vectorsWithoutText > 0) {
+      const targetDimension = embeddingConfig.dimensions
+      const sourceDimension = records[0]?.values?.length
+      if (sourceDimension && targetDimension && sourceDimension !== targetDimension) {
+        throw new Error(
+          `Cannot clone: ${vectorsWithoutText} vectors have no '${textField}' metadata and their dimensions (${sourceDimension}) ` +
+          `don't match target model dimensions (${targetDimension}). All vectors must have '${textField}' metadata for embedding regeneration.`
+        )
+      }
+    }
+
+    const embeddingResult = await this.generateBatchEmbeddings(textsToEmbed, embeddingConfig)
+
+    return records.map((record, idx) => {
+      const embeddingIdx = textIndices.indexOf(idx)
+
+      if (embeddingIdx >= 0 && embeddingResult) {
+        return embeddingResult.type === 'sparse'
+          ? { id: record.id, sparseValues: embeddingResult.sparseValues[embeddingIdx], metadata: record.metadata as Record<string, unknown> }
+          : { id: record.id, values: embeddingResult.values[embeddingIdx], metadata: record.metadata as Record<string, unknown> }
+      }
 
       return {
-        success: false,
-        totalVectors: 0,
-        copiedVectors: 0,
-        error: message,
+        id: record.id,
+        values: record.values || undefined,
+        sparseValues: record.sparseValues as SparseVector | undefined,
+        metadata: record.metadata as Record<string, unknown> | undefined,
       }
+    })
+  }
+
+  /**
+   * Validate that vector dimensions match target index
+   */
+  private async validateCloneDimensions(
+    vectors: Array<{ values?: number[] }>,
+    targetIndexName: string
+  ): Promise<void> {
+    const firstWithValues = vectors.find(v => v.values && v.values.length > 0)
+    if (!firstWithValues?.values) return
+
+    const targetInfo = await this.client!.describeIndex(targetIndexName)
+    if (targetInfo.dimension && firstWithValues.values.length !== targetInfo.dimension) {
+      throw new Error(
+        `Dimension mismatch: Generated embeddings have ${firstWithValues.values.length} dimensions ` +
+        `but target index expects ${targetInfo.dimension} dimensions`
+      )
     }
   }
 
   /**
    * Get all vectors in a namespace (for display in UI)
-   * This fetches vectors in batches and returns them all
    */
   async getAllVectors(
     indexName: string,
     namespace?: string,
     limit: number = 1000
   ): Promise<VectorRecord[]> {
+    const ns = this.getNamespace(indexName, namespace)
     const allVectors: VectorRecord[] = []
     let paginationToken: string | undefined
-    const BATCH_SIZE = 100
-
-    const index = this.getIndex(indexName)
-    const ns = namespace ? index.namespace(namespace) : index
 
     do {
-      // List vector IDs
       const listResult = await ns.listPaginated({
-        limit: Math.min(BATCH_SIZE, limit - allVectors.length),
+        limit: Math.min(PineconeService.BATCH_SIZE, limit - allVectors.length),
         paginationToken,
       })
 
-      const ids = listResult.vectors?.map((v) => v.id || '').filter(Boolean) || []
+      const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
       paginationToken = listResult.pagination?.next
 
       if (ids.length === 0) break
 
-      // Fetch full vectors
       const fetchResult = await ns.fetch(ids)
       const records = Object.values(fetchResult.records || {})
 
-      allVectors.push(
-        ...records.map((record) => ({
-          id: record.id,
-          values: record.values || [],
-          metadata: record.metadata || null,
-          sparseValues: record.sparseValues,
-        }))
-      )
+      allVectors.push(...records.map(record => ({
+        id: record.id,
+        values: record.values || [],
+        metadata: record.metadata || null,
+        sparseValues: record.sparseValues,
+      })))
 
       // Stop if we've reached the limit
       if (allVectors.length >= limit) break
@@ -864,22 +777,14 @@ class PineconeConnectionPool {
    */
   async connect(profileId: string, profile: ConnectionProfile): Promise<PineconeService> {
     const existing = this.connections.get(profileId)
-
     if (existing) {
       existing.refCount++
-      console.log(`[Pinecone Pool] Reusing connection for profile ${profileId} (refCount: ${existing.refCount})`)
       return existing.service
     }
 
     const service = new PineconeService()
     await service.connect(profile)
-
-    this.connections.set(profileId, {
-      service,
-      refCount: 1,
-    })
-
-    console.log(`[Pinecone Pool] Created new connection for profile ${profileId}`)
+    this.connections.set(profileId, { service, refCount: 1 })
     return service
   }
 
@@ -888,19 +793,12 @@ class PineconeConnectionPool {
    */
   disconnect(profileId: string): void {
     const connection = this.connections.get(profileId)
-
-    if (!connection) {
-      console.warn(`[Pinecone Pool] Attempted to disconnect unknown profile ${profileId}`)
-      return
-    }
+    if (!connection) return
 
     connection.refCount--
-    console.log(`[Pinecone Pool] Decremented refCount for profile ${profileId} (refCount: ${connection.refCount})`)
-
     if (connection.refCount <= 0) {
       connection.service.disconnect()
       this.connections.delete(profileId)
-      console.log(`[Pinecone Pool] Disconnected and removed profile ${profileId}`)
     }
   }
 
@@ -928,6 +826,3 @@ class PineconeConnectionPool {
 
 // Export singleton connection pool
 export const pineconeConnectionPool = new PineconeConnectionPool()
-
-// Export singleton service for backwards compatibility
-export const pineconeService = new PineconeService()
