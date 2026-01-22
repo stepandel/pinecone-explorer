@@ -97,11 +97,12 @@ export class EmbeddingService {
     )
 
     const values = response.data.map(item => {
-      const embedding = item as unknown as { values?: number[] }
+      const embedding = item as unknown as { values?: number[] | Float32Array }
       if (!embedding.values) {
         throw new Error('Pinecone inference returned empty embedding values')
       }
-      return embedding.values
+      // SDK may return TypedArrays - convert to regular arrays
+      return Array.from(embedding.values)
     })
 
     return { type: 'dense', values }
@@ -127,15 +128,17 @@ export class EmbeddingService {
     )
 
     const sparseValues: SparseVector[] = response.data.map(item => {
+      // SDK returns sparseValues and sparseIndices as separate top-level properties
       const embedding = item as unknown as {
-        sparseValues?: { indices: number[]; values: number[] }
+        sparseValues?: number[] | Float32Array
+        sparseIndices?: number[] | Uint32Array
       }
-      if (!embedding.sparseValues) {
+      if (!embedding.sparseValues || !embedding.sparseIndices) {
         throw new Error('Pinecone inference returned empty sparse embedding values')
       }
       return {
-        indices: embedding.sparseValues.indices,
-        values: embedding.sparseValues.values,
+        indices: Array.from(embedding.sparseIndices),
+        values: Array.from(embedding.sparseValues),
       }
     })
 
