@@ -78,7 +78,6 @@ export class EmbeddingService {
       throw new Error('Pinecone client not initialized. Please connect first.')
     }
 
-    const modelName = config.modelName || 'llama-text-embed-v2'
     const inputType = config.inputType || 'passage'
 
     const params: Record<string, unknown> = {
@@ -87,12 +86,12 @@ export class EmbeddingService {
     }
 
     // Only pass dimension for models that support it
-    if (modelName === 'llama-text-embed-v2' && config.dimensions) {
+    if (config.modelName === 'llama-text-embed-v2' && config.dimensions) {
       params.dimension = config.dimensions
     }
 
     const response = await this.pineconeClient.inference.embed(
-      modelName,
+      config.modelName,
       texts,
       params as Record<string, string>
     )
@@ -119,11 +118,10 @@ export class EmbeddingService {
       throw new Error('Pinecone client not initialized. Please connect first.')
     }
 
-    const modelName = config.modelName || 'pinecone-sparse-english-v0'
     const inputType = config.inputType || 'passage'
 
     const response = await this.pineconeClient.inference.embed(
-      modelName,
+      config.modelName,
       texts,
       { inputType, truncate: 'END' } as Record<string, string>
     )
@@ -162,10 +160,8 @@ export class EmbeddingService {
       this.openaiClient = new OpenAI({ apiKey })
     }
 
-    const modelName = config.modelName || 'text-embedding-3-small'
-
     const response = await this.openaiClient.embeddings.create({
-      model: modelName,
+      model: config.modelName,
       input: texts,
     })
 

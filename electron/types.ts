@@ -12,11 +12,11 @@ export type EmbeddingProviderType =
  */
 export interface EmbeddingConfig {
   provider: EmbeddingProviderType
-  modelName?: string
+  modelName: string
+  vectorType: 'dense' | 'sparse'
   dimensions?: number // For models that support variable dimensions (e.g., llama-text-embed-v2)
   apiKeyEnvVar?: string // Environment variable name for API key
-  inputType?: 'query' | 'passage' // For Pinecone inference: 'query' for search, 'passage' for upsert
-  vectorType?: 'dense' | 'sparse' // Type of embeddings this model produces
+  inputType?: 'query' | 'passage' // For Pinecone inference: 'query' for search, 'passage' for upsert (set at call time)
 }
 
 /**

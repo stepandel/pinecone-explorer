@@ -264,6 +264,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
           {
             provider: embeddingConfig.type as EmbeddingProviderType,
             modelName: embeddingConfig.modelName,
+            vectorType: embeddingConfig.vectorType,
             ...(embeddingConfig.defaultDimension && !isSparseModel && {
               dimensions: dimension || embeddingConfig.defaultDimension
             }),

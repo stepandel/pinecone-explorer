@@ -50,6 +50,7 @@ export function EmbeddingFunctionSelector({
       await onSave({
         provider: selectedEF.type as EmbeddingProviderType,
         modelName: selectedEF.modelName,
+        vectorType: selectedEF.vectorType,
         ...(selectedEF.defaultDimension && { dimensions: selectedEF.defaultDimension }),
       })
       setOpen(false)
