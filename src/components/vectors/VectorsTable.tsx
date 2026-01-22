@@ -47,6 +47,8 @@ interface VectorsTableProps {
   // Context menu props
   onVectorContextMenu?: (e: React.MouseEvent, vectorId: string) => void
   onTableContextMenu?: (e: React.MouseEvent) => void
+  // Embedding text field (for highlighting the column used for embeddings)
+  embeddingTextField?: string
 }
 
 export default function VectorsTable({
@@ -67,6 +69,7 @@ export default function VectorsTable({
   onVectorUpdate,
   onVectorContextMenu,
   onTableContextMenu,
+  embeddingTextField,
 }: VectorsTableProps) {
   // Ref for auto-focusing the id input when draft starts
   const draftIdInputRef = useRef<HTMLInputElement>(null)
@@ -317,35 +320,46 @@ export default function VectorsTable({
     })
 
     // Add dynamic metadata columns
-    const metadataColumns: ColumnDef<VectorRecord>[] = metadataKeys.map(key => ({
-      id: `metadata.${key}`,
-      header: key,
-      size: 150,
-      accessorFn: (row) => row.metadata?.[key],
-      cell: info => {
-        const value = info.getValue()
-        return (
-          <div className="text-xs text-foreground">
-            {value !== undefined && value !== null ? (
-              typeof value === 'object' ? (
-                <pre className="text-xs bg-secondary/50 p-1 rounded overflow-x-auto line-clamp-2">
-                  {JSON.stringify(value, null, 2)}
-                </pre>
-              ) : (
-                <div className="line-clamp-2">
-                  {String(value)}
-                </div>
-              )
-            ) : (
-              <span className="text-muted-foreground italic">-</span>
+    const metadataColumns: ColumnDef<VectorRecord>[] = metadataKeys.map(key => {
+      const isEmbeddingField = embeddingTextField === key
+      return {
+        id: `metadata.${key}`,
+        header: () => (
+          <span className={isEmbeddingField ? 'text-emerald-600 dark:text-emerald-400' : ''}>
+            {key}
+            {isEmbeddingField && (
+              <span className="ml-1 text-[9px] opacity-70" title="Text field used for embedding">⚡</span>
             )}
-          </div>
-        )
-      },
-    }))
+          </span>
+        ),
+        size: 150,
+        accessorFn: (row) => row.metadata?.[key],
+        meta: { isEmbeddingField },
+        cell: info => {
+          const value = info.getValue()
+          return (
+            <div className={`text-xs ${isEmbeddingField ? 'text-emerald-700 dark:text-emerald-300' : 'text-foreground'}`}>
+              {value !== undefined && value !== null ? (
+                typeof value === 'object' ? (
+                  <pre className="text-xs bg-secondary/50 p-1 rounded overflow-x-auto line-clamp-2">
+                    {JSON.stringify(value, null, 2)}
+                  </pre>
+                ) : (
+                  <div className="line-clamp-2">
+                    {String(value)}
+                  </div>
+                )
+              ) : (
+                <span className="text-muted-foreground italic">-</span>
+              )}
+            </div>
+          )
+        },
+      }
+    })
 
     return [...baseColumns, ...metadataColumns]
-  }, [metadataKeys, hasDistances])
+  }, [metadataKeys, hasDistances, embeddingTextField])
 
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange')
 

@@ -1027,6 +1027,7 @@ export default function VectorsView({
           onVectorUpdate={handleInlineVectorUpdate}
           onVectorContextMenu={handleVectorContextMenu}
           onTableContextMenu={handleTableContextMenu}
+          embeddingTextField={currentIndex?.embed?.fieldMap?.text}
         />
       </div>
 
