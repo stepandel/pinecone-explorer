@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, Info } from 'lucide-react'
 import { useDraftCollection } from '../../context/DraftCollectionContext'
-import { useCollection } from '../../context/CollectionContext'
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut'
+import { SHORTCUTS } from '../../constants/keyboard-shortcuts'
 import {
   EMBEDDING_FUNCTIONS,
   EMBEDDING_FUNCTION_GROUPS,
   getEmbeddingFunctionById,
   DEFAULT_EMBEDDING_FUNCTION_ID,
   type DistanceMetric,
-  type EmbeddingFunctionConfig
 } from '../../constants/embedding-functions'
 
 const inputClassName = "w-full h-6 text-[11px] px-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -27,143 +27,44 @@ type CloudProvider = keyof typeof CLOUD_REGIONS
 
 export function IndexConfigView() {
   const { draftCollection, updateDraft, cancelCreation, saveDraft, isCreating, validationErrors } = useDraftCollection()
-  const { setActiveIndex } = useCollection()
 
   // Embedding function selection - default to Pinecone's llama-text-embed-v2
   const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>(DEFAULT_EMBEDDING_FUNCTION_ID)
 
-  // Cloud and region selection - initialize from draft if available
-  const [cloud, setCloud] = useState<CloudProvider>(
-    (draftCollection?.serverlessSpec?.cloud as CloudProvider) || 'aws'
-  )
-  const [region, setRegion] = useState(
-    draftCollection?.serverlessSpec?.region || 'us-east-1'
-  )
-
-  // Get the selected embedding function config
-  const selectedEmbedding = useMemo(() =>
-    getEmbeddingFunctionById(selectedEmbeddingId),
-    [selectedEmbeddingId]
-  )
-
-  // Check if selected model is sparse
+  // Derived state from selected embedding
+  const selectedEmbedding = getEmbeddingFunctionById(selectedEmbeddingId)
   const isSparseModel = selectedEmbedding?.vectorType === 'sparse'
+  const supportedMetrics = selectedEmbedding?.supportedMetrics ?? ['cosine', 'euclidean', 'dotproduct'] as DistanceMetric[]
+  const availableDimensions = isSparseModel || !selectedEmbedding
+    ? []
+    : selectedEmbedding.availableDimensions ?? (selectedEmbedding.defaultDimension ? [selectedEmbedding.defaultDimension] : [])
 
-  // Get available dimensions for the selected embedding (empty for sparse)
-  const availableDimensions = useMemo(() => {
-    if (!selectedEmbedding || isSparseModel) return []
-    if (selectedEmbedding.availableDimensions) {
-      return selectedEmbedding.availableDimensions
-    }
-    return selectedEmbedding.defaultDimension ? [selectedEmbedding.defaultDimension] : []
-  }, [selectedEmbedding, isSparseModel])
+  // Derived cloud/region from draft (single source of truth)
+  const cloud = (draftCollection?.serverlessSpec?.cloud as CloudProvider) || 'aws'
+  const region = draftCollection?.serverlessSpec?.region || 'us-east-1'
 
-  // Get supported metrics for the selected embedding
-  const supportedMetrics = useMemo(() => {
-    if (!selectedEmbedding) return ['cosine', 'euclidean', 'dotproduct'] as DistanceMetric[]
-    return selectedEmbedding.supportedMetrics
-  }, [selectedEmbedding])
-
-  // Initialize defaults on mount
+  // Update draft when embedding changes (handles all defaults)
   useEffect(() => {
-    if (selectedEmbedding) {
-      const updates: Partial<typeof draftCollection> = {
-        embeddingFunctionId: selectedEmbeddingId,
-      }
-      // Set default dimension (only for dense models)
-      if (!draftCollection?.dimensionOverride && selectedEmbedding.defaultDimension) {
-        updates.dimensionOverride = String(selectedEmbedding.defaultDimension)
-      }
-      // Set default metric to first supported
-      if (!draftCollection?.metric || !selectedEmbedding.supportedMetrics.includes(draftCollection.metric as DistanceMetric)) {
-        updates.metric = selectedEmbedding.supportedMetrics[0]
-      }
-      updateDraft(updates)
-    }
-  }, []) // Run only on mount
-
-  // Handle embedding function change
-  const handleEmbeddingChange = useCallback((embeddingId: string) => {
-    setSelectedEmbeddingId(embeddingId)
-    const ef = getEmbeddingFunctionById(embeddingId)
-    if (ef) {
-      const isSparse = ef.vectorType === 'sparse'
-
-      // For sparse models, force AWS as cloud provider (only AWS supports sparse indexes)
-      if (isSparse && cloud !== 'aws') {
-        setCloud('aws')
-        setRegion('us-east-1')
-      }
-
-      // Update dimension to the default for this model (only for dense)
-      if (ef.defaultDimension) {
-        updateDraft({
-          embeddingFunctionId: embeddingId,
-          dimensionOverride: String(ef.defaultDimension),
-          metric: ef.supportedMetrics[0],
-          ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
-        })
-      } else {
-        // Clear dimension for sparse models
-        updateDraft({
-          embeddingFunctionId: embeddingId,
-          dimensionOverride: '',
-          metric: ef.supportedMetrics[0],
-          ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
-        })
-      }
-    }
-  }, [updateDraft, cloud])
-
-  // Handle cloud change - update region to first available and sync to draft
-  const handleCloudChange = useCallback((newCloud: CloudProvider) => {
-    const newRegion = CLOUD_REGIONS[newCloud][0]
-    setCloud(newCloud)
-    setRegion(newRegion)
-    // Sync to draft immediately
+    if (!selectedEmbedding) return
+    const isSparse = selectedEmbedding.vectorType === 'sparse'
     updateDraft({
-      serverlessSpec: {
-        cloud: newCloud,
-        region: newRegion,
-      },
+      embeddingFunctionId: selectedEmbeddingId,
+      dimensionOverride: selectedEmbedding.defaultDimension ? String(selectedEmbedding.defaultDimension) : '',
+      metric: selectedEmbedding.supportedMetrics[0],
+      ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
     })
-  }, [updateDraft])
+  }, [selectedEmbeddingId])
 
-  // Handle region change - sync to draft
-  const handleRegionChange = useCallback((newRegion: string) => {
-    setRegion(newRegion)
-    updateDraft({
-      serverlessSpec: {
-        cloud,
-        region: newRegion,
-      },
-    })
-  }, [cloud, updateDraft])
-
-  // Handle save - serverlessSpec is already synced via handleCloudChange/handleRegionChange
-  const handleSave = useCallback(async () => {
-    if (!draftCollection) return
-    saveDraft()
-  }, [draftCollection, saveDraft])
+  const handleSave = () => {
+    if (draftCollection) saveDraft()
+  }
 
   // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+S or Cmd+Enter to save
-      if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'Enter')) {
-        e.preventDefault()
-        handleSave()
-      }
-      // Escape to cancel
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        cancelCreation()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSave, cancelCreation])
+  useKeyboardShortcuts([
+    { shortcut: SHORTCUTS.SAVE, handler: handleSave, options: { skipInputs: false } },
+    { shortcut: SHORTCUTS.SAVE_ENTER, handler: handleSave, options: { skipInputs: false } },
+    { shortcut: SHORTCUTS.CANCEL, handler: cancelCreation },
+  ])
 
   if (!draftCollection) return null
 
@@ -205,7 +106,7 @@ export function IndexConfigView() {
           <div className="relative">
             <select
               value={selectedEmbeddingId}
-              onChange={(e) => handleEmbeddingChange(e.target.value)}
+              onChange={(e) => setSelectedEmbeddingId(e.target.value)}
               className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
               style={inputStyle}
             >
@@ -335,7 +236,10 @@ export function IndexConfigView() {
           <div className="relative">
             <select
               value={cloud}
-              onChange={(e) => handleCloudChange(e.target.value as CloudProvider)}
+              onChange={(e) => {
+                const newCloud = e.target.value as CloudProvider
+                updateDraft({ serverlessSpec: { cloud: newCloud, region: CLOUD_REGIONS[newCloud][0] } })
+              }}
               className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               style={inputStyle}
               disabled={isSparseModel}
@@ -361,7 +265,7 @@ export function IndexConfigView() {
           <div className="relative">
             <select
               value={region}
-              onChange={(e) => handleRegionChange(e.target.value)}
+              onChange={(e) => updateDraft({ serverlessSpec: { cloud, region: e.target.value } })}
               className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
               style={inputStyle}
             >
@@ -386,9 +290,9 @@ export function IndexConfigView() {
       {/* Footer Actions */}
       <div className="px-4 py-2 border-t border-border flex items-center justify-between bg-background">
         <div className="text-[10px] text-muted-foreground">
-          <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono">⌘↵</kbd> create
+          <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono">{SHORTCUTS.SAVE_ENTER.keys}</kbd> create
           {' · '}
-          <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono">Esc</kbd> cancel
+          <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono">{SHORTCUTS.CANCEL.keys}</kbd> cancel
         </div>
         <div className="flex items-center gap-1.5">
           <button
