@@ -19,6 +19,7 @@ import {
   BatchImportParams,
   CreateIndexParams,
   CloneIndexParams,
+  CloneNamespaceParams,
   ListVectorsParams,
   FetchVectorsParams,
   EmbeddingConfig,
@@ -30,6 +31,7 @@ settingsStore.injectIntoProcessEnv()
 
 // Track active clone operations per profile for cancellation
 const activeCloneOperations: Map<string, AbortController> = new Map()
+const activeNamespaceCloneOperations: Map<string, AbortController> = new Map()
 
 /**
  * Parse Pinecone API errors and return user-friendly messages
@@ -342,6 +344,103 @@ ipcMain.handle('pinecone:cancelClone', async (_event, profileId: string) => {
   return { success: false, error: 'No active clone operation' }
 })
 
+ipcMain.handle('pinecone:cloneNamespace', async (event, profileId: string, params: CloneNamespaceParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+
+    // Get vector count for progress tracking
+    const stats = await service.getIndexStats(params.indexName)
+    const namespaceStats = stats.namespaces[params.sourceNamespace]
+    const totalVectors = namespaceStats?.vectorCount || 0
+
+    // Create abort controller for this clone operation
+    const abortController = new AbortController()
+    const operationKey = `${profileId}:namespace`
+    activeNamespaceCloneOperations.set(operationKey, abortController)
+
+    // Send initial progress
+    event.sender.send('pinecone:cloneNamespaceProgress', {
+      phase: 'copying',
+      totalVectors,
+      processedVectors: 0,
+      message: 'Starting...',
+    })
+
+    // Progress callback sends updates to renderer
+    const onProgress = (processedVectors: number) => {
+      event.sender.send('pinecone:cloneNamespaceProgress', {
+        phase: 'copying',
+        totalVectors,
+        processedVectors,
+        message: `Copying vectors...`,
+      })
+    }
+
+    const result = await service.cloneNamespace({
+      sourceIndexName: params.indexName,
+      sourceNamespace: params.sourceNamespace,
+      targetIndexName: params.indexName,
+      targetNamespace: params.targetNamespace,
+      validateDimensions: false, // Same index, no need to validate
+      onProgress,
+      signal: abortController.signal,
+    })
+
+    // Clean up abort controller
+    activeNamespaceCloneOperations.delete(operationKey)
+
+    if (result.success) {
+      event.sender.send('pinecone:cloneNamespaceProgress', {
+        phase: 'complete',
+        totalVectors,
+        processedVectors: result.copiedVectors,
+        message: 'Clone complete',
+      })
+    } else if (result.error === 'Operation cancelled') {
+      event.sender.send('pinecone:cloneNamespaceProgress', {
+        phase: 'cancelled',
+        totalVectors,
+        processedVectors: result.copiedVectors,
+        message: 'Clone cancelled',
+      })
+    } else {
+      event.sender.send('pinecone:cloneNamespaceProgress', {
+        phase: 'error',
+        totalVectors,
+        processedVectors: result.copiedVectors,
+        message: result.error || 'Unknown error',
+      })
+    }
+
+    return { success: result.success, data: result, error: result.error }
+  } catch (error) {
+    const operationKey = `${profileId}:namespace`
+    activeNamespaceCloneOperations.delete(operationKey)
+    const message = error instanceof Error ? error.message : 'Failed to clone namespace'
+    event.sender.send('pinecone:cloneNamespaceProgress', {
+      phase: 'error',
+      totalVectors: 0,
+      processedVectors: 0,
+      message,
+    })
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:cancelCloneNamespace', async (_event, profileId: string) => {
+  const operationKey = `${profileId}:namespace`
+  const controller = activeNamespaceCloneOperations.get(operationKey)
+  if (controller) {
+    controller.abort()
+    activeNamespaceCloneOperations.delete(operationKey)
+    return { success: true }
+  }
+  return { success: false, error: 'No active namespace clone operation' }
+})
+
 // ============================================================================
 // Context Menu IPC Handlers
 // ============================================================================
@@ -442,6 +541,26 @@ ipcMain.on('context-menu:show-profile', (event, profileId: string) => {
     {
       label: 'Delete',
       click: () => event.sender.send('context-menu:profile-action', { action: 'delete', profileId })
+    }
+  ]
+  const menu = Menu.buildFromTemplate(template)
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) {
+    menu.popup({ window: win })
+  }
+})
+
+// Namespace context menu handler
+ipcMain.on('context-menu:show-namespace', (event, namespace: string) => {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Duplicate Namespace',
+      click: () => event.sender.send('context-menu:namespace-action', { action: 'duplicate', namespace })
+    },
+    { type: 'separator' },
+    {
+      label: 'Delete Namespace',
+      click: () => event.sender.send('context-menu:namespace-action', { action: 'delete', namespace })
     }
   ]
   const menu = Menu.buildFromTemplate(template)

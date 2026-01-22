@@ -309,3 +309,28 @@ export function useDeleteIndexMutation(profileId: string) {
   })
 }
 
+// Delete Namespace Mutation (deletes all vectors in a namespace)
+export function useDeleteNamespaceMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: { profileId: string; indexName: string; namespace: string }) => {
+      await window.electronAPI.pinecone.deleteVectors(params.profileId, {
+        indexName: params.indexName,
+        namespace: params.namespace,
+        deleteAll: true,
+      })
+    },
+    onSuccess: (_, params) => {
+      // Invalidate index stats to update namespace list and counts
+      queryClient.invalidateQueries({
+        queryKey: pineconeQueryKeys.indexStats(params.profileId, params.indexName),
+      })
+      // Invalidate vectors for this namespace
+      queryClient.invalidateQueries({
+        queryKey: pineconeQueryKeys.vectors(params.profileId, params.indexName, params.namespace),
+      })
+    },
+  })
+}
+

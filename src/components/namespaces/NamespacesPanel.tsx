@@ -1,8 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
-import { useIndexStatsQuery } from '../../hooks/usePineconeQueries'
+import { useIndexStatsQuery, useDeleteNamespaceMutation } from '../../hooks/usePineconeQueries'
 import { Button } from '../ui/button'
+import { DeleteNamespaceDialog } from './DeleteNamespaceDialog'
+import { DuplicateNamespaceDialog } from './DuplicateNamespaceDialog'
+import { DuplicateNamespaceProgressDialog } from './DuplicateNamespaceProgressDialog'
 
 const inputClassName = "w-full h-6 text-[11px] py-0 px-1.5 pr-5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] placeholder:text-sidebar-foreground/50 text-sidebar-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-ring/50 transition-colors"
 const inputStyle = { boxShadow: 'inset 0 0.5px 1px 0 rgb(0 0 0 / 0.04)' }
@@ -12,10 +15,30 @@ interface NamespaceInfo {
   vectorCount: number
 }
 
+interface CloneProgress {
+  phase: 'copying' | 'complete' | 'error' | 'cancelled'
+  totalVectors: number
+  processedVectors: number
+  message: string
+}
+
 export function NamespacesPanel() {
   const { currentProfile } = usePinecone()
   const { activeIndex, activeNamespace, setActiveNamespace } = useSelection()
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Dialog states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false)
+  const [selectedNamespace, setSelectedNamespace] = useState<string | null>(null)
+  const [targetNamespace, setTargetNamespace] = useState('')
+  const [cloneProgress, setCloneProgress] = useState<CloneProgress>({
+    phase: 'copying',
+    totalVectors: 0,
+    processedVectors: 0,
+    message: '',
+  })
 
   // Fetch namespaces (from index stats)
   const { data: indexStats, isLoading, error, refetch } = useIndexStatsQuery(
@@ -23,6 +46,103 @@ export function NamespacesPanel() {
     activeIndex,
     !!activeIndex
   )
+
+  // Delete namespace mutation
+  const deleteNamespaceMutation = useDeleteNamespaceMutation()
+
+  // Context menu action handler
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.contextMenu.onNamespaceAction((data) => {
+      if (data.action === 'duplicate') {
+        setSelectedNamespace(data.namespace)
+        setDuplicateDialogOpen(true)
+      } else if (data.action === 'delete') {
+        setSelectedNamespace(data.namespace)
+        setDeleteDialogOpen(true)
+      }
+    })
+    return unsubscribe
+  }, [])
+
+  // Clone progress listener
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.pinecone.onCloneNamespaceProgress((progress) => {
+      setCloneProgress(progress as CloneProgress)
+    })
+    return unsubscribe
+  }, [])
+
+  // Handle context menu on namespace
+  const handleContextMenu = useCallback((e: React.MouseEvent, namespace: string) => {
+    e.preventDefault()
+    window.electronAPI.contextMenu.showNamespaceMenu(namespace)
+  }, [])
+
+  // Handle duplicate confirmation
+  const handleDuplicateConfirm = useCallback(async (newNamespace: string) => {
+    if (!currentProfile?.id || !activeIndex || selectedNamespace === null) return
+
+    setTargetNamespace(newNamespace)
+    setDuplicateDialogOpen(false)
+    setProgressDialogOpen(true)
+    setCloneProgress({
+      phase: 'copying',
+      totalVectors: 0,
+      processedVectors: 0,
+      message: 'Starting...',
+    })
+
+    try {
+      await window.electronAPI.pinecone.cloneNamespace(currentProfile.id, {
+        indexName: activeIndex,
+        sourceNamespace: selectedNamespace,
+        targetNamespace: newNamespace,
+      })
+      // Refetch stats to show new namespace
+      refetch()
+    } catch (error) {
+      // Error is handled via progress events
+    }
+  }, [currentProfile?.id, activeIndex, selectedNamespace, refetch])
+
+  // Handle cancel clone
+  const handleCancelClone = useCallback(async () => {
+    if (!currentProfile?.id) return
+    try {
+      await window.electronAPI.pinecone.cancelCloneNamespace(currentProfile.id)
+    } catch (error) {
+      // Ignore errors
+    }
+  }, [currentProfile?.id])
+
+  // Handle progress dialog close
+  const handleProgressDialogClose = useCallback((open: boolean) => {
+    if (!open) {
+      setProgressDialogOpen(false)
+      // Refetch stats after close to ensure list is up to date
+      refetch()
+    }
+  }, [refetch])
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!currentProfile?.id || !activeIndex || selectedNamespace === null) return
+
+    try {
+      await deleteNamespaceMutation.mutateAsync({
+        profileId: currentProfile.id,
+        indexName: activeIndex,
+        namespace: selectedNamespace,
+      })
+      setDeleteDialogOpen(false)
+      // If deleted the active namespace, clear selection
+      if (activeNamespace === selectedNamespace) {
+        setActiveNamespace('')
+      }
+    } catch (error) {
+      // Error is handled by mutation
+    }
+  }, [currentProfile?.id, activeIndex, selectedNamespace, deleteNamespaceMutation, activeNamespace, setActiveNamespace])
 
   // Transform namespaces object to array
   const namespaces: NamespaceInfo[] = useMemo(() => {
@@ -155,6 +275,7 @@ export function NamespacesPanel() {
                 <button
                   key={ns.name}
                   onClick={() => handleNamespaceClick(ns.name)}
+                  onContextMenu={(e) => handleContextMenu(e, actualNamespace)}
                   className={`w-full px-3 py-1.5 text-left transition-colors duration-100 mx-1 rounded-md ${
                     isActive
                       ? 'bg-black/[0.08] dark:bg-white/[0.10]'
@@ -187,6 +308,38 @@ export function NamespacesPanel() {
           Index: <span className="text-sidebar-foreground">{activeIndex}</span>
         </div>
       </div>
+
+      {/* Delete Namespace Dialog */}
+      <DeleteNamespaceDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        namespaceName={selectedNamespace || ''}
+        vectorCount={
+          selectedNamespace !== null
+            ? namespaces.find(ns => (ns.name === '(default)' ? '' : ns.name) === selectedNamespace)?.vectorCount || 0
+            : 0
+        }
+        onConfirm={handleDeleteConfirm}
+        isDeleting={deleteNamespaceMutation.isPending}
+      />
+
+      {/* Duplicate Namespace Dialog */}
+      <DuplicateNamespaceDialog
+        open={duplicateDialogOpen}
+        onOpenChange={setDuplicateDialogOpen}
+        sourceNamespace={selectedNamespace || ''}
+        onConfirm={handleDuplicateConfirm}
+      />
+
+      {/* Duplicate Progress Dialog */}
+      <DuplicateNamespaceProgressDialog
+        open={progressDialogOpen}
+        onOpenChange={handleProgressDialogClose}
+        sourceNamespace={selectedNamespace || ''}
+        targetNamespace={targetNamespace}
+        progress={cloneProgress}
+        onCancel={handleCancelClone}
+      />
     </aside>
   )
 }
