@@ -6,21 +6,10 @@ import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import VectorsTable from './VectorsTable'
 import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filters'
 import { TypedMetadataRecord, TypedMetadataField, typedMetadataToPineconeFormat, validateMetadataValue } from '../../types/metadata'
+import { LocalVectorRecord, DraftVector, parseFilterValue } from '../../types/vectors'
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
 import { FilterRow } from '../filters/FilterRow'
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover'
-
-interface DraftVector {
-  id: string
-  metadata: TypedMetadataRecord
-}
-
-// Local VectorRecord for this view (maps from API's values to embedding for display)
-interface LocalVectorRecord {
-  id: string
-  metadata: Record<string, unknown> | null
-  embedding: number[] | null
-}
 
 interface VectorsViewProps {
   collectionName: string
@@ -83,6 +72,9 @@ export default function VectorsView({
 
   // Marked for deletion state (set of vector IDs)
   const [markedForDeletion, setMarkedForDeletion] = useState<Set<string>>(new Set())
+
+  // Deletion error state
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Namespace title truncation detection
   const namespaceTitleRef = useRef<HTMLSpanElement>(null)
@@ -205,25 +197,6 @@ export default function VectorsView({
       r => r.type === 'metadata' && r.metadataKey?.trim() && r.metadataValue?.trim()
     )
 
-    const parseFilterValue = (value: string, operator: string): string | number | string[] | number[] => {
-      const trimmed = value.trim()
-      if (operator === '$in' || operator === '$nin') {
-        const items = trimmed.split(',').map(s => s.trim()).filter(Boolean)
-        const asNumbers = items.map(Number)
-        if (asNumbers.every(n => !isNaN(n))) return asNumbers
-        return items
-      }
-      if (['$gt', '$gte', '$lt', '$lte'].includes(operator)) {
-        const num = Number(trimmed)
-        if (!isNaN(num)) return num
-      }
-      if (operator === '$eq' || operator === '$ne') {
-        const num = Number(trimmed)
-        if (!isNaN(num) && trimmed !== '') return num
-      }
-      return trimmed
-    }
-
     const metadataFilter = metadataRows.length > 0
       ? metadataRows.reduce((acc, row) => ({
           ...acc,
@@ -259,67 +232,6 @@ export default function VectorsView({
       setIsSearching(false)
     }
   }, [filterRows, collectionName, namespace, nResults, queryMutation])
-
-  // Build search params from filter rows
-  const searchParams = useMemo(() => {
-    // Extract search query from search-type rows
-    const searchRow = filterRows.find(r => r.type === 'search' && r.searchValue?.trim())
-    const queryText = searchRow?.searchValue?.trim() || undefined
-
-    // Helper to parse filter value based on operator
-    const parseFilterValue = (value: string, operator: string): string | number | string[] | number[] => {
-      const trimmed = value.trim()
-
-      // Handle array operators ($in, $nin)
-      if (operator === '$in' || operator === '$nin') {
-        const items = trimmed.split(',').map(s => s.trim()).filter(Boolean)
-        // Try to parse as numbers if all items are numeric
-        const asNumbers = items.map(Number)
-        if (asNumbers.every(n => !isNaN(n))) {
-          return asNumbers
-        }
-        return items
-      }
-
-      // For comparison operators, try to parse as number
-      if (['$gt', '$gte', '$lt', '$lte'].includes(operator)) {
-        const num = Number(trimmed)
-        if (!isNaN(num)) {
-          return num
-        }
-      }
-
-      // For equality operators, try number first, fall back to string
-      if (operator === '$eq' || operator === '$ne') {
-        const num = Number(trimmed)
-        if (!isNaN(num) && trimmed !== '') {
-          return num
-        }
-      }
-
-      return trimmed
-    }
-
-    // Extract metadata filters from metadata-type rows
-    const metadataRows = filterRows.filter(
-      r => r.type === 'metadata' && r.metadataKey?.trim() && r.metadataValue?.trim()
-    )
-    const metadataFilter = metadataRows.length > 0
-      ? metadataRows.reduce((acc, row) => ({
-          ...acc,
-          [row.metadataKey!]: {
-            [row.operator || '$eq']: parseFilterValue(row.metadataValue!, row.operator || '$eq')
-          },
-        }), {})
-      : undefined
-
-    return {
-      collectionName,
-      queryText,
-      nResults,
-      metadataFilter,
-    }
-  }, [collectionName, filterRows, nResults])
 
   // Use React Query for vectors with debouncing via staleTime
   const {
@@ -559,6 +471,7 @@ export default function VectorsView({
   // Commit deletions
   const handleCommitDeletions = useCallback(async () => {
     if (markedForDeletion.size === 0) return
+    setDeleteError(null)
 
     try {
       await deleteMutation.mutateAsync(Array.from(markedForDeletion))
@@ -569,7 +482,8 @@ export default function VectorsView({
       }
       setMarkedForDeletion(new Set())
     } catch (error) {
-      console.error('Failed to delete vectors:', error)
+      const message = error instanceof Error ? error.message : 'Failed to delete vectors'
+      setDeleteError(message)
     }
   }, [markedForDeletion, deleteMutation, selectedVectorIds, onClearSelection])
 
@@ -752,9 +666,6 @@ export default function VectorsView({
     setSearchResults(null)
   }, [])
 
-  // Ref for focusing search input
-  const searchInputRef = { current: null as HTMLInputElement | null }
-
   // Menu event listeners (from native app menu)
   useEffect(() => {
     // New vector
@@ -877,6 +788,7 @@ export default function VectorsView({
       if ((matchesShortcut(e, SHORTCUTS.CANCEL) || matchesShortcut(e, SHORTCUTS.UNDO)) && markedForDeletion.size > 0 && !hasDrafts) {
         e.preventDefault()
         setMarkedForDeletion(new Set())
+        setDeleteError(null)
       }
       // Command+Delete/Backspace to toggle deletion mark
       if (matchesShortcut(e, SHORTCUTS.DELETE_DOCUMENTS) && !hasDrafts) {
@@ -1019,7 +931,6 @@ export default function VectorsView({
           onAddToSelection={onAddToSelection}
           draftVectors={draftVectors}
           onDraftChange={handleDraftChange}
-          onDraftCancel={handleCancelDraft}
           markedForDeletion={markedForDeletion}
           onVectorUpdate={handleInlineVectorUpdate}
           onVectorContextMenu={handleVectorContextMenu}
@@ -1065,11 +976,17 @@ export default function VectorsView({
         )}
         {!hasDrafts && markedForDeletion.size > 0 && (
           <div className="flex gap-2 items-center">
+            {deleteError && (
+              <span className="text-[11px] text-destructive">{deleteError}</span>
+            )}
             <span className="text-[11px] text-muted-foreground">
               {markedForDeletion.size} marked for deletion
             </span>
             <button
-              onClick={() => setMarkedForDeletion(new Set())}
+              onClick={() => {
+                setMarkedForDeletion(new Set())
+                setDeleteError(null)
+              }}
               disabled={deleteMutation.isPending}
               className="h-6 px-2 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
             >
