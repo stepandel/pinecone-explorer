@@ -298,6 +298,15 @@ export interface CloneResult {
   error?: string
 }
 
+/**
+ * Parameters for cloning/duplicating a namespace within the same index
+ */
+export interface CloneNamespaceParams {
+  indexName: string
+  sourceNamespace: string
+  targetNamespace: string
+}
+
 // Legacy type aliases for backwards compatibility during migration
 export type CollectionInfo = IndexInfo
 export type DocumentRecord = VectorRecord

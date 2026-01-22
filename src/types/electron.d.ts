@@ -183,6 +183,18 @@ declare global {
     error?: string
   }
 
+  interface CloneNamespaceParams {
+    indexName: string
+    sourceNamespace: string
+    targetNamespace: string
+  }
+
+  interface CloneNamespaceResult {
+    success: boolean
+    copiedVectors: number
+    error?: string
+  }
+
   interface UpdateInfo {
     version: string
     releaseDate?: string
@@ -217,6 +229,9 @@ declare global {
       cloneIndex: (profileId: string, params: { sourceIndexName: string; targetIndexName: string; regenerateEmbeddings?: boolean; textField?: string }) => Promise<CloneResult>
       onCloneProgress: (callback: (progress: CloneProgress) => void) => () => void
       cancelClone: (profileId: string) => Promise<void>
+      cloneNamespace: (profileId: string, params: CloneNamespaceParams) => Promise<CloneNamespaceResult>
+      onCloneNamespaceProgress: (callback: (progress: CloneProgress) => void) => () => void
+      cancelCloneNamespace: (profileId: string) => Promise<void>
     }
     contextMenu: {
       showIndexMenu: (indexName: string) => void
@@ -227,6 +242,8 @@ declare global {
       onVectorAction: (callback: (action: { action: string; vectorId?: string }) => void) => () => void
       showProfileMenu: (profileId: string) => void
       onProfileAction: (callback: (action: { action: string; profileId: string }) => void) => () => void
+      showNamespaceMenu: (namespace: string) => void
+      onNamespaceAction: (callback: (action: { action: string; namespace: string }) => void) => () => void
     }
     profiles: {
       getAll: () => Promise<ConnectionProfile[]>

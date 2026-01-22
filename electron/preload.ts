@@ -13,6 +13,7 @@ import {
   BatchImportResult,
   CreateIndexParams,
   CloneIndexParams,
+  CloneNamespaceParams,
   CloneProgress,
   CloneResult,
   ListVectorsParams,
@@ -134,6 +135,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw new Error(result.error)
       }
     },
+    cloneNamespace: async (profileId: string, params: CloneNamespaceParams): Promise<{ success: boolean; copiedVectors: number; error?: string }> => {
+      const result = await ipcRenderer.invoke('pinecone:cloneNamespace', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    onCloneNamespaceProgress: (callback: (progress: CloneProgress) => void): (() => void) => {
+      const handler = (_event: any, progress: CloneProgress) => callback(progress)
+      ipcRenderer.on('pinecone:cloneNamespaceProgress', handler)
+      return () => ipcRenderer.removeListener('pinecone:cloneNamespaceProgress', handler)
+    },
+    cancelCloneNamespace: async (profileId: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('pinecone:cancelCloneNamespace', profileId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
   },
   contextMenu: {
     showIndexMenu: (indexName: string): void => {
@@ -165,6 +184,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_event: any, data: { action: string; profileId: string }) => callback(data)
       ipcRenderer.on('context-menu:profile-action', handler)
       return () => ipcRenderer.removeListener('context-menu:profile-action', handler)
+    },
+    showNamespaceMenu: (namespace: string): void => {
+      ipcRenderer.send('context-menu:show-namespace', namespace)
+    },
+    onNamespaceAction: (callback: (action: { action: string; namespace: string }) => void): (() => void) => {
+      const handler = (_event: any, data: { action: string; namespace: string }) => callback(data)
+      ipcRenderer.on('context-menu:namespace-action', handler)
+      return () => ipcRenderer.removeListener('context-menu:namespace-action', handler)
     },
   },
   profiles: {
