@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { cn } from '@/lib/utils'
 
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
+
+function generateUUID(): string {
+  return crypto.randomUUID()
+}
 
 interface DuplicateNamespaceDialogProps {
   open: boolean
@@ -27,6 +31,10 @@ export function DuplicateNamespaceDialog({
       setTargetNamespace(defaultTargetName)
     }
   }, [open, defaultTargetName])
+
+  const handleGenerateUUID = useCallback(() => {
+    setTargetNamespace(generateUUID())
+  }, [])
 
   // Validation: non-empty and different from source
   const isValid = targetNamespace.trim().length > 0 && targetNamespace.trim() !== sourceNamespace
@@ -67,9 +75,21 @@ export function DuplicateNamespaceDialog({
 
             {/* Target namespace input */}
             <div className="mt-3">
-              <label className="text-[10px] text-muted-foreground">
-                New namespace name
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-muted-foreground">
+                  New namespace name
+                </label>
+                <button
+                  type="button"
+                  onClick={handleGenerateUUID}
+                  className={cn(
+                    "text-[10px] text-primary hover:text-primary/80",
+                    "transition-colors"
+                  )}
+                >
+                  Generate UUID
+                </button>
+              </div>
               <input
                 type="text"
                 value={targetNamespace}
