@@ -46,27 +46,21 @@ export class EmbeddingService {
   }
 
   /**
-   * Check if a model generates sparse embeddings
+   * Generate embeddings for an array of texts.
+   * Returns EmbeddingResult which can be either dense or sparse based on the model.
    */
-  isSparseModel(config: EmbeddingConfig): boolean {
-    const sparseModels = ['pinecone-sparse-english-v0']
-    return sparseModels.includes(config.modelName || '')
-  }
+  async generateEmbeddings(texts: string[], config: EmbeddingConfig): Promise<EmbeddingResult> {
+    const isSparse = config.vectorType === 'sparse'
 
-  /**
-   * Generate embeddings for an array of texts (dense vectors only)
-   */
-  async generateEmbeddings(
-    texts: string[],
-    config: EmbeddingConfig
-  ): Promise<number[][]> {
-    if (this.isSparseModel(config)) {
-      throw new Error('Use generateEmbeddingsWithType for sparse models')
-    }
     switch (config.provider) {
       case 'pinecone':
-        return this.generatePineconeEmbeddings(texts, config)
+        return isSparse
+          ? this.generatePineconeSparseEmbeddings(texts, config)
+          : this.generatePineconeDenseEmbeddings(texts, config)
       case 'openai':
+        if (isSparse) {
+          throw new Error('OpenAI does not support sparse embeddings')
+        }
         return this.generateOpenAIEmbeddings(texts, config)
       default:
         throw new Error(`Unsupported embedding provider: ${config.provider}`)
@@ -74,61 +68,12 @@ export class EmbeddingService {
   }
 
   /**
-   * Generate embeddings with type information (supports both dense and sparse)
+   * Generate dense embeddings using Pinecone Inference API
    */
-  async generateEmbeddingsWithType(
+  private async generatePineconeDenseEmbeddings(
     texts: string[],
     config: EmbeddingConfig
   ): Promise<EmbeddingResult> {
-    if (this.isSparseModel(config)) {
-      return this.generatePineconeSparseEmbeddings(texts, config)
-    }
-
-    const values = await this.generateEmbeddings(texts, config)
-    return { type: 'dense', values }
-  }
-
-  /**
-   * Get the dimension for a given embedding model
-   */
-  getDimension(config: EmbeddingConfig): number {
-    const modelDimensions: Record<string, number> = {
-      // OpenAI models
-      'text-embedding-3-small': 1536,
-      'text-embedding-3-large': 3072,
-      // Pinecone models (default dimensions)
-      'llama-text-embed-v2': 1024,
-      'multilingual-e5-large': 1024,
-    }
-
-    const modelName = config.modelName || this.getDefaultModel(config.provider)
-
-    // For Pinecone models with variable dimensions, use the configured dimension
-    if (config.provider === 'pinecone' && config.dimensions) {
-      return config.dimensions
-    }
-
-    return modelDimensions[modelName] || 1024
-  }
-
-  /**
-   * Get default model for a provider
-   */
-  private getDefaultModel(provider: 'pinecone' | 'openai'): string {
-    const defaults: Record<'pinecone' | 'openai', string> = {
-      pinecone: 'llama-text-embed-v2',
-      openai: 'text-embedding-3-small',
-    }
-    return defaults[provider]
-  }
-
-  /**
-   * Generate embeddings using Pinecone Inference API
-   */
-  private async generatePineconeEmbeddings(
-    texts: string[],
-    config: EmbeddingConfig
-  ): Promise<number[][]> {
     if (!this.pineconeClient) {
       throw new Error('Pinecone client not initialized. Please connect first.')
     }
@@ -136,13 +81,12 @@ export class EmbeddingService {
     const modelName = config.modelName || 'llama-text-embed-v2'
     const inputType = config.inputType || 'passage'
 
-    // Build parameters for Pinecone inference
     const params: Record<string, unknown> = {
       inputType,
       truncate: 'END',
     }
 
-    // Only pass dimension for models that support it (llama-text-embed-v2)
+    // Only pass dimension for models that support it
     if (modelName === 'llama-text-embed-v2' && config.dimensions) {
       params.dimension = config.dimensions
     }
@@ -153,15 +97,15 @@ export class EmbeddingService {
       params as Record<string, string>
     )
 
-    // Extract values from the response
-    // The SDK types may not match the actual response structure
-    return response.data.map(item => {
+    const values = response.data.map(item => {
       const embedding = item as unknown as { values?: number[] }
       if (!embedding.values) {
         throw new Error('Pinecone inference returned empty embedding values')
       }
       return embedding.values
     })
+
+    return { type: 'dense', values }
   }
 
   /**
@@ -178,20 +122,13 @@ export class EmbeddingService {
     const modelName = config.modelName || 'pinecone-sparse-english-v0'
     const inputType = config.inputType || 'passage'
 
-    const params: Record<string, unknown> = {
-      inputType,
-      truncate: 'END',
-    }
-
     const response = await this.pineconeClient.inference.embed(
       modelName,
       texts,
-      params as Record<string, string>
+      { inputType, truncate: 'END' } as Record<string, string>
     )
 
-    // Extract sparse values from the response
     const sparseValues: SparseVector[] = response.data.map(item => {
-      // The SDK returns sparseValues for sparse models
       const embedding = item as unknown as {
         sparseValues?: { indices: number[]; values: number[] }
       }
@@ -208,12 +145,12 @@ export class EmbeddingService {
   }
 
   /**
-   * Generate embeddings using OpenAI
+   * Generate dense embeddings using OpenAI
    */
   private async generateOpenAIEmbeddings(
     texts: string[],
     config: EmbeddingConfig
-  ): Promise<number[][]> {
+  ): Promise<EmbeddingResult> {
     const apiKeyEnvVar = config.apiKeyEnvVar || 'OPENAI_API_KEY'
     const apiKey = process.env[apiKeyEnvVar]
 
@@ -232,7 +169,7 @@ export class EmbeddingService {
       input: texts,
     })
 
-    return response.data.map((d) => d.embedding)
+    return { type: 'dense', values: response.data.map(d => d.embedding) }
   }
 }
 

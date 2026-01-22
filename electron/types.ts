@@ -16,6 +16,7 @@ export interface EmbeddingConfig {
   dimensions?: number // For models that support variable dimensions (e.g., llama-text-embed-v2)
   apiKeyEnvVar?: string // Environment variable name for API key
   inputType?: 'query' | 'passage' // For Pinecone inference: 'query' for search, 'passage' for upsert
+  vectorType?: 'dense' | 'sparse' // Type of embeddings this model produces
 }
 
 /**
@@ -132,7 +133,7 @@ export interface UpsertVectorsParams {
   namespace?: string
   vectors: Array<{
     id: string
-    values: number[]
+    values?: number[] // Optional for sparse-only vectors
     metadata?: Record<string, unknown>
     sparseValues?: {
       indices: number[]

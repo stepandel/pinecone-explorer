@@ -11,6 +11,7 @@ declare global {
     dimensions?: number // For models that support variable dimensions (e.g., llama-text-embed-v2)
     apiKeyEnvVar?: string // Environment variable name for API key
     inputType?: 'query' | 'passage' // For Pinecone inference: 'query' for search, 'passage' for upsert
+    vectorType?: 'dense' | 'sparse' // Type of embeddings this model produces
   }
 
   interface ConnectionProfile {

@@ -21,7 +21,7 @@ import {
   CloneResult,
   EmbeddingConfig,
 } from './types'
-import { EmbeddingService, SparseVector } from './embedding-service'
+import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-service'
 
 /**
  * Main Pinecone service class
@@ -231,11 +231,17 @@ class PineconeService {
       }
 
       // Use inputType: 'query' for search operations
-      const embeddings = await this.embeddingService!.generateEmbeddings(
+      const embeddingResult = await this.embeddingService!.generateEmbeddings(
         [params.queryText],
         { ...embeddingConfig, inputType: 'query' }
       )
-      queryVector = embeddings[0]
+      if (embeddingResult.type === 'dense') {
+        queryVector = embeddingResult.values[0]
+      } else {
+        // Sparse-only queries require hybrid search with a dense vector
+        // For now, throw an error - user should provide vector directly for sparse indexes
+        throw new Error('Text-based queries are not yet supported for sparse indexes. Please provide a vector directly.')
+      }
     }
 
     if (!queryVector) {
@@ -277,7 +283,7 @@ class PineconeService {
     for (let i = 0; i < vectors.length; i += BATCH_SIZE) {
       const batch = vectors.slice(i, i + BATCH_SIZE).map(v => ({
         id: v.id,
-        values: v.values,
+        values: v.values || [], // Empty array for sparse-only vectors
         metadata: v.metadata as RecordMetadata | undefined,
         sparseValues: v.sparseValues,
       }))
@@ -294,6 +300,14 @@ class PineconeService {
   ): Promise<void> {
     let values = params.values
 
+    // Build metadata, including text if provided
+    const metadata: Record<string, unknown> = { ...params.metadata }
+    if (params.text) {
+      metadata._text = params.text
+    }
+
+    let sparseValues: SparseVector | undefined
+
     // Generate embedding if requested
     if (params.generateEmbedding && params.text) {
       const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
@@ -302,27 +316,25 @@ class PineconeService {
       }
 
       // Use inputType: 'passage' for upsert operations
-      const embeddings = await this.embeddingService!.generateEmbeddings(
+      const embeddingResult = await this.embeddingService!.generateEmbeddings(
         [params.text],
         { ...embeddingConfig, inputType: 'passage' }
       )
-      values = embeddings[0]
+      if (embeddingResult.type === 'dense') {
+        values = embeddingResult.values[0]
+      } else {
+        sparseValues = embeddingResult.sparseValues[0]
+      }
     }
 
-    if (!values) {
+    if (!values && !sparseValues) {
       throw new Error('Either values or text with generateEmbedding must be provided.')
-    }
-
-    // Build metadata, including text if provided
-    const metadata: Record<string, unknown> = { ...params.metadata }
-    if (params.text) {
-      metadata._text = params.text
     }
 
     await this.upsertVectors({
       indexName: params.indexName,
       namespace: params.namespace,
-      vectors: [{ id: params.id, values, metadata }],
+      vectors: [{ id: params.id, values, sparseValues, metadata }],
     })
   }
 
@@ -337,6 +349,7 @@ class PineconeService {
     const ns = params.namespace ? index.namespace(params.namespace) : index
 
     let values = params.values
+    let sparseValues: SparseVector | undefined
 
     // Regenerate embedding if requested
     if (params.regenerateEmbedding && params.text) {
@@ -346,11 +359,15 @@ class PineconeService {
       }
 
       // Use inputType: 'passage' for upsert operations
-      const embeddings = await this.embeddingService!.generateEmbeddings(
+      const embeddingResult = await this.embeddingService!.generateEmbeddings(
         [params.text],
         { ...embeddingConfig, inputType: 'passage' }
       )
-      values = embeddings[0]
+      if (embeddingResult.type === 'dense') {
+        values = embeddingResult.values[0]
+      } else {
+        sparseValues = embeddingResult.sparseValues[0]
+      }
     }
 
     // Build metadata update
@@ -360,10 +377,11 @@ class PineconeService {
     }
 
     // Use update for metadata-only changes, upsert for value changes
-    if (values) {
+    if (values || sparseValues) {
       await ns.upsert([{
         id: params.id,
-        values,
+        values: values || [], // Empty array for sparse-only vectors
+        sparseValues,
         metadata: Object.keys(metadata).length > 0 ? metadata as RecordMetadata : undefined,
       }])
     } else if (Object.keys(metadata).length > 0) {
@@ -412,7 +430,8 @@ class PineconeService {
       try {
         let vectorsToUpsert: Array<{
           id: string
-          values: number[]
+          values?: number[]
+          sparseValues?: SparseVector
           metadata?: Record<string, unknown>
         }> = []
 
@@ -422,10 +441,10 @@ class PineconeService {
             .filter((v) => v.text && !v.values)
             .map((v) => v.text!)
 
-          let embeddings: number[][] = []
+          let embeddingResult: EmbeddingResult | null = null
           if (textsToEmbed.length > 0) {
             // Use inputType: 'passage' for upsert operations
-            embeddings = await this.embeddingService!.generateEmbeddings(
+            embeddingResult = await this.embeddingService!.generateEmbeddings(
               textsToEmbed,
               { ...embeddingConfig, inputType: 'passage' }
             )
@@ -433,10 +452,17 @@ class PineconeService {
 
           let embeddingIndex = 0
           vectorsToUpsert = batch.map((v) => {
-            const values = v.values || embeddings[embeddingIndex++]
             const metadata: Record<string, unknown> = { ...v.metadata }
             if (v.text) metadata._text = v.text
-            return { id: v.id, values, metadata }
+
+            if (v.values) {
+              return { id: v.id, values: v.values, metadata }
+            } else if (embeddingResult?.type === 'dense') {
+              return { id: v.id, values: embeddingResult.values[embeddingIndex++], metadata }
+            } else if (embeddingResult?.type === 'sparse') {
+              return { id: v.id, sparseValues: embeddingResult.sparseValues[embeddingIndex++], metadata }
+            }
+            return { id: v.id, metadata }
           })
         } else {
           // Use provided values directly
@@ -676,9 +702,9 @@ class PineconeService {
             }
           }
 
-          // Use generateEmbeddingsWithType to support both dense and sparse
+          // Generate embeddings (supports both dense and sparse)
           const embeddingResult = textsToEmbed.length > 0
-            ? await this.embeddingService!.generateEmbeddingsWithType(
+            ? await this.embeddingService!.generateEmbeddings(
                 textsToEmbed,
                 { ...embeddingConfig, inputType: 'passage' }
               )
