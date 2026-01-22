@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ConnectionProfile,
+  IndexInfo,
   QueryVectorsParams,
   CreateVectorParams,
   UpdateVectorParams,
-  DeleteVectorsParams,
   BatchImportParams,
   CreateIndexParams,
 } from '../../electron/types'
@@ -264,11 +264,46 @@ export function useDeleteIndexMutation(profileId: string) {
   return useMutation({
     mutationFn: async (indexName: string) => {
       await window.electronAPI.pinecone.deleteIndex(profileId, indexName)
+      return { profileId, indexName }
     },
-    onSuccess: () => {
-      // Invalidate indexes to refetch
-      queryClient.invalidateQueries({
+    onMutate: async (indexName) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
         queryKey: pineconeQueryKeys.indexes(profileId),
+      })
+
+      // Snapshot the previous value
+      const previousIndexes = queryClient.getQueryData<IndexInfo[]>(
+        pineconeQueryKeys.indexes(profileId)
+      )
+
+      // Optimistically remove the index from the cache
+      if (previousIndexes) {
+        queryClient.setQueryData(
+          pineconeQueryKeys.indexes(profileId),
+          previousIndexes.filter((index) => index.name !== indexName)
+        )
+      }
+
+      return { previousIndexes }
+    },
+    onError: (_err, _indexName, context) => {
+      // Roll back to the previous value on error
+      if (context?.previousIndexes) {
+        queryClient.setQueryData(
+          pineconeQueryKeys.indexes(profileId),
+          context.previousIndexes
+        )
+      }
+    },
+    onSuccess: (data) => {
+      // Remove any stats queries for the deleted index
+      queryClient.removeQueries({
+        queryKey: pineconeQueryKeys.indexStats(data.profileId, data.indexName),
+      })
+      // Remove any vector queries for the deleted index
+      queryClient.removeQueries({
+        queryKey: pineconeQueryKeys.vectors(data.profileId, data.indexName),
       })
     },
   })
