@@ -1,9 +1,11 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { TypedMetadataRecord, TypedMetadataField, MetadataValueType } from '../types/metadata'
 
 interface UseMetadataEditingProps {
   /** Initial metadata from the vector */
   initialMetadata: Record<string, unknown> | null
+  /** Vector ID - used to detect when to reset state (when switching vectors) */
+  vectorId: string
   /** Whether this is a draft vector */
   isDraft: boolean
   /** Callback when draft changes */
@@ -37,15 +39,25 @@ interface UseMetadataEditingReturn {
  */
 export function useMetadataEditing({
   initialMetadata,
+  vectorId,
   isDraft,
   onDraftChange,
 }: UseMetadataEditingProps): UseMetadataEditingReturn {
   const [draftMetadata, setDraftMetadata] = useState(initialMetadata)
+  const prevVectorIdRef = useRef(vectorId)
+  const isInitializedRef = useRef(initialMetadata !== null)
 
-  // Reset when initial metadata changes
+  // Reset when switching vectors or when initial data loads
   useEffect(() => {
-    setDraftMetadata(initialMetadata)
-  }, [initialMetadata])
+    const vectorChanged = prevVectorIdRef.current !== vectorId
+    const dataJustLoaded = !isInitializedRef.current && initialMetadata !== null
+
+    if (vectorChanged || dataJustLoaded) {
+      setDraftMetadata(initialMetadata)
+      prevVectorIdRef.current = vectorId
+      isInitializedRef.current = initialMetadata !== null
+    }
+  }, [vectorId, initialMetadata])
 
   const hasChanges = JSON.stringify(draftMetadata) !== JSON.stringify(initialMetadata)
 

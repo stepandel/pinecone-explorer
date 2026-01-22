@@ -11,6 +11,7 @@ import { LocalVectorRecord } from '../../types/vectors'
 interface VectorDetailPanelProps {
   vector: LocalVectorRecord
   collectionName: string
+  namespace?: string
   profileId: string
   isDraft?: boolean
   isFirstVector?: boolean
@@ -20,6 +21,7 @@ interface VectorDetailPanelProps {
 export default function VectorDetailPanel({
   vector,
   collectionName,
+  namespace,
   profileId,
   isDraft = false,
   isFirstVector = false,
@@ -33,7 +35,7 @@ export default function VectorDetailPanel({
   const embeddingTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Update mutation
-  const updateMutation = useUpdateVectorMutation(profileId, collectionName)
+  const updateMutation = useUpdateVectorMutation(profileId, collectionName, namespace)
 
   // Metadata editing hook
   const {
@@ -47,6 +49,7 @@ export default function VectorDetailPanel({
     changeFieldType: handleMetadataTypeChange,
   } = useMetadataEditing({
     initialMetadata: vector.metadata,
+    vectorId: vector.id,
     isDraft,
     onDraftChange,
   })
