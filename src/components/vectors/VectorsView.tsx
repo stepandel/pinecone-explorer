@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
@@ -8,6 +8,7 @@ import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filter
 import { TypedMetadataRecord, TypedMetadataField, typedMetadataToPineconeFormat, validateMetadataValue } from '../../types/metadata'
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
 import { FilterRow } from '../filters/FilterRow'
+import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover'
 
 interface DraftVector {
   id: string
@@ -82,6 +83,23 @@ export default function VectorsView({
 
   // Marked for deletion state (set of vector IDs)
   const [markedForDeletion, setMarkedForDeletion] = useState<Set<string>>(new Set())
+
+  // Namespace title truncation detection
+  const namespaceTitleRef = useRef<HTMLSpanElement>(null)
+  const [isNamespaceTruncated, setIsNamespaceTruncated] = useState(false)
+
+  // Check if namespace title is truncated
+  useEffect(() => {
+    const checkTruncation = () => {
+      const el = namespaceTitleRef.current
+      if (el) {
+        setIsNamespaceTruncated(el.scrollWidth > el.clientWidth)
+      }
+    }
+    checkTruncation()
+    window.addEventListener('resize', checkTruncation)
+    return () => window.removeEventListener('resize', checkTruncation)
+  }, [namespace])
 
   // Create vector mutation
   const createMutation = useCreateVectorMutation(
@@ -917,7 +935,32 @@ export default function VectorsView({
         {/* Row 1: Collection name and count */}
         <div className="px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-            <h1 className="text-lg font-semibold text-foreground truncate">{namespace || '(default)'}</h1>
+            {isNamespaceTruncated ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <span
+                    ref={namespaceTitleRef}
+                    className="text-lg font-semibold text-foreground truncate max-w-[300px] cursor-text"
+                  >
+                    {namespace || '(default)'}
+                  </span>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="px-2.5 py-1.5 min-w-0 max-w-[400px] rounded-md bg-popover/95 backdrop-blur-xl shadow-sm ring-1 ring-black/10 dark:ring-white/10"
+                  align="start"
+                  sideOffset={4}
+                >
+                  <div className="text-[13px] text-popover-foreground break-all select-all">{namespace || '(default)'}</div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <span
+                ref={namespaceTitleRef}
+                className="text-lg font-semibold text-foreground truncate max-w-[300px]"
+              >
+                {namespace || '(default)'}
+              </span>
+            )}
             <div className="flex-shrink-0">
               <EmbeddingFunctionSelector
                 collectionName={collectionName}
