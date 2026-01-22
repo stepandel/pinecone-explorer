@@ -268,13 +268,11 @@ export interface BatchImportResult {
 }
 
 /**
- * Parameters for cloning/copying an index
+ * Parameters for cloning/copying an index (copies all namespaces)
  */
 export interface CloneIndexParams {
   sourceIndexName: string
-  sourceNamespace?: string
   targetIndexName: string
-  targetNamespace?: string
   regenerateEmbeddings?: boolean
   textField?: string // Metadata field containing text for embedding (default: '_text')
 }

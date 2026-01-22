@@ -92,30 +92,43 @@ function buildCreateParams(draft: DraftIndex, isSparseModel: boolean): CreateInd
   return params
 }
 
-// Helper: discover text fields from sample vectors
+// Helper: discover text fields from sample vectors across all namespaces
 async function discoverTextFields(profileId: string, indexName: string): Promise<string[]> {
-  const sampleVectors = await window.electronAPI.pinecone.getAllVectors(
-    profileId,
-    indexName,
-    undefined,
-    50
-  )
+  // Get index stats to find namespaces with vectors
+  const stats = await window.electronAPI.pinecone.getIndexStats(profileId, indexName)
+  const namespacesWithVectors = Object.entries(stats.namespaces)
+    .filter(([, ns]) => ns.vectorCount > 0)
+    .map(([name]) => name)
 
   const fieldSet = new Set<string>()
-  sampleVectors.forEach(vector => {
-    if (vector.metadata) {
-      Object.entries(vector.metadata).forEach(([key, value]) => {
-        if (typeof value === 'string' && value.length > 0) {
-          fieldSet.add(key)
-        }
-      })
-    }
-  })
+
+  // Sample from each namespace until we find fields (limit to first 3 namespaces)
+  for (const namespace of namespacesWithVectors.slice(0, 3)) {
+    const sampleVectors = await window.electronAPI.pinecone.getAllVectors(
+      profileId,
+      indexName,
+      namespace || undefined,
+      20
+    )
+
+    sampleVectors.forEach(vector => {
+      if (vector.metadata) {
+        Object.entries(vector.metadata).forEach(([key, value]) => {
+          if (typeof value === 'string' && value.length > 0) {
+            fieldSet.add(key)
+          }
+        })
+      }
+    })
+
+    // Stop if we found fields
+    if (fieldSet.size > 0) break
+  }
 
   if (fieldSet.size === 0) return ['_text']
 
   // Sort with common text field names first
-  const priorityFields = ['_text', 'text', 'content', 'body', 'description']
+  const priorityFields = ['_text', 'text', 'content', 'body', 'description', 'message']
   return Array.from(fieldSet).sort((a, b) => {
     const aIdx = priorityFields.indexOf(a)
     const bIdx = priorityFields.indexOf(b)

@@ -214,7 +214,7 @@ declare global {
       batchImport: (profileId: string, params: BatchImportParams) => Promise<BatchImportResult>
       createIndex: (profileId: string, params: CreateIndexParams) => Promise<IndexInfo>
       deleteIndex: (profileId: string, indexName: string) => Promise<void>
-      cloneIndex: (profileId: string, params: { sourceIndexName: string; sourceNamespace?: string; targetIndexName: string; targetNamespace?: string; regenerateEmbeddings?: boolean; textField?: string }) => Promise<CloneResult>
+      cloneIndex: (profileId: string, params: { sourceIndexName: string; targetIndexName: string; regenerateEmbeddings?: boolean; textField?: string }) => Promise<CloneResult>
       onCloneProgress: (callback: (progress: CloneProgress) => void) => () => void
       cancelClone: (profileId: string) => Promise<void>
     }

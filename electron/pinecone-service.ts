@@ -143,6 +143,7 @@ class PineconeService {
     texts: string[],
     config: EmbeddingConfig
   ): Promise<EmbeddingResult | null> {
+    console.log('generateBatchEmbeddings', texts, config)
     if (texts.length === 0) return null
     return this.embeddingService!.generateEmbeddings(
       texts,
@@ -558,8 +559,7 @@ class PineconeService {
   }
 
   /**
-   * Clone vectors from one index/namespace to another.
-   * If no sourceNamespace is specified, copies all namespaces.
+   * Clone all vectors from one index to another, preserving all namespaces.
    */
   async cloneIndex(
     params: CloneIndexParams,
@@ -581,11 +581,7 @@ class PineconeService {
 
       const sourceStats = await this.getIndexStats(params.sourceIndexName)
       const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.sourceIndexName)
-
-      // Determine which namespaces to copy
-      const namespacesToCopy: string[] = params.sourceNamespace !== undefined
-        ? [params.sourceNamespace]
-        : Object.keys(sourceStats.namespaces)
+      const namespacesToCopy = Object.keys(sourceStats.namespaces)
 
       const totalVectors = namespacesToCopy.reduce(
         (sum, ns) => sum + (sourceStats.namespaces[ns]?.vectorCount || 0),
@@ -601,22 +597,17 @@ class PineconeService {
       let processedVectors = 0
       let dimensionValidated = false
 
-      for (const sourceNamespace of namespacesToCopy) {
+      for (const namespace of namespacesToCopy) {
         if (signal?.aborted) {
           return { success: false, totalVectors, copiedVectors: processedVectors, error: 'Operation cancelled' }
         }
 
-        // Target namespace: use specified targetNamespace if copying single namespace, otherwise preserve source namespace
-        const targetNamespace = params.sourceNamespace !== undefined
-          ? (params.targetNamespace ?? sourceNamespace)
-          : sourceNamespace
-
-        const nsLabel = sourceNamespace || '(default)'
+        const nsLabel = namespace || '(default)'
         const result = await this.cloneNamespace({
           sourceIndexName: params.sourceIndexName,
-          sourceNamespace,
+          sourceNamespace: namespace,
           targetIndexName: params.targetIndexName,
-          targetNamespace,
+          targetNamespace: namespace,
           regenerateEmbeddings: params.regenerateEmbeddings,
           textField: params.textField,
           embeddingConfig,

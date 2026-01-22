@@ -14,7 +14,7 @@ import {
 } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { cn } from '@/lib/utils'
-import { CloneNamespaceProgressDialog } from '../namespaces/CloneNamespaceProgressDialog'
+import { CloneIndexProgressDialog } from '../namespaces/CloneNamespaceProgressDialog'
 
 export function IndexesPanel() {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
@@ -307,11 +307,11 @@ export function IndexesPanel() {
 
       {/* Clone Progress Dialog */}
       {cloneProgress && (
-        <CloneNamespaceProgressDialog
+        <CloneIndexProgressDialog
           open={cloneProgressOpen}
           onOpenChange={setCloneProgressOpen}
-          sourceNamespace={draftIndex?.sourceIndex?.name || ''}
-          targetNamespace={draftIndex?.name || ''}
+          sourceIndex={draftIndex?.sourceIndex?.name || ''}
+          targetIndex={draftIndex?.name || ''}
           progress={cloneProgress}
           onCancel={cancelClone}
         />
