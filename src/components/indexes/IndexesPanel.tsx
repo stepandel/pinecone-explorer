@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useCollection } from '../../context/CollectionContext'
-import { useDraftCollection } from '../../context/DraftCollectionContext'
+import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useDeleteIndexMutation } from '../../hooks/usePineconeQueries'
 import {
   Dialog,
@@ -19,7 +19,7 @@ import { CloneNamespaceProgressDialog } from '../namespaces/CloneNamespaceProgre
 export function IndexesPanel() {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useCollection()
-  const { startCreation, startCopyFromCollection, draftCollection, cloneProgress, cloneProgressOpen, setCloneProgressOpen, cancelClone } = useDraftCollection()
+  const { startCreation, startCopyFromIndex, draftIndex, cloneProgress, cloneProgressOpen, setCloneProgressOpen, cancelClone } = useDraftIndex()
 
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -107,8 +107,8 @@ export function IndexesPanel() {
       return
     }
 
-    startCopyFromCollection(copiedIndex)
-  }, [copiedIndex, indexes, startCopyFromCollection])
+    startCopyFromIndex(copiedIndex)
+  }, [copiedIndex, indexes, startCopyFromIndex])
 
   // Clear copied index when profile changes
   useEffect(() => {
@@ -230,7 +230,7 @@ export function IndexesPanel() {
       <div className="px-2 py-2 border-t border-border">
         <button
           onClick={startCreation}
-          disabled={draftCollection !== null}
+          disabled={draftIndex !== null}
           className="w-full h-6 flex items-center justify-center gap-1 text-[10px] rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title="Create new index"
         >
@@ -310,8 +310,8 @@ export function IndexesPanel() {
         <CloneNamespaceProgressDialog
           open={cloneProgressOpen}
           onOpenChange={setCloneProgressOpen}
-          sourceNamespace={draftCollection?.sourceCollection?.name || ''}
-          targetNamespace={draftCollection?.name || ''}
+          sourceNamespace={draftIndex?.sourceIndex?.name || ''}
+          targetNamespace={draftIndex?.name || ''}
           progress={cloneProgress}
           onCancel={cancelClone}
         />

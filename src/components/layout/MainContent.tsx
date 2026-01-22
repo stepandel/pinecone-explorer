@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useCollection } from '../../context/CollectionContext'
-import { useDraftCollection } from '../../context/DraftCollectionContext'
+import { useDraftIndex } from '../../context/DraftIndexContext'
 import { usePanel } from '../../context/PanelContext'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { IndexesPanel } from '../indexes/IndexesPanel'
@@ -17,7 +17,7 @@ interface VectorRecord {
 
 export function MainContent() {
   const { activeIndex, activeNamespace } = useCollection()
-  const { draftCollection } = useDraftCollection()
+  const { draftIndex } = useDraftIndex()
   const { currentProfile } = usePinecone()
   const {
     indexesPanelWidth,
@@ -130,7 +130,7 @@ export function MainContent() {
         className="h-full transition-[padding] duration-200"
         style={{ paddingLeft: `${leftPadding}px`, paddingRight: `${rightPadding}px` }}
       >
-        {draftCollection ? (
+        {draftIndex ? (
           <IndexConfigView />
         ) : showVectors ? (
           <VectorsView

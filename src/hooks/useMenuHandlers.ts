@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { usePanel } from '../context/PanelContext'
 import { useCollection } from '../context/CollectionContext'
-import { useDraftCollection } from '../context/DraftCollectionContext'
+import { useDraftIndex } from '../context/DraftIndexContext'
 
 /**
  * Hook to handle native menu events in the connection window.
@@ -10,7 +10,7 @@ import { useDraftCollection } from '../context/DraftCollectionContext'
 export function useMenuHandlers() {
   const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } = usePanel()
   const { activeCollection } = useCollection()
-  const { startCreation } = useDraftCollection()
+  const { startCreation } = useDraftIndex()
 
   // View menu handlers
   const handleToggleLeftPanel = useCallback(() => {

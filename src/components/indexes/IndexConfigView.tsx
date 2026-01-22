@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, Info } from 'lucide-react'
-import { useDraftCollection } from '../../context/DraftCollectionContext'
+import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut'
 import { SHORTCUTS } from '../../constants/keyboard-shortcuts'
 import {
@@ -26,7 +26,7 @@ const CLOUD_REGIONS = {
 type CloudProvider = keyof typeof CLOUD_REGIONS
 
 export function IndexConfigView() {
-  const { draftCollection, updateDraft, cancelCreation, saveDraft, isCreating, validationErrors } = useDraftCollection()
+  const { draftIndex, updateDraft, cancelCreation, saveDraft, isCreating, validationErrors } = useDraftIndex()
 
   // Embedding function selection - default to Pinecone's llama-text-embed-v2
   const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>(DEFAULT_EMBEDDING_FUNCTION_ID)
@@ -40,8 +40,8 @@ export function IndexConfigView() {
     : selectedEmbedding.availableDimensions ?? (selectedEmbedding.defaultDimension ? [selectedEmbedding.defaultDimension] : [])
 
   // Derived cloud/region from draft (single source of truth)
-  const cloud = (draftCollection?.serverlessSpec?.cloud as CloudProvider) || 'aws'
-  const region = draftCollection?.serverlessSpec?.region || 'us-east-1'
+  const cloud = (draftIndex?.serverlessSpec?.cloud as CloudProvider) || 'aws'
+  const region = draftIndex?.serverlessSpec?.region || 'us-east-1'
 
   // Update draft when embedding changes (handles all defaults)
   useEffect(() => {
@@ -56,7 +56,7 @@ export function IndexConfigView() {
   }, [selectedEmbeddingId])
 
   const handleSave = () => {
-    if (draftCollection) saveDraft()
+    if (draftIndex) saveDraft()
   }
 
   // Keyboard shortcuts
@@ -66,7 +66,7 @@ export function IndexConfigView() {
     { shortcut: SHORTCUTS.CANCEL, handler: cancelCreation },
   ])
 
-  if (!draftCollection) return null
+  if (!draftIndex) return null
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -88,7 +88,7 @@ export function IndexConfigView() {
           <input
             id="index-name"
             type="text"
-            value={draftCollection.name}
+            value={draftIndex.name}
             onChange={(e) => updateDraft({ name: e.target.value })}
             placeholder="my-index"
             className={inputClassName}
@@ -137,7 +137,7 @@ export function IndexConfigView() {
         </div>
 
         {/* Text Field - only shown when copying */}
-        {draftCollection.sourceCollection && (
+        {draftIndex.sourceIndex && (
           <div className="space-y-1">
             <label htmlFor="text-field" className="text-[11px] font-medium text-muted-foreground">
               Embedding Text Field
@@ -145,12 +145,12 @@ export function IndexConfigView() {
             <div className="relative">
               <select
                 id="text-field"
-                value={draftCollection.textField || '_text'}
+                value={draftIndex.textField || '_text'}
                 onChange={(e) => updateDraft({ textField: e.target.value })}
                 className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
                 style={inputStyle}
               >
-                {(draftCollection.availableTextFields || ['_text']).map(field => (
+                {(draftIndex.availableTextFields || ['_text']).map(field => (
                   <option key={field} value={field}>{field}</option>
                 ))}
               </select>
@@ -170,7 +170,7 @@ export function IndexConfigView() {
             </label>
             <div className="relative">
               <select
-                value={draftCollection.dimensionOverride || ''}
+                value={draftIndex.dimensionOverride || ''}
                 onChange={(e) => updateDraft({ dimensionOverride: e.target.value })}
                 className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
                 style={inputStyle}
@@ -213,7 +213,7 @@ export function IndexConfigView() {
                     type="radio"
                     name="metric"
                     value={metric}
-                    checked={(draftCollection.metric || 'cosine') === metric}
+                    checked={(draftIndex.metric || 'cosine') === metric}
                     onChange={() => updateDraft({ metric })}
                     disabled={!isSupported}
                     className="h-3 w-3"
@@ -305,7 +305,7 @@ export function IndexConfigView() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isCreating || !draftCollection.name.trim()}
+            disabled={isCreating || !draftIndex.name.trim()}
             className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isCreating ? 'Creating...' : 'Create Index'}

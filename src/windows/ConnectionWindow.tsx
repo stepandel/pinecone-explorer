@@ -1,6 +1,6 @@
 import { PineconeProvider } from '../providers/PineconeProvider'
 import { CollectionProvider } from '../context/CollectionContext'
-import { DraftCollectionProvider } from '../context/DraftCollectionContext'
+import { DraftIndexProvider } from '../context/DraftIndexContext'
 import { ClipboardProvider } from '../context/ClipboardContext'
 import { AppLayout } from '../components/layout/AppLayout'
 import { useProfileQuery } from '../hooks/usePineconeQueries'
@@ -35,9 +35,9 @@ export function ConnectionWindow({ windowId, profileId }: ConnectionWindowProps)
     <PineconeProvider profile={profile} windowId={windowId}>
       <ClipboardProvider>
         <CollectionProvider>
-          <DraftCollectionProvider>
+          <DraftIndexProvider>
             <AppLayout />
-          </DraftCollectionProvider>
+          </DraftIndexProvider>
         </CollectionProvider>
       </ClipboardProvider>
     </PineconeProvider>
