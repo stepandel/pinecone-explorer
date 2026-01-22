@@ -305,6 +305,21 @@ export default function VectorsView({
     return Array.from(fields).sort()
   }, [vectors])
 
+  // Extract text fields (string-type metadata fields) for embedding text field dropdown
+  const availableTextFields = useMemo(() => {
+    const textFields = new Set<string>()
+    vectors.forEach((vec: LocalVectorRecord) => {
+      if (vec.metadata) {
+        Object.entries(vec.metadata).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            textFields.add(key)
+          }
+        })
+      }
+    })
+    return Array.from(textFields).sort()
+  }, [vectors])
+
   // Filter row handlers
   const handleFilterRowChange = useCallback((id: string, updates: Partial<FilterRowType>) => {
     setFilterRows(prev => prev.map(row =>
@@ -911,6 +926,7 @@ export default function VectorsView({
                 clientTextFieldOverride={textFieldOverride}
                 onTextFieldSave={handleSaveTextFieldOverride}
                 onTextFieldClear={handleClearTextFieldOverride}
+                availableTextFields={availableTextFields}
               />
             </div>
           </div>

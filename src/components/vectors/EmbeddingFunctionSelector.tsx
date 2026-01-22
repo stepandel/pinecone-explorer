@@ -20,6 +20,7 @@ interface EmbeddingFunctionSelectorProps {
   clientTextFieldOverride?: string | null      // Client-side text field override
   onTextFieldSave?: (textField: string) => Promise<void>
   onTextFieldClear?: () => Promise<void>
+  availableTextFields?: string[]               // Available string metadata fields from vectors
 }
 
 export function EmbeddingFunctionSelector({
@@ -35,6 +36,7 @@ export function EmbeddingFunctionSelector({
   clientTextFieldOverride,
   onTextFieldSave,
   onTextFieldClear,
+  availableTextFields = [],
 }: EmbeddingFunctionSelectorProps) {
   const [open, setOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string>('')
@@ -61,6 +63,19 @@ export function EmbeddingFunctionSelector({
     }
   }, [currentOverride, open])
 
+  // Auto-select text field when there's only one available and no override
+  useEffect(() => {
+    if (
+      availableTextFields.length === 1 &&
+      !clientTextFieldOverride &&
+      !indexEmbedConfig?.fieldMap?.text &&
+      onTextFieldSave
+    ) {
+      // Auto-save the only available text field
+      onTextFieldSave(availableTextFields[0])
+    }
+  }, [availableTextFields, clientTextFieldOverride, indexEmbedConfig, onTextFieldSave])
+
   const selectedEF = EMBEDDING_FUNCTIONS.find(ef => ef.id === selectedId)
 
   const serverFunction = EMBEDDING_FUNCTIONS.find(ef => ef.modelName === serverConfig?.config?.model_name)
@@ -80,10 +95,10 @@ export function EmbeddingFunctionSelector({
         })
       }
       // Save text field if changed
-      const trimmedTextField = textFieldInput.trim()
-      if (trimmedTextField && trimmedTextField !== '_text' && onTextFieldSave) {
-        await onTextFieldSave(trimmedTextField)
-      } else if (!trimmedTextField && clientTextFieldOverride && onTextFieldClear) {
+      const selectedField = textFieldInput.trim()
+      if (selectedField && selectedField !== clientTextFieldOverride && onTextFieldSave) {
+        await onTextFieldSave(selectedField)
+      } else if (!selectedField && clientTextFieldOverride && onTextFieldClear) {
         // Clear if empty and there was an override
         await onTextFieldClear()
       }
@@ -110,7 +125,8 @@ export function EmbeddingFunctionSelector({
 
   // Check if there are any changes to save
   const hasEmbeddingChange = selectedEF !== undefined && selectedEF !== null
-  const hasTextFieldChange = textFieldInput.trim() !== (clientTextFieldOverride || '') && textFieldInput.trim() !== ''
+  const selectedField = textFieldInput.trim()
+  const hasTextFieldChange = selectedField !== (clientTextFieldOverride || '') && selectedField !== ''
   const canSave = hasEmbeddingChange || hasTextFieldChange
 
   // For integrated inference, show a read-only display
@@ -235,20 +251,33 @@ export function EmbeddingFunctionSelector({
             </div>
           </div>
 
-          {/* Text Field Input */}
+          {/* Text Field Selector */}
           <div className="px-1 space-y-1.5">
             <Label htmlFor="text-field" className="text-[11px] font-normal">Text Field</Label>
-            <input
-              id="text-field"
-              type="text"
-              value={textFieldInput}
-              onChange={(e) => setTextFieldInput(e.target.value)}
-              placeholder="_text"
-              className="w-full h-[22px] rounded-[5px] border-none bg-white/10 dark:bg-white/5 px-2 text-[13px] text-foreground shadow-[0_0.5px_1px_rgba(0,0,0,0.1),inset_0_0.5px_0.5px_rgba(255,255,255,0.1)] ring-1 ring-black/10 dark:ring-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground/50"
-            />
-            <p className="text-[10px] text-muted-foreground">
-              Metadata field containing text for embeddings
-            </p>
+            <div className="relative">
+              <select
+                id="text-field"
+                value={textFieldInput}
+                onChange={(e) => setTextFieldInput(e.target.value)}
+                className="w-full h-[22px] appearance-none rounded-[5px] border-none bg-white/10 dark:bg-white/5 pl-2 pr-6 text-[13px] text-foreground shadow-[0_0.5px_1px_rgba(0,0,0,0.1),inset_0_0.5px_0.5px_rgba(255,255,255,0.1)] ring-1 ring-black/10 dark:ring-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-default"
+              >
+                <option value="">Select field...</option>
+                {availableTextFields.map(field => (
+                  <option key={field} value={field}>{field}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/70" />
+            </div>
+            {availableTextFields.length === 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                No text fields found in vectors
+              </p>
+            )}
+            {availableTextFields.length > 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                Metadata field containing text for embeddings
+              </p>
+            )}
           </div>
 
           {/* Selected info */}
