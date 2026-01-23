@@ -41,7 +41,7 @@ const PanelContext = createContext<PanelContextType | undefined>(undefined)
 
 export function PanelProvider({ children }: { children: ReactNode }) {
   const [indexesPanelOpen, setIndexesPanelOpen] = useState(true)
-  const [indexesPanelWidth, setIndexesPanelWidth] = useState(73)
+  const [indexesPanelWidth, setIndexesPanelWidth] = useState(120)
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [leftPanelWidth, setLeftPanelWidth] = useState(220)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)

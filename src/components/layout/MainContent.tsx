@@ -70,7 +70,7 @@ export function MainContent() {
   // Handle mouse move for resizing
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isResizingIndexes) {
-      const newWidth = Math.max(60, Math.min(240, e.clientX))
+      const newWidth = Math.max(120, Math.min(240, e.clientX))
       setIndexesPanelWidth(newWidth)
     } else if (isResizingLeft) {
       // Adjust for the IndexesPanel width
