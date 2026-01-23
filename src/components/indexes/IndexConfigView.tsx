@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, Info } from 'lucide-react'
+import { ChevronDown, ChevronRight, Info, RefreshCw } from 'lucide-react'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut'
 import { SHORTCUTS } from '../../constants/keyboard-shortcuts'
@@ -10,6 +10,13 @@ import {
   DEFAULT_EMBEDDING_FUNCTION_ID,
   type DistanceMetric,
 } from '../../constants/embedding-functions'
+import { MetadataFieldList } from '../shared/MetadataFieldEditor'
+import {
+  type MetadataField,
+  parseVectorJson,
+  metadataToFields,
+  fieldsToMetadata,
+} from '../../utils/vectorJsonParser'
 
 const inputClassName = "w-full h-6 text-[11px] px-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
@@ -30,6 +37,17 @@ export function IndexConfigView() {
 
   // Embedding function selection - default to Pinecone's llama-text-embed-v2
   const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>(DEFAULT_EMBEDDING_FUNCTION_ID)
+
+  // First namespace setup state (for non-copy mode only)
+  const [showFirstNamespace, setShowFirstNamespace] = useState(false)
+  const [firstNamespaceName, setFirstNamespaceName] = useState('')
+
+  // First vector state
+  const [firstVectorId, setFirstVectorId] = useState<string>(() => crypto.randomUUID())
+  const [firstVectorMetadata, setFirstVectorMetadata] = useState<MetadataField[]>([])
+  const [firstVectorJsonMode, setFirstVectorJsonMode] = useState(false)
+  const [firstVectorJsonValue, setFirstVectorJsonValue] = useState('')
+  const [firstVectorJsonError, setFirstVectorJsonError] = useState<string | null>(null)
 
   // Derived state from selected embedding
   const selectedEmbedding = getEmbeddingFunctionById(selectedEmbeddingId)
@@ -54,6 +72,61 @@ export function IndexConfigView() {
       ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
     })
   }, [selectedEmbeddingId])
+
+  // Sync first namespace state to draft
+  useEffect(() => {
+    if (showFirstNamespace) {
+      updateDraft({
+        firstNamespace: {
+          name: firstNamespaceName,
+          firstVector: {
+            id: firstVectorId,
+            metadataFields: firstVectorMetadata,
+          },
+        },
+      })
+    } else {
+      // Clear first namespace when section is collapsed
+      updateDraft({ firstNamespace: undefined })
+    }
+  }, [showFirstNamespace, firstNamespaceName, firstVectorId, firstVectorMetadata])
+
+  // Pre-populate embedding text field when it changes
+  useEffect(() => {
+    if (showFirstNamespace && draftIndex?.textField && firstVectorMetadata.length === 0) {
+      setFirstVectorMetadata([{ key: draftIndex.textField, type: 'string', value: '' }])
+    }
+  }, [showFirstNamespace, draftIndex?.textField])
+
+  // Handle JSON mode toggle for first vector
+  const handleFirstVectorJsonModeChange = (enabled: boolean) => {
+    if (enabled) {
+      // Serialize current metadata to JSON
+      const metadata = fieldsToMetadata(firstVectorMetadata)
+      const jsonObj = {
+        id: firstVectorId,
+        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+      }
+      setFirstVectorJsonValue(JSON.stringify(jsonObj, null, 2))
+      setFirstVectorJsonError(null)
+    } else {
+      // Parse JSON and update fields
+      if (firstVectorJsonValue.trim()) {
+        const result = parseVectorJson(firstVectorJsonValue)
+        if (!result.success) {
+          setFirstVectorJsonError(result.error || 'Invalid JSON')
+          return // Stay in JSON mode
+        }
+        if (result.vectors && result.vectors.length > 0) {
+          const v = result.vectors[0]
+          if (v.id) setFirstVectorId(v.id)
+          setFirstVectorMetadata(v.metadata ? metadataToFields(v.metadata) : [])
+        }
+      }
+      setFirstVectorJsonError(null)
+    }
+    setFirstVectorJsonMode(enabled)
+  }
 
   const handleSave = () => {
     if (draftIndex) saveDraft()
@@ -276,6 +349,174 @@ export function IndexConfigView() {
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
           </div>
         </div>
+
+        {/* Embedding Text Field - for new indexes (not copy mode) */}
+        {!draftIndex.sourceIndex && (
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">
+              Embedding Text Field
+            </label>
+            <input
+              type="text"
+              value={draftIndex.textField || ''}
+              onChange={(e) => updateDraft({ textField: e.target.value || undefined })}
+              placeholder="_text"
+              className={inputClassName}
+              style={inputStyle}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Metadata field name that will contain text for embeddings
+            </p>
+          </div>
+        )}
+
+        {/* First Namespace Setup (Optional) - only for non-copy mode */}
+        {!draftIndex.sourceIndex && (
+          <div className="space-y-2 pt-2 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setShowFirstNamespace(!showFirstNamespace)}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronRight className={`h-3 w-3 transition-transform ${showFirstNamespace ? 'rotate-90' : ''}`} />
+              Set up first namespace <span className="text-muted-foreground/60">(optional)</span>
+            </button>
+
+            {showFirstNamespace && (
+              <div className="space-y-4 pl-4 pt-2">
+                {/* Namespace Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground">
+                    Namespace Name
+                  </label>
+                  <input
+                    type="text"
+                    value={firstNamespaceName}
+                    onChange={(e) => setFirstNamespaceName(e.target.value)}
+                    placeholder="my-namespace (leave empty for default)"
+                    className={inputClassName}
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* First Vector Section */}
+                <div className="space-y-3 pt-2 border-t border-border/50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-[10px] font-medium text-muted-foreground">First Vector</h4>
+                      <p className="text-[9px] text-muted-foreground/70">Required to create the namespace</p>
+                    </div>
+                    {/* Form/JSON Toggle */}
+                    <div className="flex rounded-md border border-input overflow-hidden" style={inputStyle}>
+                      <button
+                        type="button"
+                        onClick={() => handleFirstVectorJsonModeChange(false)}
+                        className={`px-2 h-5 text-[9px] font-medium transition-colors ${
+                          !firstVectorJsonMode
+                            ? 'bg-foreground text-background'
+                            : 'bg-background text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Form
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleFirstVectorJsonModeChange(true)}
+                        className={`px-2 h-5 text-[9px] font-medium transition-colors border-l border-input ${
+                          firstVectorJsonMode
+                            ? 'bg-foreground text-background'
+                            : 'bg-background text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        JSON
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Embedding field info */}
+                  {draftIndex.textField && (
+                    <div className="flex items-start gap-1.5 p-1.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                      <Info className="h-3 w-3 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-[9px] text-blue-600 dark:text-blue-400">
+                        Fill the <code className="px-0.5 bg-blue-500/10 rounded font-mono">{draftIndex.textField}</code> field with text to auto-generate embeddings.
+                      </p>
+                    </div>
+                  )}
+
+                  {firstVectorJsonMode ? (
+                    /* JSON Mode */
+                    <div className="space-y-2">
+                      <textarea
+                        value={firstVectorJsonValue}
+                        onChange={(e) => {
+                          setFirstVectorJsonValue(e.target.value)
+                          setFirstVectorJsonError(null)
+                        }}
+                        placeholder={`{
+  "id": "vec-001",
+  "metadata": {
+    "title": "My Document",
+    "category": "articles"
+  }
+}`}
+                        className="w-full h-32 text-[10px] px-2 py-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring font-mono resize-none"
+                        style={inputStyle}
+                      />
+                      {firstVectorJsonError && (
+                        <div className="p-1.5 bg-destructive/10 border border-destructive/20 rounded-md">
+                          <p className="text-[9px] text-destructive">{firstVectorJsonError}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Form Mode */
+                    <div className="space-y-3">
+                      {/* Vector ID */}
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-medium text-muted-foreground">
+                          Vector ID
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={firstVectorId}
+                            onChange={(e) => setFirstVectorId(e.target.value)}
+                            placeholder="vec-001"
+                            className={`${inputClassName} flex-1`}
+                            style={inputStyle}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setFirstVectorId(crypto.randomUUID())}
+                            className="h-6 w-6 flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent"
+                            style={inputStyle}
+                            title="Generate UUID"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                          </button>
+                        </div>
+                        {validationErrors.firstVectorId && (
+                          <p className="text-[9px] text-destructive">{validationErrors.firstVectorId}</p>
+                        )}
+                      </div>
+
+                      {/* Metadata Fields */}
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-medium text-muted-foreground">
+                          Metadata
+                        </label>
+                        <MetadataFieldList
+                          fields={firstVectorMetadata}
+                          onChange={setFirstVectorMetadata}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sparse model info */}

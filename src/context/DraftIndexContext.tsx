@@ -3,12 +3,23 @@ import { usePinecone } from '../providers/PineconeProvider'
 import { useCreateIndexMutation } from '../hooks/usePineconeQueries'
 import { useSelection } from './SelectionContext'
 import { getEmbeddingFunctionById, getEmbeddingFunctionByModelStrict, DEFAULT_EMBEDDING_FUNCTION_ID } from '../constants/embedding-functions'
+import { type MetadataField, fieldsToMetadata } from '../utils/vectorJsonParser'
 
 export interface CloneProgressState {
   phase: 'preparing' | 'copying' | 'complete' | 'error' | 'cancelled'
   totalVectors: number
   processedVectors: number
   message: string
+}
+
+export interface FirstVectorConfig {
+  id: string
+  metadataFields: MetadataField[]
+}
+
+export interface FirstNamespaceConfig {
+  name: string
+  firstVector?: FirstVectorConfig
 }
 
 export interface DraftIndex {
@@ -23,6 +34,7 @@ export interface DraftIndex {
   sourceIndex?: IndexInfo
   textField?: string
   availableTextFields?: string[]
+  firstNamespace?: FirstNamespaceConfig
 }
 
 interface DraftIndexContextValue {
@@ -67,6 +79,13 @@ function validateDraft(draft: DraftIndex, isSparseModel: boolean): Record<string
     const dimension = parseInt(draft.dimensionOverride, 10)
     if (!draft.dimensionOverride.trim() || isNaN(dimension) || dimension <= 0) {
       errors.dimension = 'Dimension must be a positive number'
+    }
+  }
+
+  // Validate first vector if namespace setup is enabled
+  if (draft.firstNamespace?.firstVector) {
+    if (!draft.firstNamespace.firstVector.id.trim()) {
+      errors.firstVectorId = 'Vector ID is required'
     }
   }
 
@@ -147,7 +166,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
   const [cloneProgressOpen, setCloneProgressOpen] = useState(false)
 
   const { currentProfile, refreshIndexes } = usePinecone()
-  const { setActiveIndex } = useSelection()
+  const { setActiveIndex, selectIndexAndNamespace } = useSelection()
   const createMutation = useCreateIndexMutation(currentProfile?.id || '')
 
   // Listen for clone progress updates
@@ -285,9 +304,55 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
         )
       }
 
+      // Save text field override if specified (for new indexes, not copy mode)
+      if (!draftIndex.sourceIndex && draftIndex.textField?.trim()) {
+        await window.electronAPI.profiles.setTextFieldOverride(
+          currentProfile.id,
+          newIndexName,
+          draftIndex.textField.trim()
+        )
+      }
+
       // Handle copy mode
       if (draftIndex.sourceIndex) {
         await handleCloneOperation(newIndexName, draftIndex, currentProfile.id)
+      } else if (draftIndex.firstNamespace?.firstVector) {
+        // Handle first namespace setup with first vector creation
+        const { name: namespaceName, firstVector } = draftIndex.firstNamespace
+        const namespace = namespaceName.trim() || undefined
+
+        // Convert metadata fields to object
+        const metadata = fieldsToMetadata(firstVector.metadataFields)
+
+        // Get text from configured text field for embedding generation
+        const textField = draftIndex.textField?.trim()
+        let text: string | undefined
+        if (textField && metadata[textField] && typeof metadata[textField] === 'string') {
+          text = metadata[textField] as string
+        }
+
+        // Create the first vector (which implicitly creates the namespace)
+        await window.electronAPI.pinecone.createVector(currentProfile.id, {
+          indexName: newIndexName,
+          namespace,
+          id: firstVector.id.trim(),
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+          text,
+          textField,
+          generateEmbedding: !!text,
+        })
+
+        setDraftIndex(null)
+        setValidationErrors({})
+        // Navigate to the index and namespace
+        selectIndexAndNamespace(newIndexName, namespace || '')
+      } else if (draftIndex.firstNamespace) {
+        // First namespace without vector - just navigate (namespace won't exist until vector is created)
+        const { name: namespaceName } = draftIndex.firstNamespace
+
+        setDraftIndex(null)
+        setValidationErrors({})
+        selectIndexAndNamespace(newIndexName, namespaceName.trim())
       } else {
         setDraftIndex(null)
         setValidationErrors({})
@@ -299,7 +364,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsCreating(false)
     }
-  }, [draftIndex, currentProfile, createMutation, setActiveIndex, refreshIndexes])
+  }, [draftIndex, currentProfile, createMutation, setActiveIndex, selectIndexAndNamespace, refreshIndexes])
 
   // Helper for clone operation (kept inside provider for access to state setters)
   const handleCloneOperation = async (newIndexName: string, draft: DraftIndex, profileId: string) => {
