@@ -234,14 +234,9 @@ export function NamespacesPanel() {
       {/* Header */}
       <div className="px-3 py-2">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Namespaces
-          </h2>
-          {indexStats && (
-            <span className="text-[10px] text-muted-foreground">
-              {indexStats.totalVectorCount.toLocaleString()} vectors
-            </span>
-          )}
+          <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
+            Index: <span className="text-sidebar-foreground">{activeIndex}</span>
+          </div>
         </div>
         {/* Search input */}
         <div className="relative">
@@ -330,16 +325,13 @@ export function NamespacesPanel() {
         )}
       </div>
 
-      {/* Footer - New namespace button and Index info */}
-      <div className="px-3 py-2 border-t border-border space-y-2">
+      {/* Footer */}
+      <div className="px-2 py-2 border-t border-border">
         <NewButton
           onClick={() => startNamespaceCreation(activeIndex)}
           label="Namespace"
           title="Create new namespace"
         />
-        <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
-          Index: <span className="text-sidebar-foreground">{activeIndex}</span>
-        </div>
       </div>
 
       {/* Delete Namespace Dialog */}
