@@ -133,7 +133,7 @@ export function FilterRow({
           type="text"
           value={row.selectValue || ''}
           onChange={(e) => onChange(row.id, { selectValue: e.target.value })}
-          placeholder="Document ID..."
+          placeholder="Vector ID..."
           className={`flex-1 ${inputClassName}`}
           style={inputStyle}
         />

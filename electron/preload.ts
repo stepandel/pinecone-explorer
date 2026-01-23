@@ -395,7 +395,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:delete-index', handler)
       return () => ipcRenderer.removeListener('menu:delete-index', handler)
     },
-    // Vector menu events (replacing document events)
+    // Vector menu events
     onNewVector: (callback: () => void): (() => void) => {
       const handler = () => callback()
       ipcRenderer.on('menu:new-vector', handler)

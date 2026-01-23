@@ -22,12 +22,12 @@ export function useMenuHandlers() {
   }, [rightPanelOpen, setRightPanelOpen])
 
   const handleFocusSearch = useCallback(() => {
-    // Dispatch event for DocumentsView to focus the search input
+    // Dispatch event for VectorsView to focus the search input
     window.dispatchEvent(new CustomEvent('menu:focus-search'))
   }, [])
 
   const handleClearFilters = useCallback(() => {
-    // Dispatch event for DocumentsView to clear filters
+    // Dispatch event for VectorsView to clear filters
     window.dispatchEvent(new CustomEvent('menu:clear-filters'))
   }, [])
 
@@ -57,37 +57,37 @@ export function useMenuHandlers() {
     }
   }, [activeIndex])
 
-  // Vector menu handlers (formerly document)
+  // Vector menu handlers
   const handleNewVector = useCallback(() => {
-    // Dispatch event for DocumentsView to create a new vector
+    // Dispatch event for VectorsView to create a new vector
     if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:new-document'))
+      window.dispatchEvent(new CustomEvent('menu:new-vector'))
     }
   }, [activeIndex])
 
   const handleEditVector = useCallback(() => {
-    // Dispatch event for DocumentsView to edit the selected vector
-    window.dispatchEvent(new CustomEvent('menu:edit-document'))
+    // Dispatch event for VectorsView to edit the selected vector
+    window.dispatchEvent(new CustomEvent('menu:edit-vector'))
   }, [])
 
   const handleDeleteSelected = useCallback(() => {
-    // Dispatch event for DocumentsView to delete selected vectors
+    // Dispatch event for VectorsView to delete selected vectors
     window.dispatchEvent(new CustomEvent('menu:delete-selected'))
   }, [])
 
   const handleCopyVectors = useCallback(() => {
-    // Dispatch event for DocumentsView to copy selected vectors
-    window.dispatchEvent(new CustomEvent('menu:copy-documents'))
+    // Dispatch event for VectorsView to copy selected vectors
+    window.dispatchEvent(new CustomEvent('menu:copy-vectors'))
   }, [])
 
   const handlePasteVectors = useCallback(() => {
-    // Dispatch event for DocumentsView to paste vectors
-    window.dispatchEvent(new CustomEvent('menu:paste-documents'))
+    // Dispatch event for VectorsView to paste vectors
+    window.dispatchEvent(new CustomEvent('menu:paste-vectors'))
   }, [])
 
   const handleSelectAllVectors = useCallback(() => {
-    // Dispatch event for DocumentsView to select all vectors
-    window.dispatchEvent(new CustomEvent('menu:select-all-documents'))
+    // Dispatch event for VectorsView to select all vectors
+    window.dispatchEvent(new CustomEvent('menu:select-all-vectors'))
   }, [])
 
   const handleConfigureEmbedding = useCallback(() => {

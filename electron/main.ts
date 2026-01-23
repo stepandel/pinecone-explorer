@@ -486,7 +486,7 @@ ipcMain.on('context-menu:show-index-panel', (event) => {
   }
 })
 
-// Vector context menu (replacing document menu)
+// Vector context menu
 ipcMain.on('context-menu:show-vector', (event, vectorId: string, options?: { hasCopiedVectors?: boolean }) => {
   const template: MenuItemConstructorOptions[] = [
     {

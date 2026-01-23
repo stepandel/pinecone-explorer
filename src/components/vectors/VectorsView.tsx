@@ -794,26 +794,26 @@ export default function VectorsView({
     }
 
     // Listen for menu events dispatched from useMenuHandlers
-    window.addEventListener('menu:new-document', handleMenuNewVector)
+    window.addEventListener('menu:new-vector', handleMenuNewVector)
     window.addEventListener('menu:delete-selected', handleMenuDeleteSelected)
-    window.addEventListener('menu:copy-documents', handleMenuCopyVectors)
-    window.addEventListener('menu:paste-documents', handleMenuPasteVectors)
-    window.addEventListener('menu:select-all-documents', handleMenuSelectAll)
+    window.addEventListener('menu:copy-vectors', handleMenuCopyVectors)
+    window.addEventListener('menu:paste-vectors', handleMenuPasteVectors)
+    window.addEventListener('menu:select-all-vectors', handleMenuSelectAll)
     window.addEventListener('menu:focus-search', handleMenuFocusSearch)
     window.addEventListener('menu:clear-filters', handleMenuClearFilters)
     window.addEventListener('menu:configure-embedding', handleMenuConfigureEmbedding)
-    window.addEventListener('menu:edit-document', handleMenuEditVector)
+    window.addEventListener('menu:edit-vector', handleMenuEditVector)
 
     return () => {
-      window.removeEventListener('menu:new-document', handleMenuNewVector)
+      window.removeEventListener('menu:new-vector', handleMenuNewVector)
       window.removeEventListener('menu:delete-selected', handleMenuDeleteSelected)
-      window.removeEventListener('menu:copy-documents', handleMenuCopyVectors)
-      window.removeEventListener('menu:paste-documents', handleMenuPasteVectors)
-      window.removeEventListener('menu:select-all-documents', handleMenuSelectAll)
+      window.removeEventListener('menu:copy-vectors', handleMenuCopyVectors)
+      window.removeEventListener('menu:paste-vectors', handleMenuPasteVectors)
+      window.removeEventListener('menu:select-all-vectors', handleMenuSelectAll)
       window.removeEventListener('menu:focus-search', handleMenuFocusSearch)
       window.removeEventListener('menu:clear-filters', handleMenuClearFilters)
       window.removeEventListener('menu:configure-embedding', handleMenuConfigureEmbedding)
-      window.removeEventListener('menu:edit-document', handleMenuEditVector)
+      window.removeEventListener('menu:edit-vector', handleMenuEditVector)
     }
   }, [
     handleStartCreate,

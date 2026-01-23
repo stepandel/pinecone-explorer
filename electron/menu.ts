@@ -153,18 +153,18 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
         { role: 'paste' },
         { type: 'separator' },
         {
-          label: 'Copy Documents',
+          label: 'Copy Vectors',
           accelerator: 'CmdOrCtrl+C',
           click: () => {
-            sendToFocusedWindow('menu:copy-documents')
+            sendToFocusedWindow('menu:copy-vectors')
           },
           registerAccelerator: false, // Don't override system copy
         },
         {
-          label: 'Paste Documents',
+          label: 'Paste Vectors',
           accelerator: 'CmdOrCtrl+V',
           click: () => {
-            sendToFocusedWindow('menu:paste-documents')
+            sendToFocusedWindow('menu:paste-vectors')
           },
           registerAccelerator: false, // Don't override system paste
         },
@@ -179,10 +179,10 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
         { type: 'separator' },
         { role: 'selectAll' },
         {
-          label: 'Select All Documents',
+          label: 'Select All Vectors',
           accelerator: 'CmdOrCtrl+Shift+A',
           click: () => {
-            sendToFocusedWindow('menu:select-all-documents')
+            sendToFocusedWindow('menu:select-all-vectors')
           },
         },
       ],
@@ -286,29 +286,29 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
       ],
     },
 
-    // Document menu
+    // Vector menu
     {
-      label: 'Document',
+      label: 'Vector',
       submenu: [
         {
-          label: 'New Document',
+          label: 'New Vector',
           accelerator: 'CmdOrCtrl+N',
           click: () => {
-            sendToFocusedWindow('menu:new-document')
+            sendToFocusedWindow('menu:new-vector')
           },
         },
         { type: 'separator' },
         {
-          label: 'Edit Selected Document',
+          label: 'Edit Selected Vector',
           accelerator: 'Return',
           click: () => {
-            sendToFocusedWindow('menu:edit-document')
+            sendToFocusedWindow('menu:edit-vector')
           },
           registerAccelerator: false, // Don't override return key globally
         },
         { type: 'separator' },
         {
-          label: 'Delete Selected Documents',
+          label: 'Delete Selected Vectors',
           accelerator: 'CmdOrCtrl+Backspace',
           click: () => {
             sendToFocusedWindow('menu:delete-selected')
