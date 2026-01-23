@@ -6,7 +6,7 @@ import { Label } from '../ui/label'
 import { EMBEDDING_FUNCTIONS, EMBEDDING_FUNCTION_GROUPS, DEFAULT_EMBEDDING_FUNCTION_ID, getEmbeddingFunctionById } from '../../constants/embedding-functions'
 
 interface EmbeddingFunctionSelectorProps {
-  collectionName: string
+  indexName: string
   currentOverride: EmbeddingConfig | null
   serverConfig: { name: string; type: string; config?: Record<string, unknown> } | null
   onSave: (override: EmbeddingConfig) => Promise<void>
@@ -24,7 +24,7 @@ interface EmbeddingFunctionSelectorProps {
 }
 
 export function EmbeddingFunctionSelector({
-  collectionName,
+  indexName,
   currentOverride,
   serverConfig,
   onSave,

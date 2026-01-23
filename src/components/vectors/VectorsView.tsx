@@ -13,7 +13,7 @@ import { FilterRow } from '../filters/FilterRow'
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover'
 
 interface VectorsViewProps {
-  collectionName: string
+  indexName: string
   namespace?: string
   // Multi-select props
   selectedVectorIds: Set<string>
@@ -41,7 +41,7 @@ function createDefaultFilterRow(): FilterRowType {
 }
 
 export default function VectorsView({
-  collectionName,
+  indexName,
   namespace,
   selectedVectorIds,
   primarySelectedVectorId,
@@ -98,25 +98,29 @@ export default function VectorsView({
   // Create vector mutation
   const createMutation = useCreateVectorMutation(
     currentProfile?.id || '',
-    collectionName
+    indexName,
+    namespace
   )
 
   // Delete vectors mutation
   const deleteMutation = useDeleteVectorsMutation(
     currentProfile?.id || '',
-    collectionName
+    indexName,
+    namespace
   )
 
   // Batch import mutation (for pasting)
   const createBatchMutation = useBatchImportMutation(
     currentProfile?.id || '',
-    collectionName
+    indexName,
+    namespace
   )
 
   // Update vector mutation (for inline editing)
   const updateMutation = useUpdateVectorMutation(
     currentProfile?.id || '',
-    collectionName
+    indexName,
+    namespace
   )
 
   // Query vectors mutation (for semantic search)
@@ -131,7 +135,7 @@ export default function VectorsView({
 
   // Fetch indexes to get the current index's info
   const { data: indexes = [] } = useIndexesQuery(currentProfile?.id || null)
-  const currentIndex = indexes.find((c: IndexInfo) => c.name === collectionName)
+  const currentIndex = indexes.find((c: IndexInfo) => c.name === indexName)
 
   // Embedding function override state
   const [embeddingOverride, setEmbeddingOverride] = useState<EmbeddingConfig | null>(null)
@@ -148,11 +152,11 @@ export default function VectorsView({
   // Fetch embedding and text field overrides when collection changes
   useEffect(() => {
     const fetchOverrides = async () => {
-      if (!currentProfile?.id || !collectionName) return
+      if (!currentProfile?.id || !indexName) return
       try {
         const [embeddingOvr, textFieldOvr] = await Promise.all([
-          window.electronAPI.profiles.getEmbeddingOverride(currentProfile.id, collectionName),
-          window.electronAPI.profiles.getTextFieldOverride(currentProfile.id, collectionName),
+          window.electronAPI.profiles.getEmbeddingOverride(currentProfile.id, indexName),
+          window.electronAPI.profiles.getTextFieldOverride(currentProfile.id, indexName),
         ])
         setEmbeddingOverride(embeddingOvr)
         setTextFieldOverride(textFieldOvr)
@@ -161,45 +165,45 @@ export default function VectorsView({
       }
     }
     fetchOverrides()
-  }, [currentProfile?.id, collectionName])
+  }, [currentProfile?.id, indexName])
 
   const handleSaveOverride = useCallback(async (override: EmbeddingConfig) => {
     if (!currentProfile?.id) return
     await window.electronAPI.profiles.setEmbeddingOverride(
       currentProfile.id,
-      collectionName,
+      indexName,
       override
     )
     setEmbeddingOverride(override)
-  }, [currentProfile?.id, collectionName])
+  }, [currentProfile?.id, indexName])
 
   const handleClearOverride = useCallback(async () => {
     if (!currentProfile?.id) return
     await window.electronAPI.profiles.clearEmbeddingOverride(
       currentProfile.id,
-      collectionName
+      indexName
     )
     setEmbeddingOverride(null)
-  }, [currentProfile?.id, collectionName])
+  }, [currentProfile?.id, indexName])
 
   const handleSaveTextFieldOverride = useCallback(async (textField: string) => {
     if (!currentProfile?.id) return
     await window.electronAPI.profiles.setTextFieldOverride(
       currentProfile.id,
-      collectionName,
+      indexName,
       textField
     )
     setTextFieldOverride(textField)
-  }, [currentProfile?.id, collectionName])
+  }, [currentProfile?.id, indexName])
 
   const handleClearTextFieldOverride = useCallback(async () => {
     if (!currentProfile?.id) return
     await window.electronAPI.profiles.clearTextFieldOverride(
       currentProfile.id,
-      collectionName
+      indexName
     )
     setTextFieldOverride(null)
-  }, [currentProfile?.id, collectionName])
+  }, [currentProfile?.id, indexName])
 
   // Reset filters and deletion marks when collection changes
   useEffect(() => {
@@ -210,7 +214,7 @@ export default function VectorsView({
     setDraftError(null)
     setSearchResults(null)
     setIsSearching(false)
-  }, [collectionName])
+  }, [indexName])
 
   // Handle search execution
   const handleSearch = useCallback(async () => {
@@ -240,7 +244,7 @@ export default function VectorsView({
     setIsSearching(true)
     try {
       const result = await queryMutation.mutateAsync({
-        indexName: collectionName,
+        indexName: indexName,
         namespace,
         queryText,
         topK: nResults || 10,
@@ -262,7 +266,7 @@ export default function VectorsView({
     } finally {
       setIsSearching(false)
     }
-  }, [filterRows, collectionName, namespace, nResults, queryMutation])
+  }, [filterRows, indexName, namespace, nResults, queryMutation])
 
   // Use React Query for vectors with debouncing via staleTime
   const {
@@ -270,7 +274,7 @@ export default function VectorsView({
     isLoading: loading,
     error,
     isFetching,
-  } = useVectorsQuery(currentProfile?.id || null, collectionName, namespace)
+  } = useVectorsQuery(currentProfile?.id || null, indexName, namespace)
 
   // Map vectors to record format
   const rawVectors: LocalVectorRecord[] = useMemo(() => {
@@ -463,20 +467,33 @@ export default function VectorsView({
         // Single vector - use single create mutation
         const draft = draftVectors[0]
         const metadata = typedMetadataToPineconeFormat(draft.metadata)
+        // Extract text from the embedding text field if present
+        const text = metadata?.[effectiveTextField] as string | undefined
+        const hasText = typeof text === 'string' && text.trim().length > 0
         await createMutation.mutateAsync({
           id: draft.id,
           metadata,
-          generateEmbedding: false,
+          text: hasText ? text : undefined,
+          textField: hasText ? effectiveTextField : undefined,
+          generateEmbedding: hasText,
         })
       } else {
         // Multiple vectors - use batch import mutation
-        const vectorsToCreate = draftVectors.map(draft => ({
-          id: draft.id,
-          metadata: typedMetadataToPineconeFormat(draft.metadata),
-        }))
+        const vectorsToCreate = draftVectors.map(draft => {
+          const metadata = typedMetadataToPineconeFormat(draft.metadata)
+          const text = metadata?.[effectiveTextField] as string | undefined
+          return {
+            id: draft.id,
+            metadata,
+            text: typeof text === 'string' && text.trim().length > 0 ? text : undefined,
+          }
+        })
+        // Generate embeddings if any vector has text
+        const anyHasText = vectorsToCreate.some(v => v.text)
         await createBatchMutation.mutateAsync({
           vectors: vectorsToCreate,
-          generateEmbeddings: false,
+          generateEmbeddings: anyHasText,
+          textField: anyHasText ? effectiveTextField : undefined,
         })
       }
       setDraftVectors([])
@@ -487,7 +504,7 @@ export default function VectorsView({
       const message = error instanceof Error ? error.message : 'Failed to create vector(s)'
       setDraftError(message)
     }
-  }, [draftVectors, createMutation, createBatchMutation, onClearSelection, onIsFirstVectorChange])
+  }, [draftVectors, createMutation, createBatchMutation, onClearSelection, onIsFirstVectorChange, effectiveTextField])
 
   // Toggle deletion mark for all selected vectors
   const handleToggleDeletion = useCallback(() => {
@@ -548,8 +565,8 @@ export default function VectorsView({
       values: vec.embedding || [],
       metadata: vec.metadata || undefined,
     }))
-    copyVectors(vectorsToCopy, collectionName, currentProfile.id)
-  }, [selectedVectorIds, vectors, draftVectors, collectionName, currentProfile?.id, copyVectors])
+    copyVectors(vectorsToCopy, indexName, currentProfile.id)
+  }, [selectedVectorIds, vectors, draftVectors, indexName, currentProfile?.id, copyVectors])
 
   // Resolve ID conflicts for pasting
   const resolveConflictingIds = useCallback((
@@ -923,7 +940,7 @@ export default function VectorsView({
             )}
             <div className="flex-shrink-0">
               <EmbeddingFunctionSelector
-                collectionName={collectionName}
+                indexName={indexName}
                 currentOverride={embeddingOverride}
                 serverConfig={null}
                 onSave={handleSaveOverride}

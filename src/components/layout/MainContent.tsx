@@ -140,7 +140,7 @@ export function MainContent() {
           <NamespaceConfigView />
         ) : showVectors ? (
           <VectorsView
-            collectionName={activeIndex}
+            indexName={activeIndex}
             namespace={activeNamespace}
             selectedVectorIds={selectedVectorIds}
             primarySelectedVectorId={primarySelectedVectorId}
@@ -210,7 +210,7 @@ export function MainContent() {
         {selectedVector && activeIndex && currentProfile ? (
           <VectorDetailPanel
             vector={selectedVector}
-            collectionName={activeIndex}
+            indexName={activeIndex}
             namespace={activeNamespace ?? undefined}
             profileId={currentProfile.id}
             isDraft={isSelectedDraft}
