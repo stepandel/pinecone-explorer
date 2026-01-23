@@ -162,16 +162,16 @@ body {
    * Reference: macOS Sonoma dark mode with strong depth hierarchy
    */
 
-  /* Base: Window background - mid-level surface */
-  --background: oklch(0.24 0 0);
+  /* Base: Window background */
+  --background: oklch(0.28 0 0);
   --foreground: oklch(0.93 0 0);
 
   /* Cards: Elevated surfaces for grouped content */
-  --card: oklch(0.30 0 0);
+  --card: oklch(0.32 0 0);
   --card-foreground: oklch(0.93 0 0);
 
   /* Popovers: Floating elements, most elevated */
-  --popover: oklch(0.34 0 0);
+  --popover: oklch(0.36 0 0);
   --popover-foreground: oklch(0.95 0 0);
 
   /* Primary: macOS vibrant blue accent */
@@ -179,11 +179,11 @@ body {
   --primary-foreground: oklch(1 0 0);
 
   /* Secondary: Subtle surface variation */
-  --secondary: oklch(0.28 0 0);
+  --secondary: oklch(0.32 0 0);
   --secondary-foreground: oklch(0.90 0 0);
 
   /* Muted: De-emphasized elements */
-  --muted: oklch(0.26 0 0);
+  --muted: oklch(0.30 0 0);
   --muted-foreground: oklch(0.55 0 0);
 
   /* Accent: Selection highlight */
@@ -206,10 +206,9 @@ body {
   --chart-5: oklch(0.70 0.18 25);
 
   /*
-   * Sidebar: Elevated navigation surface
-   * Lighter than background to appear "above" the canvas
+   * Sidebar: Navigation surface
    */
-  --sidebar: oklch(0.26 0 0);
+  --sidebar: oklch(0.30 0 0);
   --sidebar-foreground: oklch(0.90 0 0);
   --sidebar-primary: oklch(0.65 0.18 255);
   --sidebar-primary-foreground: oklch(1 0 0);
@@ -227,19 +226,19 @@ body {
    */
   --glass-border: oklch(1 0 0 / 10%);
 
-  /* Detail panel: Inspector - elevated, floating appearance */
-  --panel-detail: oklch(0.27 0 0);
+  /* Detail panel: Inspector */
+  --panel-detail: oklch(0.30 0 0);
   --panel-detail-shadow:
     inset 1px 0 0 oklch(1 0 0 / 8%),
-    -4px 0 16px oklch(0 0 0 / 40%);
+    -4px 0 16px oklch(0 0 0 / 25%);
 
   /* Content area: Main working surface wrapper */
-  --content-background: oklch(0.20 0 0);
-  --shadow-panel: 0 1px 3px oklch(0 0 0 / 20%);
+  --content-background: oklch(0.26 0 0);
+  --shadow-panel: 0 1px 3px oklch(0 0 0 / 15%);
 
-  /* Canvas: Table/document area - deepest, recessed surface */
-  --canvas-background: oklch(0.17 0 0);
-  --canvas-shadow: inset 0 1px 4px oklch(0 0 0 / 30%);
+  /* Canvas: Table/document area */
+  --canvas-background: oklch(0.28 0 0);
+  --canvas-shadow: none;
 
   /* Table rows: Alternating and hover states */
   --table-row-alt: oklch(1 0 0 / 3%);
