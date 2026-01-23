@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 
 interface PanelContextType {
-  // Indexes panel (fixed, resizable, not collapsible)
+  // Indexes panel (collapsible, resizable)
+  indexesPanelOpen: boolean
+  setIndexesPanelOpen: (open: boolean) => void
   indexesPanelWidth: number
   setIndexesPanelWidth: (width: number) => void
 
@@ -38,7 +40,8 @@ interface PanelContextType {
 const PanelContext = createContext<PanelContextType | undefined>(undefined)
 
 export function PanelProvider({ children }: { children: ReactNode }) {
-  const [indexesPanelWidth, setIndexesPanelWidth] = useState(73)
+  const [indexesPanelOpen, setIndexesPanelOpen] = useState(true)
+  const [indexesPanelWidth, setIndexesPanelWidth] = useState(120)
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [leftPanelWidth, setLeftPanelWidth] = useState(220)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
@@ -111,6 +114,8 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   return (
     <PanelContext.Provider
       value={{
+        indexesPanelOpen,
+        setIndexesPanelOpen,
         indexesPanelWidth,
         setIndexesPanelWidth,
         leftPanelOpen,

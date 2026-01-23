@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { ChevronsRight } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftNamespace } from '../../context/DraftNamespaceContext'
 import { useIndexStatsQuery, useDeleteNamespaceMutation } from '../../hooks/usePineconeQueries'
 import { Button } from '../ui/button'
+import { NewButton } from '../ui/new-button'
 import { DeleteNamespaceDialog } from './DeleteNamespaceDialog'
 import { DuplicateNamespaceDialog } from './DuplicateNamespaceDialog'
 import { DuplicateNamespaceProgressDialog } from './DuplicateNamespaceProgressDialog'
@@ -24,7 +25,12 @@ interface CloneProgress {
   message: string
 }
 
-export function NamespacesPanel() {
+interface NamespacesPanelProps {
+  showIndexesToggle?: boolean
+  onToggleIndexesPanel?: () => void
+}
+
+export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: NamespacesPanelProps) {
   const { currentProfile } = usePinecone()
   const { activeIndex, activeNamespace, setActiveNamespace } = useSelection()
   const { startCreation: startNamespaceCreation } = useDraftNamespace()
@@ -211,6 +217,23 @@ export function NamespacesPanel() {
           boxShadow: 'var(--sidebar-shadow)',
         }}
       >
+        {/* Header with expand button */}
+        {showIndexesToggle && onToggleIndexesPanel && (
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={onToggleIndexesPanel}
+                className="p-0.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors"
+                title="Show indexes panel"
+              >
+                <ChevronsRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Namespaces
+              </h2>
+            </div>
+          </div>
+        )}
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-muted-foreground px-4">
             <p className="text-sm">Select an index</p>
@@ -234,14 +257,23 @@ export function NamespacesPanel() {
       {/* Header */}
       <div className="px-3 py-2">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            Namespaces
-          </h2>
-          {indexStats && (
-            <span className="text-[10px] text-muted-foreground">
-              {indexStats.totalVectorCount.toLocaleString()} vectors
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {showIndexesToggle && onToggleIndexesPanel && (
+              <button
+                onClick={onToggleIndexesPanel}
+                className="p-0.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors"
+                title="Show indexes panel"
+              >
+                <ChevronsRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            )}
+            <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Namespaces
+            </h2>
+          </div>
+          <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
+            Index: <span className="text-sidebar-foreground">{activeIndex}</span>
+          </div>
         </div>
         {/* Search input */}
         <div className="relative">
@@ -330,18 +362,13 @@ export function NamespacesPanel() {
         )}
       </div>
 
-      {/* Footer - New namespace button and Index info */}
-      <div className="px-3 py-2 border-t border-border space-y-2">
-        <button
+      {/* Footer */}
+      <div className="px-2 py-2">
+        <NewButton
           onClick={() => startNamespaceCreation(activeIndex)}
-          className="w-full h-6 flex items-center justify-center gap-1 text-[10px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] text-sidebar-foreground transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-          <span>New Namespace</span>
-        </button>
-        <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
-          Index: <span className="text-sidebar-foreground">{activeIndex}</span>
-        </div>
+          label="Namespace"
+          title="Create new namespace"
+        />
       </div>
 
       {/* Delete Namespace Dialog */}

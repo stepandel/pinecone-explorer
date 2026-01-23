@@ -11,6 +11,7 @@ import { LocalVectorRecord, DraftVector, parseFilterValue } from '../../types/ve
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
 import { FilterRow } from '../filters/FilterRow'
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover'
+import { NewButton } from '../ui/new-button'
 
 interface VectorsViewProps {
   indexName: string
@@ -909,8 +910,8 @@ export default function VectorsView({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar area - calm floating control surface */}
-      <div className="flex-shrink-0 bg-white/60 dark:bg-white/[0.03]">
+      {/* Toolbar area - elevated control surface */}
+      <div className="flex-shrink-0 bg-white/60 dark:bg-white/[0.06] border-b border-transparent dark:border-white/[0.06]">
         {/* Row 1: Namespace name and count */}
         <div className="px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 overflow-hidden">
@@ -986,11 +987,12 @@ export default function VectorsView({
 
       </div>
 
-      {/* Table - primary content canvas */}
+      {/* Table - primary content canvas (recessed) */}
       <div
         className="flex-1 overflow-auto"
         style={{
           background: 'var(--canvas-background)',
+          boxShadow: 'var(--canvas-shadow)',
         }}
       >
         <VectorsTable
@@ -1015,15 +1017,14 @@ export default function VectorsView({
       </div>
 
       {/* Bottom Toolbar */}
-      <div className="px-4 py-1.5 flex items-center justify-between">
-        <button
+      <div className="px-4 py-1.5 flex items-center justify-between bg-white/60 dark:bg-white/[0.06] border-t border-transparent dark:border-white/[0.06]">
+        <NewButton
           onClick={handleStartCreate}
           disabled={hasDrafts || markedForDeletion.size > 0}
-          className="h-6 w-6 p-0 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
           title="Add vector"
-        >
-          +
-        </button>
+          label="Vector"
+          className="w-auto px-2"
+        />
         {hasDrafts && (
           <div className="flex items-center gap-3">
             {draftError && (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { ChevronsLeft } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
@@ -13,10 +13,15 @@ import {
   DialogFooter,
 } from '../ui/dialog'
 import { Button } from '../ui/button'
+import { NewButton } from '../ui/new-button'
 import { cn } from '@/lib/utils'
 import { CloneIndexProgressDialog } from '../namespaces/CloneNamespaceProgressDialog'
 
-export function IndexesPanel() {
+interface IndexesPanelProps {
+  onToggleCollapse?: () => void
+}
+
+export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useSelection()
   const { startCreation, startCopyFromIndex, draftIndex, cloneProgress, cloneProgressOpen, setCloneProgressOpen, cancelClone } = useDraftIndex()
@@ -122,14 +127,24 @@ export function IndexesPanel() {
       style={{
         background: 'var(--sidebar)',
         borderRight: '1px solid var(--border)',
+        boxShadow: 'var(--sidebar-shadow)',
       }}
       onContextMenu={handlePanelContextMenu}
     >
       {/* Header */}
-      <div className="px-2 py-2 border-b border-border">
+      <div className="px-2 py-2 flex items-center justify-between">
         <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Indexes
         </h2>
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-0.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors"
+            title="Collapse panel"
+          >
+            <ChevronsLeft className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* Indexes List */}
@@ -185,16 +200,13 @@ export function IndexesPanel() {
       </div>
 
       {/* Footer with Create button */}
-      <div className="px-2 py-2 border-t border-border">
-        <button
+      <div className="px-2 py-2">
+        <NewButton
           onClick={startCreation}
           disabled={draftIndex !== null}
-          className="w-full h-6 flex items-center justify-center gap-1 text-[10px] rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          label="Index"
           title="Create new index"
-        >
-          <Plus className="h-3 w-3" />
-          <span>New</span>
-        </button>
+        />
       </div>
 
       {/* Delete Confirmation Dialog */}
