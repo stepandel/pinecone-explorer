@@ -1021,7 +1021,7 @@ export default function VectorsView({
           onClick={handleStartCreate}
           disabled={hasDrafts || markedForDeletion.size > 0}
           title="Add vector"
-          label="New Vector"
+          label="Vector"
           className="w-auto px-2"
         />
         {hasDrafts && (

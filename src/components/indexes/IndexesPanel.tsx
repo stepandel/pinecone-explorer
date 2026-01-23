@@ -189,6 +189,7 @@ export function IndexesPanel() {
         <NewButton
           onClick={startCreation}
           disabled={draftIndex !== null}
+          label="Index"
           title="Create new index"
         />
       </div>

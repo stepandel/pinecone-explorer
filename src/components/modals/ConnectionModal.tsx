@@ -355,7 +355,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
         <div className="p-2">
           <NewButton
             onClick={() => handleProfileSelect('')}
-            label="New"
+            label="Connection"
             title="Create new connection"
           />
         </div>

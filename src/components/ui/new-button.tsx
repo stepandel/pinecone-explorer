@@ -3,9 +3,9 @@ import { cn } from '@/lib/utils'
 
 interface NewButtonProps {
   onClick: () => void
+  label: string
   disabled?: boolean
   title?: string
-  label?: string
   className?: string
 }
 
@@ -13,7 +13,7 @@ export function NewButton({
   onClick,
   disabled = false,
   title,
-  label = 'New',
+  label,
   className,
 }: NewButtonProps) {
   return (

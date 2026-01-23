@@ -334,7 +334,7 @@ export function NamespacesPanel() {
       <div className="px-3 py-2 border-t border-border space-y-2">
         <NewButton
           onClick={() => startNamespaceCreation(activeIndex)}
-          label="New Namespace"
+          label="Namespace"
           title="Create new namespace"
         />
         <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
