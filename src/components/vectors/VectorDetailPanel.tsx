@@ -60,6 +60,25 @@ export default function VectorDetailPanel({
     onDraftChange,
   })
 
+  // Helper to get embedding display string
+  const getEmbeddingDisplayString = useCallback(() => {
+    const hasDense = vector.embedding && vector.embedding.length > 0
+    const hasSparse = vector.sparseEmbedding && vector.sparseEmbedding.indices.length > 0
+
+    if (hasDense) {
+      return JSON.stringify(vector.embedding)
+    } else if (hasSparse) {
+      return JSON.stringify({ sparse: vector.sparseEmbedding }, null, 2)
+    }
+    return ''
+  }, [vector.embedding, vector.sparseEmbedding])
+
+  // Check if this is a sparse-only vector (no editable dense values)
+  const isSparseOnly = Boolean(
+    (!vector.embedding || vector.embedding.length === 0) &&
+    vector.sparseEmbedding && vector.sparseEmbedding.indices.length > 0
+  )
+
   // Check for embedding changes
   const hasEmbeddingChanges = (() => {
     if (!draftEmbedding && !vector.embedding) return false
@@ -76,10 +95,10 @@ export default function VectorDetailPanel({
 
   // Reset embedding when vector changes
   useEffect(() => {
-    setDraftEmbedding(vector.embedding ? JSON.stringify(vector.embedding) : '')
+    setDraftEmbedding(getEmbeddingDisplayString())
     setEmbeddingError(null)
     setIsEditingEmbedding(false)
-  }, [vector.id, vector.embedding])
+  }, [vector.id, vector.embedding, vector.sparseEmbedding, getEmbeddingDisplayString])
 
   // Auto-resize and focus embedding textarea
   useEffect(() => {
@@ -98,10 +117,10 @@ export default function VectorDetailPanel({
 
   const handleCancel = useCallback(() => {
     resetMetadata()
-    setDraftEmbedding(vector.embedding ? JSON.stringify(vector.embedding) : '')
+    setDraftEmbedding(getEmbeddingDisplayString())
     setEmbeddingError(null)
     setIsEditingEmbedding(false)
-  }, [vector.embedding, resetMetadata])
+  }, [getEmbeddingDisplayString, resetMetadata])
 
   const handleSave = useCallback(async () => {
     try {
@@ -258,22 +277,31 @@ export default function VectorDetailPanel({
         {/* Embedding Section */}
         {!isDraft && (
           <section>
-            <h3 className="text-xs font-semibold text-muted-foreground mb-1">embedding</h3>
+            <h3 className="text-xs font-semibold text-muted-foreground mb-1">
+              embedding
+              {isSparseOnly && <span className="ml-1 text-[10px] opacity-70">(sparse)</span>}
+            </h3>
             {isEditingEmbedding ? (
               <div>
                 <textarea
                   ref={embeddingTextareaRef}
                   value={draftEmbedding}
                   onChange={e => {
-                    setDraftEmbedding(e.target.value)
-                    setEmbeddingError(null)
+                    if (!isSparseOnly) {
+                      setDraftEmbedding(e.target.value)
+                      setEmbeddingError(null)
+                    }
                   }}
                   onBlur={() => setIsEditingEmbedding(false)}
                   placeholder="No embedding"
+                  readOnly={isSparseOnly}
                   className={`w-full text-xs font-mono overflow-hidden focus:outline-none resize-none p-2 bg-black/[0.03] dark:bg-white/[0.04] rounded-md ${
                     hasEmbeddingChanges ? 'ring-1 ring-blue-500/20' : ''
-                  } focus-within:ring-1 focus-within:ring-blue-500/30`}
+                  } focus-within:ring-1 focus-within:ring-blue-500/30 ${isSparseOnly ? 'cursor-default' : ''}`}
                 />
+                {isSparseOnly && (
+                  <p className="text-xs text-muted-foreground mt-1">Sparse embeddings are read-only</p>
+                )}
                 {embeddingError && <p className="text-xs text-destructive mt-1">{embeddingError}</p>}
               </div>
             ) : (
@@ -283,7 +311,7 @@ export default function VectorDetailPanel({
                   hasEmbeddingChanges ? 'ring-1 ring-blue-500/20' : ''
                 }`}
               >
-                <EmbeddingCell embedding={vector.embedding} />
+                <EmbeddingCell embedding={vector.embedding} sparseEmbedding={vector.sparseEmbedding} />
               </div>
             )}
           </section>

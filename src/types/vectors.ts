@@ -8,6 +8,8 @@ export interface LocalVectorRecord {
   id: string
   metadata: Record<string, unknown> | null
   embedding: number[] | null
+  /** Sparse embedding values (for sparse or hybrid indexes) */
+  sparseEmbedding?: { indices: number[]; values: number[] } | null
   /** Distance/score from semantic search results */
   distance?: number | null
 }

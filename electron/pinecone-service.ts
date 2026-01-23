@@ -400,12 +400,29 @@ class PineconeService {
     const ns = this.getNamespace(params.indexName, params.namespace)
 
     for (let i = 0; i < params.vectors.length; i += PineconeService.BATCH_SIZE) {
-      const batch = params.vectors.slice(i, i + PineconeService.BATCH_SIZE).map(v => ({
-        id: v.id,
-        values: v.values || [],
-        metadata: v.metadata as RecordMetadata | undefined,
-        sparseValues: v.sparseValues,
-      }))
+      const batch = params.vectors.slice(i, i + PineconeService.BATCH_SIZE).map(v => {
+        const record: {
+          id: string
+          values?: number[]
+          metadata?: RecordMetadata
+          sparseValues?: SparseVector
+        } = {
+          id: v.id,
+          metadata: v.metadata as RecordMetadata | undefined,
+        }
+        // Only include values if they exist (for dense or hybrid indexes)
+        if (v.values && v.values.length > 0) {
+          record.values = v.values
+        }
+        // Only include sparseValues if they exist (for sparse or hybrid indexes)
+        if (v.sparseValues) {
+          record.sparseValues = v.sparseValues
+        }
+
+
+        console.log('record', record)
+        return record
+      })
       await ns.upsert(batch)
     }
   }
@@ -473,12 +490,22 @@ class PineconeService {
 
     // Use upsert for value changes, update for metadata-only changes
     if (embedding.values || embedding.sparseValues) {
-      await ns.upsert([{
+      const record: {
+        id: string
+        values?: number[]
+        sparseValues?: SparseVector
+        metadata?: RecordMetadata
+      } = {
         id: params.id,
-        values: embedding.values || [],
-        sparseValues: embedding.sparseValues,
         metadata: Object.keys(metadata).length > 0 ? metadata as RecordMetadata : undefined,
-      }])
+      }
+      if (embedding.values && embedding.values.length > 0) {
+        record.values = embedding.values
+      }
+      if (embedding.sparseValues) {
+        record.sparseValues = embedding.sparseValues
+      }
+      await ns.upsert([record])
     } else if (Object.keys(metadata).length > 0) {
       await ns.update({
         id: params.id,

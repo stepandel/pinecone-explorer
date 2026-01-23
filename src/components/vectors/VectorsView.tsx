@@ -258,6 +258,7 @@ export default function VectorsView({
         id: match.id,
         metadata: match.metadata || null,
         embedding: match.values || null,
+        sparseEmbedding: match.sparseValues || null,
       }))
       setSearchResults(results)
     } catch (error) {
@@ -283,6 +284,7 @@ export default function VectorsView({
       id: vec.id,
       metadata: vec.metadata || null,
       embedding: vec.values || null,
+      sparseEmbedding: vec.sparseValues || null,
     }))
   }, [queryData?.vectors])
   const fetchTimeMs = queryData?.fetchTimeMs ?? null
