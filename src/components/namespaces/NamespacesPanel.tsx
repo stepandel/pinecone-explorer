@@ -234,6 +234,9 @@ export function NamespacesPanel() {
       {/* Header */}
       <div className="px-3 py-2">
         <div className="flex items-center justify-between mb-2">
+          <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            Namespaces
+          </h2>
           <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
             Index: <span className="text-sidebar-foreground">{activeIndex}</span>
           </div>
@@ -326,7 +329,7 @@ export function NamespacesPanel() {
       </div>
 
       {/* Footer */}
-      <div className="px-2 py-2 border-t border-border">
+      <div className="px-2 py-2">
         <NewButton
           onClick={() => startNamespaceCreation(activeIndex)}
           label="Namespace"

@@ -126,7 +126,7 @@ export function IndexesPanel() {
       onContextMenu={handlePanelContextMenu}
     >
       {/* Header */}
-      <div className="px-2 py-2 border-b border-border">
+      <div className="px-2 py-2">
         <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Indexes
         </h2>
@@ -185,7 +185,7 @@ export function IndexesPanel() {
       </div>
 
       {/* Footer with Create button */}
-      <div className="px-2 py-2 border-t border-border">
+      <div className="px-2 py-2">
         <NewButton
           onClick={startCreation}
           disabled={draftIndex !== null}

@@ -357,6 +357,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
             onClick={() => handleProfileSelect('')}
             label="Connection"
             title="Create new connection"
+            className="bg-black/[0.06] dark:bg-white/[0.08] hover:bg-black/[0.10] dark:hover:bg-white/[0.12] text-foreground"
           />
         </div>
       </div>
