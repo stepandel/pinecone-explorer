@@ -20,7 +20,6 @@ export function NamespaceConfigView() {
     cancelCreation,
     saveDraft,
     setJsonMode,
-    applyJsonChanges,
     isSaving,
     validationErrors,
   } = useDraftNamespace()
@@ -121,25 +120,36 @@ export function NamespaceConfigView() {
 
         {/* Divider */}
         <div className="border-t border-border pt-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-[11px] font-medium text-muted-foreground">
               Initial Vectors
             </h3>
-            <div className="flex items-center gap-2">
+            {/* Segmented Control for Form/JSON toggle */}
+            <div className="flex rounded-md border border-input overflow-hidden" style={inputStyle}>
               <button
                 type="button"
-                onClick={() => setJsonMode(!draftNamespace.jsonMode)}
-                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setJsonMode(false)}
+                className={`px-3 h-6 text-[10px] font-medium transition-colors ${
+                  !draftNamespace.jsonMode
+                    ? 'bg-foreground text-background'
+                    : 'bg-background text-muted-foreground hover:text-foreground'
+                }`}
               >
-                {draftNamespace.jsonMode ? 'Use Form' : 'View as JSON'}
+                Form
+              </button>
+              <button
+                type="button"
+                onClick={() => setJsonMode(true)}
+                className={`px-3 h-6 text-[10px] font-medium transition-colors border-l border-input ${
+                  draftNamespace.jsonMode
+                    ? 'bg-foreground text-background'
+                    : 'bg-background text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                JSON
               </button>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground mb-3">
-            {draftNamespace.jsonMode
-              ? 'Edit JSON directly. Changes will be applied when switching back to form view.'
-              : 'Define the first vector(s) to create the namespace'}
-          </p>
 
           {/* Embedding Text Field Info */}
           {embeddingTextField ? (
@@ -194,20 +204,13 @@ Or an array of vectors:
               style={inputStyle}
             />
             {validationErrors.json && (
-              <p className="text-[10px] text-destructive">{validationErrors.json}</p>
+              <div className="p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-[11px] text-destructive">{validationErrors.json}</p>
+                {validationErrors.jsonPosition && (
+                  <p className="text-[10px] text-destructive/70 mt-0.5">{validationErrors.jsonPosition}</p>
+                )}
+              </div>
             )}
-            {validationErrors.jsonPosition && (
-              <p className="text-[10px] text-muted-foreground">{validationErrors.jsonPosition}</p>
-            )}
-            <button
-              type="button"
-              onClick={applyJsonChanges}
-              disabled={!draftNamespace.jsonValue.trim()}
-              className="h-6 px-3 text-[11px] rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              style={inputStyle}
-            >
-              Validate JSON
-            </button>
           </div>
         ) : (
           /* Form Mode - Vector List */
