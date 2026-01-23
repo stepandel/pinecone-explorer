@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
+import { usePanel } from '../../context/PanelContext'
 import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
@@ -56,6 +57,7 @@ export default function VectorsView({
   onIsFirstVectorChange,
 }: VectorsViewProps) {
   const { currentProfile } = usePinecone()
+  const { setEmbeddingTextField } = usePanel()
   const [filterRows, setFilterRows] = useState<FilterRowType[]>([createDefaultFilterRow()])
   const [nResults, setNResults] = useState(10)
 
@@ -137,6 +139,11 @@ export default function VectorsView({
 
   // Compute effective text field: index embed > client override > default '_text'
   const effectiveTextField = currentIndex?.embed?.fieldMap?.text || textFieldOverride || '_text'
+
+  // Sync effective text field to context for VectorDetailPanel
+  useEffect(() => {
+    setEmbeddingTextField(effectiveTextField)
+  }, [effectiveTextField, setEmbeddingTextField])
 
   // Fetch embedding and text field overrides when collection changes
   useEffect(() => {
@@ -666,13 +673,15 @@ export default function VectorsView({
   // Inline vector update handler
   const handleInlineVectorUpdate = useCallback(async (
     vectorId: string,
-    updates: { metadata?: Record<string, unknown> }
+    updates: { metadata?: Record<string, unknown>; regenerateEmbedding?: boolean }
   ) => {
     await updateMutation.mutateAsync({
       id: vectorId,
       metadata: updates.metadata as Record<string, string | number | boolean> | undefined,
+      regenerateEmbedding: updates.regenerateEmbedding,
+      textField: effectiveTextField,
     })
-  }, [updateMutation])
+  }, [updateMutation, effectiveTextField])
 
   // Context menu action listener
   useEffect(() => {

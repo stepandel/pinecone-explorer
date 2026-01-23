@@ -16,6 +16,7 @@ interface VectorDetailPanelProps {
   isDraft?: boolean
   isFirstVector?: boolean
   onDraftChange?: (updates: { id?: string; metadata?: Record<string, unknown> }) => void
+  embeddingTextField?: string // The metadata field used for embedding text
 }
 
 export default function VectorDetailPanel({
@@ -26,12 +27,17 @@ export default function VectorDetailPanel({
   isDraft = false,
   isFirstVector = false,
   onDraftChange,
+  embeddingTextField,
 }: VectorDetailPanelProps) {
   // Embedding editing state
   const [draftEmbedding, setDraftEmbedding] = useState<string>('')
   const [embeddingError, setEmbeddingError] = useState<string | null>(null)
   const [isEditingEmbedding, setIsEditingEmbedding] = useState(false)
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false)
+  const [pendingSaveData, setPendingSaveData] = useState<{
+    metadata: Record<string, unknown>
+    values?: number[]
+  } | null>(null)
   const embeddingTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Update mutation
@@ -117,7 +123,26 @@ export default function VectorDetailPanel({
       }
 
       if (hasMetadataChanges || hasEmbeddingChanges) {
-        await updateMutation.mutateAsync(updates)
+        // Check if the embedding text field was modified
+        const textFieldChanged = embeddingTextField &&
+          draftMetadata &&
+          draftMetadata[embeddingTextField] !== vector.metadata?.[embeddingTextField]
+
+        if (textFieldChanged && !hasEmbeddingChanges) {
+          // Text field changed but embedding wasn't manually edited - ask user
+          setPendingSaveData({
+            metadata: draftMetadata,
+            values: updates.values,
+          })
+          setShowRegenerateDialog(true)
+          return
+        }
+
+        // Save directly (no text field change, or embedding was manually edited)
+        await updateMutation.mutateAsync({
+          ...updates,
+          textField: embeddingTextField,
+        })
       }
       setEmbeddingError(null)
     } catch (e) {
@@ -128,7 +153,29 @@ export default function VectorDetailPanel({
         setEmbeddingError(message)
       }
     }
-  }, [vector.id, hasMetadataChanges, hasEmbeddingChanges, draftMetadata, draftEmbedding, updateMutation])
+  }, [vector.id, vector.metadata, hasMetadataChanges, hasEmbeddingChanges, draftMetadata, draftEmbedding, updateMutation, embeddingTextField])
+
+  // Handle regenerate dialog confirmation
+  const handleRegenerateConfirm = useCallback(async (regenerate: boolean) => {
+    if (!pendingSaveData) return
+
+    try {
+      await updateMutation.mutateAsync({
+        id: vector.id,
+        metadata: pendingSaveData.metadata,
+        values: pendingSaveData.values,
+        regenerateEmbedding: regenerate,
+        textField: embeddingTextField,
+      })
+      setEmbeddingError(null)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to save changes'
+      setEmbeddingError(message)
+    } finally {
+      setPendingSaveData(null)
+      setShowRegenerateDialog(false)
+    }
+  }, [pendingSaveData, vector.id, updateMutation, embeddingTextField])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -251,8 +298,13 @@ export default function VectorDetailPanel({
 
         <RegenerateEmbeddingDialog
           open={showRegenerateDialog}
-          onOpenChange={setShowRegenerateDialog}
-          onConfirm={() => setShowRegenerateDialog(false)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingSaveData(null)
+              setShowRegenerateDialog(false)
+            }
+          }}
+          onConfirm={handleRegenerateConfirm}
           isLoading={updateMutation.isPending}
         />
       </div>

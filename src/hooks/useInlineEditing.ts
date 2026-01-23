@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { LocalVectorRecord, EditingState } from '../types/vectors'
 
+/** Pending save state when embedding text field was modified */
+export interface PendingEmbeddingSave {
+  vectorId: string
+  metadata: Record<string, unknown>
+}
+
 interface UseInlineEditingProps {
   /** All vectors in the table */
   vectors: LocalVectorRecord[]
   /** Callback to persist changes */
-  onSave?: (vectorId: string, updates: { metadata?: Record<string, unknown> }) => Promise<void>
+  onSave?: (vectorId: string, updates: { metadata?: Record<string, unknown>; regenerateEmbedding?: boolean }) => Promise<void>
+  /** The metadata field used for embedding text (to detect when regeneration might be needed) */
+  embeddingTextField?: string
 }
 
 interface UseInlineEditingReturn {
@@ -25,6 +33,12 @@ interface UseInlineEditingReturn {
   handleEditKeyDown: (e: React.KeyboardEvent) => void
   /** Check if a specific vector is being edited */
   isEditing: (vectorId: string) => boolean
+  /** Pending save that requires user confirmation for embedding regeneration */
+  pendingEmbeddingSave: PendingEmbeddingSave | null
+  /** Confirm the pending save with regeneration choice */
+  confirmPendingSave: (regenerate: boolean) => Promise<void>
+  /** Cancel the pending save */
+  cancelPendingSave: () => void
 }
 
 /**
@@ -34,8 +48,10 @@ interface UseInlineEditingReturn {
 export function useInlineEditing({
   vectors,
   onSave,
+  embeddingTextField,
 }: UseInlineEditingProps): UseInlineEditingReturn {
   const [editingState, setEditingState] = useState<EditingState | null>(null)
+  const [pendingEmbeddingSave, setPendingEmbeddingSave] = useState<PendingEmbeddingSave | null>(null)
   const editingInputRef = useRef<HTMLInputElement>(null)
 
   // Start editing a vector
@@ -63,6 +79,21 @@ export function useInlineEditing({
     const hasMetaChanges = JSON.stringify(editingState.metadata) !== JSON.stringify(originalVec.metadata || {})
 
     if (hasMetaChanges) {
+      // Check if the embedding text field was modified
+      const textFieldChanged = embeddingTextField &&
+        editingState.metadata[embeddingTextField] !== originalVec.metadata?.[embeddingTextField]
+
+      if (textFieldChanged) {
+        // Set pending state - user needs to confirm whether to regenerate embedding
+        setPendingEmbeddingSave({
+          vectorId: editingState.vectorId,
+          metadata: editingState.metadata,
+        })
+        setEditingState(null)
+        return
+      }
+
+      // No text field change - save directly
       try {
         await onSave(editingState.vectorId, { metadata: editingState.metadata })
       } catch (error) {
@@ -70,7 +101,27 @@ export function useInlineEditing({
       }
     }
     setEditingState(null)
-  }, [editingState, vectors, onSave])
+  }, [editingState, vectors, onSave, embeddingTextField])
+
+  // Confirm the pending save with regeneration choice
+  const confirmPendingSave = useCallback(async (regenerate: boolean) => {
+    if (!pendingEmbeddingSave || !onSave) return
+
+    try {
+      await onSave(pendingEmbeddingSave.vectorId, {
+        metadata: pendingEmbeddingSave.metadata,
+        regenerateEmbedding: regenerate,
+      })
+    } catch (error) {
+      console.error('Failed to update vector:', error)
+    }
+    setPendingEmbeddingSave(null)
+  }, [pendingEmbeddingSave, onSave])
+
+  // Cancel the pending save
+  const cancelPendingSave = useCallback(() => {
+    setPendingEmbeddingSave(null)
+  }, [])
 
   // Handle editing field change with type preservation
   const handleEditChange = useCallback((field: string, value: string) => {
@@ -129,5 +180,8 @@ export function useInlineEditing({
     handleEditChange,
     handleEditKeyDown,
     isEditing,
+    pendingEmbeddingSave,
+    confirmPendingSave,
+    cancelPendingSave,
   }
 }

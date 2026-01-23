@@ -459,12 +459,16 @@ class PineconeService {
 
     let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
 
-    if (params.regenerateEmbedding && params.text) {
-      const config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
-      if (!config) {
-        throw new Error('No embedding configuration found. Please configure an embedding provider.')
+    if (params.regenerateEmbedding) {
+      // Get text to embed: explicit params.text, or from metadata field
+      const textToEmbed = params.text || (metadata[textField] as string | undefined)
+      if (textToEmbed && typeof textToEmbed === 'string') {
+        const config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+        if (!config) {
+          throw new Error('No embedding configuration found. Please configure an embedding provider.')
+        }
+        embedding = await this.generateSingleEmbedding(textToEmbed, config)
       }
-      embedding = await this.generateSingleEmbedding(params.text, config)
     }
 
     // Use upsert for value changes, update for metadata-only changes

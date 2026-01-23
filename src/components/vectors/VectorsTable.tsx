@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,6 +9,7 @@ import {
 import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { useTableSelection } from '../../hooks/useTableSelection'
 import { useInlineEditing } from '../../hooks/useInlineEditing'
+import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
 
 interface VectorsTableProps {
   vectors: LocalVectorRecord[]
@@ -24,7 +25,7 @@ interface VectorsTableProps {
   draftVectors?: DraftVector[]
   onDraftChange?: (draft: DraftVector, index: number) => void
   markedForDeletion?: Set<string>
-  onVectorUpdate?: (vectorId: string, updates: { metadata?: Record<string, unknown> }) => Promise<void>
+  onVectorUpdate?: (vectorId: string, updates: { metadata?: Record<string, unknown>; regenerateEmbedding?: boolean }) => Promise<void>
   onVectorContextMenu?: (e: React.MouseEvent, vectorId: string) => void
   onTableContextMenu?: (e: React.MouseEvent) => void
   // Embedding text field (for highlighting the column used for embeddings)
@@ -92,10 +93,27 @@ export default function VectorsTable({
     handleEditChange,
     handleEditKeyDown,
     isEditing,
+    pendingEmbeddingSave,
+    confirmPendingSave,
+    cancelPendingSave,
   } = useInlineEditing({
     vectors,
     onSave: onVectorUpdate,
+    embeddingTextField,
   })
+
+  // Loading state for regenerate dialog
+  const [isRegenerating, setIsRegenerating] = useState(false)
+
+  // Handle regenerate dialog confirmation
+  const handleRegenerateConfirm = async (regenerate: boolean) => {
+    setIsRegenerating(true)
+    try {
+      await confirmPendingSave(regenerate)
+    } finally {
+      setIsRegenerating(false)
+    }
+  }
 
   // Handle double-click to start editing
   const handleRowDoubleClick = (e: React.MouseEvent, vecId: string) => {
@@ -245,6 +263,16 @@ export default function VectorsTable({
 
   return (
     <div className="overflow-auto h-full" onContextMenu={onTableContextMenu}>
+      {/* Regenerate embedding dialog */}
+      <RegenerateEmbeddingDialog
+        open={pendingEmbeddingSave !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelPendingSave()
+        }}
+        onConfirm={handleRegenerateConfirm}
+        isLoading={isRegenerating}
+      />
+
       <table style={{ minWidth: '100%', width: table.getCenterTotalSize() }}>
         <thead className="sticky top-0 z-10" style={{ background: 'var(--canvas-background)', boxShadow: '0 1px 0 var(--border)' }}>
           {table.getHeaderGroups().map(hg => (
