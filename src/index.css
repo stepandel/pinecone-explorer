@@ -60,6 +60,10 @@ body {
   --color-inspector-section: var(--inspector-section-bg);
   --color-inspector-section-border: var(--inspector-section-border);
 
+  /* Table rows */
+  --color-table-row-alt: var(--table-row-alt);
+  --color-table-row-hover: var(--table-row-hover);
+
   /* Animations */
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
@@ -139,56 +143,59 @@ body {
   /* Inspector inset sections */
   --inspector-section-bg: oklch(0 0 0 / 4%);
   --inspector-section-border: oklch(0 0 0 / 6%);
+
+  /* Table rows */
+  --table-row-alt: oklch(0 0 0 / 2.5%);
+  --table-row-hover: oklch(0 0 0 / 5%);
 }
 
 .dark {
   /*
-   * macOS Dark Mode Design System
+   * macOS Dark Mode Design System (Apple-style depth)
    *
    * Principles:
-   * - No pure black: use warm dark grays (0.28-0.38 lightness range)
-   * - Elevation through brightness: higher = lighter
-   * - Soft borders: subtle white overlays, not harsh lines
-   * - Calm contrast: primary text ~0.92, secondary ~0.58
-   * - Materials: translucent layers that suggest depth
+   * - Clear depth hierarchy: canvas (deepest) < background < sidebar < cards < popovers
+   * - Subtle shadows create separation between layers
+   * - Warm dark grays with enough contrast to distinguish surfaces
+   * - Soft white overlay borders for edge definition
    *
-   * Reference: macOS Sonoma dark mode ~#3a3a3c (#484848 for elevated)
+   * Reference: macOS Sonoma dark mode with strong depth hierarchy
    */
 
-  /* Base: Warm dark gray foundation */
-  --background: oklch(0.30 0 0);
-  --foreground: oklch(0.92 0 0);
+  /* Base: Window background - mid-level surface */
+  --background: oklch(0.24 0 0);
+  --foreground: oklch(0.93 0 0);
 
-  /* Cards: Slightly elevated surfaces */
-  --card: oklch(0.34 0 0);
-  --card-foreground: oklch(0.92 0 0);
+  /* Cards: Elevated surfaces for grouped content */
+  --card: oklch(0.30 0 0);
+  --card-foreground: oklch(0.93 0 0);
 
   /* Popovers: Floating elements, most elevated */
-  --popover: oklch(0.38 0 0);
-  --popover-foreground: oklch(0.94 0 0);
+  --popover: oklch(0.34 0 0);
+  --popover-foreground: oklch(0.95 0 0);
 
   /* Primary: macOS vibrant blue accent */
   --primary: oklch(0.65 0.20 255);
   --primary-foreground: oklch(1 0 0);
 
   /* Secondary: Subtle surface variation */
-  --secondary: oklch(0.32 0 0);
+  --secondary: oklch(0.28 0 0);
   --secondary-foreground: oklch(0.90 0 0);
 
   /* Muted: De-emphasized elements */
-  --muted: oklch(0.30 0 0);
-  --muted-foreground: oklch(0.58 0 0);
+  --muted: oklch(0.26 0 0);
+  --muted-foreground: oklch(0.55 0 0);
 
-  /* Accent: Selection highlight - visible but not overwhelming */
+  /* Accent: Selection highlight */
   --accent: oklch(0.55 0.18 255 / 35%);
   --accent-foreground: oklch(0.98 0 0);
 
   /* Destructive: Softer red for dark mode */
   --destructive: oklch(0.65 0.20 25);
 
-  /* Borders: Subtle white overlay, not stark lines */
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
+  /* Borders: Subtle white overlay for edge definition */
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 10%);
   --ring: oklch(0.65 0.20 255 / 50%);
 
   /* Charts: Adjusted for dark background visibility */
@@ -199,42 +206,48 @@ body {
   --chart-5: oklch(0.70 0.18 25);
 
   /*
-   * Sidebar: Navigation material
-   * Same tone as detail panel for balanced chrome
+   * Sidebar: Elevated navigation surface
+   * Lighter than background to appear "above" the canvas
    */
-  --sidebar: oklch(0.30 0 0 / 95%);
-  --sidebar-foreground: oklch(0.88 0 0);
+  --sidebar: oklch(0.26 0 0);
+  --sidebar-foreground: oklch(0.90 0 0);
   --sidebar-primary: oklch(0.65 0.18 255);
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.55 0.16 255 / 30%);
   --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.65 0.18 255 / 40%);
   --sidebar-shadow:
-    inset -1px 0 0 oklch(1 0 0 / 5%);
+    inset -1px 0 0 oklch(1 0 0 / 6%),
+    2px 0 8px oklch(0 0 0 / 30%);
 
   /*
    * Glass/Panel system
-   * Layered materials with subtle separation
+   * Layered materials with clear separation
    */
-  --glass-border: oklch(1 0 0 / 8%);
+  --glass-border: oklch(1 0 0 / 10%);
 
-  /* Detail panel: Inspector/properties - same as sidebar */
-  --panel-detail: oklch(0.30 0 0 / 95%);
+  /* Detail panel: Inspector - elevated, floating appearance */
+  --panel-detail: oklch(0.27 0 0);
   --panel-detail-shadow:
-    inset 1px 0 0 oklch(1 0 0 / 6%);
+    inset 1px 0 0 oklch(1 0 0 / 8%),
+    -4px 0 16px oklch(0 0 0 / 40%);
 
-  /* Content area: Main working surface */
-  --content-background: oklch(0.28 0 0 / 95%);
-  --shadow-panel: none;
+  /* Content area: Main working surface wrapper */
+  --content-background: oklch(0.20 0 0);
+  --shadow-panel: 0 1px 3px oklch(0 0 0 / 20%);
 
-  /* Canvas: Table/document area - slightly recessed */
-  --canvas-background: oklch(0.26 0 0);
-  --canvas-shadow: none;
+  /* Canvas: Table/document area - deepest, recessed surface */
+  --canvas-background: oklch(0.17 0 0);
+  --canvas-shadow: inset 0 1px 4px oklch(0 0 0 / 30%);
+
+  /* Table rows: Alternating and hover states */
+  --table-row-alt: oklch(1 0 0 / 3%);
+  --table-row-hover: oklch(1 0 0 / 8%);
 
   /* Inspector sections: Grouped content areas */
-  --inspector-section-bg: oklch(0 0 0 / 10%);
-  --inspector-section-border: oklch(1 0 0 / 6%);
+  --inspector-section-bg: oklch(0 0 0 / 15%);
+  --inspector-section-border: oklch(1 0 0 / 8%);
 }
 
 @layer base {

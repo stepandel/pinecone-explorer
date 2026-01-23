@@ -910,8 +910,8 @@ export default function VectorsView({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar area - calm floating control surface */}
-      <div className="flex-shrink-0 bg-white/60 dark:bg-white/[0.03]">
+      {/* Toolbar area - elevated control surface */}
+      <div className="flex-shrink-0 bg-white/60 dark:bg-white/[0.06] border-b border-transparent dark:border-white/[0.06]">
         {/* Row 1: Namespace name and count */}
         <div className="px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 overflow-hidden">
@@ -987,11 +987,12 @@ export default function VectorsView({
 
       </div>
 
-      {/* Table - primary content canvas */}
+      {/* Table - primary content canvas (recessed) */}
       <div
         className="flex-1 overflow-auto"
         style={{
           background: 'var(--canvas-background)',
+          boxShadow: 'var(--canvas-shadow)',
         }}
       >
         <VectorsTable
@@ -1016,7 +1017,7 @@ export default function VectorsView({
       </div>
 
       {/* Bottom Toolbar */}
-      <div className="px-4 py-1.5 flex items-center justify-between">
+      <div className="px-4 py-1.5 flex items-center justify-between bg-white/60 dark:bg-white/[0.06] border-t border-transparent dark:border-white/[0.06]">
         <NewButton
           onClick={handleStartCreate}
           disabled={hasDrafts || markedForDeletion.size > 0}

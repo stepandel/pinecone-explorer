@@ -388,7 +388,7 @@ function DraftRow({
 }: DraftRowProps) {
   return (
     <tr
-      className={`cursor-pointer ${isSelected ? 'bg-primary/15 dark:bg-primary/25' : 'bg-primary/5 dark:bg-primary/10'}`}
+      className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/20 dark:bg-primary/30' : 'bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 dark:hover:bg-primary/20'}`}
       onClick={e => onRowClick(e, draft.id, index)}
       onDoubleClick={e => onRowDoubleClick(e, draft.id)}
       onMouseDown={e => onMouseDown(e, index)}
@@ -474,16 +474,20 @@ function DataRow({
   onEditKeyDown,
   onEditBlur,
 }: DataRowProps) {
-  // Determine row background
+  // Determine row background - using CSS variables for proper dark mode support
   let rowBgClass: string
+  let rowHoverClass = 'hover:bg-[var(--table-row-hover)]'
   if (isEditing) {
-    rowBgClass = 'bg-primary/8'
+    rowBgClass = 'bg-primary/10'
+    rowHoverClass = ''
   } else if (isMarkedForDeletion) {
-    rowBgClass = isSelected ? 'bg-destructive/20' : 'bg-destructive/12'
+    rowBgClass = isSelected ? 'bg-destructive/25' : 'bg-destructive/15'
+    rowHoverClass = 'hover:bg-destructive/30'
   } else if (isSelected) {
-    rowBgClass = 'bg-primary/15 dark:bg-primary/25'
+    rowBgClass = 'bg-primary/20 dark:bg-primary/30'
+    rowHoverClass = ''
   } else {
-    rowBgClass = adjustedIndex % 2 === 1 ? 'bg-black/[0.04] dark:bg-white/[0.04]' : ''
+    rowBgClass = adjustedIndex % 2 === 1 ? 'bg-[var(--table-row-alt)]' : ''
   }
 
   const vec = row.original
@@ -492,7 +496,7 @@ function DataRow({
   if (isEditing && editingState) {
     return (
       <tr
-        className={`transition-colors cursor-pointer ${rowBgClass}`}
+        className={`transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
         onContextMenu={e => onContextMenu?.(e, vec.id)}
       >
         {hasDistances && (
@@ -530,7 +534,7 @@ function DataRow({
   // Normal row
   return (
     <tr
-      className={`transition-colors cursor-pointer ${rowBgClass}`}
+      className={`transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
       onClick={e => onRowClick(e, vec.id, rowIndex)}
       onDoubleClick={e => onRowDoubleClick(e, vec.id)}
       onMouseDown={e => onMouseDown(e, rowIndex)}

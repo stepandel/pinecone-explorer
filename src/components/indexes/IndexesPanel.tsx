@@ -122,6 +122,7 @@ export function IndexesPanel() {
       style={{
         background: 'var(--sidebar)',
         borderRight: '1px solid var(--border)',
+        boxShadow: 'var(--sidebar-shadow)',
       }}
       onContextMenu={handlePanelContextMenu}
     >
