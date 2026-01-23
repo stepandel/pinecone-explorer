@@ -112,8 +112,8 @@ body {
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
 
-  /* macOS Sidebar (neutral translucent material) */
-  --sidebar: oklch(0.94 0 0 / 65%);
+  /* Sidebar */
+  --sidebar: oklch(0.94 0 0);
   --sidebar-foreground: oklch(0.15 0 0);
   --sidebar-primary: oklch(0.40 0.18 255);
   --sidebar-primary-foreground: oklch(1 0 0);
@@ -216,9 +216,7 @@ body {
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.65 0.18 255 / 40%);
-  --sidebar-shadow:
-    inset -1px 0 0 oklch(1 0 0 / 6%),
-    2px 0 8px oklch(0 0 0 / 30%);
+  --sidebar-shadow: 1px 0 3px oklch(0 0 0 / 12%);
 
   /*
    * Glass/Panel system
@@ -228,13 +226,11 @@ body {
 
   /* Detail panel: Inspector */
   --panel-detail: oklch(0.30 0 0);
-  --panel-detail-shadow:
-    inset 1px 0 0 oklch(1 0 0 / 8%),
-    -4px 0 16px oklch(0 0 0 / 25%);
+  --panel-detail-shadow: -1px 0 3px oklch(0 0 0 / 12%);
 
   /* Content area: Main working surface wrapper */
   --content-background: oklch(0.26 0 0);
-  --shadow-panel: 0 1px 3px oklch(0 0 0 / 15%);
+  --shadow-panel: 0 1px 2px oklch(0 0 0 / 8%);
 
   /* Canvas: Table/document area */
   --canvas-background: oklch(0.28 0 0);
