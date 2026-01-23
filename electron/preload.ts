@@ -395,6 +395,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:delete-index', handler)
       return () => ipcRenderer.removeListener('menu:delete-index', handler)
     },
+    // Namespace menu events
+    onNewNamespace: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:new-namespace', handler)
+      return () => ipcRenderer.removeListener('menu:new-namespace', handler)
+    },
+    onDuplicateNamespace: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:duplicate-namespace', handler)
+      return () => ipcRenderer.removeListener('menu:duplicate-namespace', handler)
+    },
+    onDeleteNamespace: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:delete-namespace', handler)
+      return () => ipcRenderer.removeListener('menu:delete-namespace', handler)
+    },
     // Vector menu events
     onNewVector: (callback: () => void): (() => void) => {
       const handler = () => callback()

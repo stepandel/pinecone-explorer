@@ -67,6 +67,31 @@ export function NamespacesPanel() {
     return unsubscribe
   }, [])
 
+  // Native menu event handlers
+  useEffect(() => {
+    const handleMenuDuplicateNamespace = () => {
+      if (activeNamespace !== null) {
+        setSelectedNamespace(activeNamespace)
+        setDuplicateDialogOpen(true)
+      }
+    }
+
+    const handleMenuDeleteNamespace = () => {
+      if (activeNamespace !== null) {
+        setSelectedNamespace(activeNamespace)
+        setDeleteDialogOpen(true)
+      }
+    }
+
+    window.addEventListener('menu:duplicate-namespace', handleMenuDuplicateNamespace)
+    window.addEventListener('menu:delete-namespace', handleMenuDeleteNamespace)
+
+    return () => {
+      window.removeEventListener('menu:duplicate-namespace', handleMenuDuplicateNamespace)
+      window.removeEventListener('menu:delete-namespace', handleMenuDeleteNamespace)
+    }
+  }, [activeNamespace])
+
   // Clone progress listener
   useEffect(() => {
     const unsubscribe = window.electronAPI.pinecone.onCloneNamespaceProgress((progress) => {

@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react'
 import { usePanel } from '../context/PanelContext'
 import { useSelection } from '../context/SelectionContext'
 import { useDraftIndex } from '../context/DraftIndexContext'
+import { useDraftNamespace } from '../context/DraftNamespaceContext'
 
 /**
  * Hook to handle native menu events in the connection window.
@@ -9,8 +10,9 @@ import { useDraftIndex } from '../context/DraftIndexContext'
  */
 export function useMenuHandlers() {
   const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } = usePanel()
-  const { activeIndex } = useSelection()
-  const { startCreation } = useDraftIndex()
+  const { activeIndex, activeNamespace } = useSelection()
+  const { startCreation: startIndexCreation } = useDraftIndex()
+  const { startCreation: startNamespaceCreation } = useDraftNamespace()
 
   // View menu handlers
   const handleToggleLeftPanel = useCallback(() => {
@@ -33,8 +35,8 @@ export function useMenuHandlers() {
 
   // Index menu handlers
   const handleNewIndex = useCallback(() => {
-    startCreation()
-  }, [startCreation])
+    startIndexCreation()
+  }, [startIndexCreation])
 
   const handleDuplicateIndex = useCallback(() => {
     // Dispatch event to duplicate the active index
@@ -56,6 +58,27 @@ export function useMenuHandlers() {
       window.dispatchEvent(new CustomEvent('menu:delete-index'))
     }
   }, [activeIndex])
+
+  // Namespace menu handlers
+  const handleNewNamespace = useCallback(() => {
+    if (activeIndex) {
+      startNamespaceCreation(activeIndex)
+    }
+  }, [activeIndex, startNamespaceCreation])
+
+  const handleDuplicateNamespace = useCallback(() => {
+    // Dispatch event to duplicate the active namespace
+    if (activeIndex && activeNamespace !== null) {
+      window.dispatchEvent(new CustomEvent('menu:duplicate-namespace'))
+    }
+  }, [activeIndex, activeNamespace])
+
+  const handleDeleteNamespace = useCallback(() => {
+    // Dispatch event to delete the active namespace
+    if (activeIndex && activeNamespace !== null) {
+      window.dispatchEvent(new CustomEvent('menu:delete-namespace'))
+    }
+  }, [activeIndex, activeNamespace])
 
   // Vector menu handlers
   const handleNewVector = useCallback(() => {
@@ -120,6 +143,11 @@ export function useMenuHandlers() {
     const unsubRenameIndex = window.electronAPI.menu.onRenameIndex(handleRenameIndex)
     const unsubDeleteIndex = window.electronAPI.menu.onDeleteIndex(handleDeleteIndex)
 
+    // Namespace menu
+    const unsubNewNamespace = window.electronAPI.menu.onNewNamespace(handleNewNamespace)
+    const unsubDuplicateNamespace = window.electronAPI.menu.onDuplicateNamespace(handleDuplicateNamespace)
+    const unsubDeleteNamespace = window.electronAPI.menu.onDeleteNamespace(handleDeleteNamespace)
+
     // Vector menu
     const unsubNewVector = window.electronAPI.menu.onNewVector(handleNewVector)
     const unsubEditVector = window.electronAPI.menu.onEditVector(handleEditVector)
@@ -144,6 +172,9 @@ export function useMenuHandlers() {
       unsubDuplicateIndex()
       unsubRenameIndex()
       unsubDeleteIndex()
+      unsubNewNamespace()
+      unsubDuplicateNamespace()
+      unsubDeleteNamespace()
       unsubNewVector()
       unsubEditVector()
       unsubDeleteSelected()
@@ -163,6 +194,9 @@ export function useMenuHandlers() {
     handleDuplicateIndex,
     handleRenameIndex,
     handleDeleteIndex,
+    handleNewNamespace,
+    handleDuplicateNamespace,
+    handleDeleteNamespace,
     handleNewVector,
     handleEditVector,
     handleDeleteSelected,

@@ -310,6 +310,10 @@ declare global {
       onDeleteIndex: (callback: () => void) => () => void
       onCopyIndex: (callback: () => void) => () => void
       onPasteIndex: (callback: () => void) => () => void
+      // Namespace menu events
+      onNewNamespace: (callback: () => void) => () => void
+      onDuplicateNamespace: (callback: () => void) => () => void
+      onDeleteNamespace: (callback: () => void) => () => void
       // Vector menu events
       onNewVector: (callback: () => void) => () => void
       onEditVector: (callback: () => void) => () => void

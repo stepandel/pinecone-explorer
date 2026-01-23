@@ -282,7 +282,33 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
             sendToFocusedWindow('menu:delete-index')
           },
         },
+      ],
+    },
+
+    // Namespace menu
+    {
+      label: 'Namespace',
+      submenu: [
+        {
+          label: 'New Namespace...',
+          click: () => {
+            sendToFocusedWindow('menu:new-namespace')
+          },
+        },
         { type: 'separator' },
+        {
+          label: 'Duplicate Namespace',
+          click: () => {
+            sendToFocusedWindow('menu:duplicate-namespace')
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Delete Namespace',
+          click: () => {
+            sendToFocusedWindow('menu:delete-namespace')
+          },
+        },
       ],
     },
 
