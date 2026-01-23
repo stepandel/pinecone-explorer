@@ -41,7 +41,8 @@ interface DraftNamespaceContextValue {
   removeVector: (index: number) => void
   cancelCreation: () => void
   saveDraft: () => Promise<void>
-  parseJson: () => void
+  setJsonMode: (enabled: boolean) => void
+  applyJsonChanges: () => boolean
 }
 
 const DraftNamespaceContext = createContext<DraftNamespaceContextValue | null>(null)
@@ -49,6 +50,23 @@ const DraftNamespaceContext = createContext<DraftNamespaceContextValue | null>(n
 // Generate a UUID for vector IDs
 function generateUUID(): string {
   return crypto.randomUUID()
+}
+
+// Serialize vectors to JSON for display
+function vectorsToJson(vectors: DraftVector[]): string {
+  const jsonVectors = vectors.map((v) => {
+    const metadata = fieldsToMetadata(v.metadataFields)
+    return {
+      id: v.id,
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+    }
+  })
+
+  // If single vector, return object; if multiple, return array
+  if (jsonVectors.length === 1) {
+    return JSON.stringify(jsonVectors[0], null, 2)
+  }
+  return JSON.stringify(jsonVectors, null, 2)
 }
 
 // Create initial draft with one vector, optionally pre-populated with embedding text field
@@ -207,8 +225,9 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
     setValidationErrors({})
   }, [])
 
-  const parseJson = useCallback(() => {
-    if (!draftNamespace) return
+  // Apply JSON changes to vectors (returns true if successful)
+  const applyJsonChanges = useCallback((): boolean => {
+    if (!draftNamespace || !draftNamespace.jsonMode) return true
 
     const result = parseVectorJson(draftNamespace.jsonValue)
     if (!result.success) {
@@ -218,7 +237,7 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
           jsonPosition: `Line ${result.errorPosition.line}, Column ${result.errorPosition.column}`,
         }),
       })
-      return
+      return false
     }
 
     // Convert parsed vectors to draft format
@@ -229,17 +248,69 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
 
     if (vectors.length === 0) {
       setValidationErrors({ json: 'No valid vectors found in JSON' })
-      return
+      return false
     }
 
-    // Update draft with parsed vectors and switch to form mode
+    // Update vectors from JSON
     setDraftNamespace({
       ...draftNamespace,
       vectors,
-      jsonMode: false,
-      jsonValue: '',
     })
     setValidationErrors({})
+    return true
+  }, [draftNamespace])
+
+  // Toggle between JSON and form mode
+  const setJsonMode = useCallback((enabled: boolean) => {
+    if (!draftNamespace) return
+
+    if (enabled) {
+      // Switching TO JSON mode: serialize current vectors to JSON
+      const jsonValue = vectorsToJson(draftNamespace.vectors)
+      setDraftNamespace({
+        ...draftNamespace,
+        jsonMode: true,
+        jsonValue,
+      })
+      setValidationErrors({})
+    } else {
+      // Switching FROM JSON mode: try to apply changes first
+      if (draftNamespace.jsonValue.trim()) {
+        const result = parseVectorJson(draftNamespace.jsonValue)
+        if (!result.success) {
+          setValidationErrors({
+            json: result.error || 'Invalid JSON',
+            ...(result.errorPosition && {
+              jsonPosition: `Line ${result.errorPosition.line}, Column ${result.errorPosition.column}`,
+            }),
+          })
+          return // Stay in JSON mode if invalid
+        }
+
+        const vectors: DraftVector[] = (result.vectors || []).map((v) => ({
+          id: v.id || generateUUID(),
+          metadataFields: v.metadata ? metadataToFields(v.metadata) : [],
+        }))
+
+        if (vectors.length === 0) {
+          setValidationErrors({ json: 'No valid vectors found in JSON' })
+          return
+        }
+
+        setDraftNamespace({
+          ...draftNamespace,
+          vectors,
+          jsonMode: false,
+        })
+      } else {
+        // Empty JSON, just switch to form mode keeping current vectors
+        setDraftNamespace({
+          ...draftNamespace,
+          jsonMode: false,
+        })
+      }
+      setValidationErrors({})
+    }
   }, [draftNamespace])
 
   const saveDraft = useCallback(async () => {
@@ -325,7 +396,8 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
       removeVector,
       cancelCreation,
       saveDraft,
-      parseJson,
+      setJsonMode,
+      applyJsonChanges,
     }),
     [
       draftNamespace,
@@ -338,7 +410,8 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
       removeVector,
       cancelCreation,
       saveDraft,
-      parseJson,
+      setJsonMode,
+      applyJsonChanges,
     ]
   )
 

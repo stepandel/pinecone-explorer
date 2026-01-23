@@ -19,7 +19,8 @@ export function NamespaceConfigView() {
     removeVector,
     cancelCreation,
     saveDraft,
-    parseJson,
+    setJsonMode,
+    applyJsonChanges,
     isSaving,
     validationErrors,
   } = useDraftNamespace()
@@ -127,16 +128,16 @@ export function NamespaceConfigView() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => updateDraft({ jsonMode: !draftNamespace.jsonMode })}
+                onClick={() => setJsonMode(!draftNamespace.jsonMode)}
                 className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
               >
-                {draftNamespace.jsonMode ? 'Use Form' : 'Paste JSON'}
+                {draftNamespace.jsonMode ? 'Use Form' : 'View as JSON'}
               </button>
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground mb-3">
             {draftNamespace.jsonMode
-              ? 'Paste JSON to create one or more vectors'
+              ? 'Edit JSON directly. Changes will be applied when switching back to form view.'
               : 'Define the first vector(s) to create the namespace'}
           </p>
 
@@ -200,12 +201,12 @@ Or an array of vectors:
             )}
             <button
               type="button"
-              onClick={parseJson}
+              onClick={applyJsonChanges}
               disabled={!draftNamespace.jsonValue.trim()}
               className="h-6 px-3 text-[11px] rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
               style={inputStyle}
             >
-              Parse JSON
+              Validate JSON
             </button>
           </div>
         ) : (
