@@ -172,7 +172,7 @@ export default function VectorsTable({
             )
           }
           return (
-            <div className={`text-xs line-clamp-2 ${isEmbeddingField ? 'text-emerald-700 dark:text-emerald-300' : 'text-foreground'}`}>
+            <div className="text-xs line-clamp-2 text-foreground">
               {String(value)}
             </div>
           )
