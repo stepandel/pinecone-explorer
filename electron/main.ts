@@ -445,7 +445,7 @@ ipcMain.handle('pinecone:cancelCloneNamespace', async (_event, profileId: string
 // Context Menu IPC Handlers
 // ============================================================================
 
-// Index context menu (replacing collection menu)
+// Index context menu
 ipcMain.on('context-menu:show-index', (event, indexName: string) => {
   const template: MenuItemConstructorOptions[] = [
     {

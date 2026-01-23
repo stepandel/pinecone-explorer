@@ -14,7 +14,7 @@ export interface KeyboardShortcut {
   keys: string
   accelerator: string
   action: string
-  category: 'general' | 'collections' | 'documents' | 'view' | 'editing'
+  category: 'general' | 'indexes' | 'vectors' | 'view' | 'editing'
 }
 
 // Helper to check if a keyboard event matches a shortcut
@@ -88,57 +88,57 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
     category: 'general',
   },
 
-  // Collections
-  NEW_COLLECTION: {
-    id: 'new-collection',
+  // Indexes
+  NEW_INDEX: {
+    id: 'new-index',
     keys: '⌘⇧N',
     accelerator: 'CmdOrCtrl+Shift+N',
-    action: 'New Collection',
-    category: 'collections',
+    action: 'New Index',
+    category: 'indexes',
   },
-  PASTE_COLLECTION: {
-    id: 'paste-collection',
+  PASTE_INDEX: {
+    id: 'paste-index',
     keys: '⌘V',
     accelerator: 'CmdOrCtrl+V',
-    action: 'Paste Collection',
-    category: 'collections',
+    action: 'Paste Index',
+    category: 'indexes',
   },
 
-  // Documents
-  NEW_DOCUMENT: {
-    id: 'new-document',
+  // Vectors
+  NEW_VECTOR: {
+    id: 'new-vector',
     keys: '⌘N',
     accelerator: 'CmdOrCtrl+N',
-    action: 'New Document',
-    category: 'documents',
+    action: 'New Vector',
+    category: 'vectors',
   },
-  COPY_DOCUMENTS: {
-    id: 'copy-documents',
+  COPY_VECTORS: {
+    id: 'copy-vectors',
     keys: '⌘C',
     accelerator: 'CmdOrCtrl+C',
-    action: 'Copy Documents',
-    category: 'documents',
+    action: 'Copy Vectors',
+    category: 'vectors',
   },
-  PASTE_DOCUMENTS: {
-    id: 'paste-documents',
+  PASTE_VECTORS: {
+    id: 'paste-vectors',
     keys: '⌘V',
     accelerator: 'CmdOrCtrl+V',
-    action: 'Paste Documents',
-    category: 'documents',
+    action: 'Paste Vectors',
+    category: 'vectors',
   },
-  DELETE_DOCUMENTS: {
-    id: 'delete-documents',
+  DELETE_VECTORS: {
+    id: 'delete-vectors',
     keys: '⌘⌫',
     accelerator: 'CmdOrCtrl+Backspace',
     action: 'Delete Selected',
-    category: 'documents',
+    category: 'vectors',
   },
-  SELECT_ALL_DOCUMENTS: {
-    id: 'select-all-documents',
+  SELECT_ALL_VECTORS: {
+    id: 'select-all-vectors',
     keys: '⌘⇧A',
     accelerator: 'CmdOrCtrl+Shift+A',
-    action: 'Select All Documents',
-    category: 'documents',
+    action: 'Select All Vectors',
+    category: 'vectors',
   },
 
   // View
@@ -146,7 +146,7 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
     id: 'toggle-left-panel',
     keys: '⌘1',
     accelerator: 'CmdOrCtrl+1',
-    action: 'Toggle Collections Panel',
+    action: 'Toggle Namespaces Panel',
     category: 'view',
   },
   TOGGLE_RIGHT_PANEL: {
@@ -217,13 +217,13 @@ export function getShortcutsByCategory(): Array<{
 }> {
   const categoryLabels: Record<string, string> = {
     general: 'General',
-    collections: 'Collections',
-    documents: 'Documents',
+    indexes: 'Indexes',
+    vectors: 'Vectors',
     view: 'View',
     editing: 'Editing',
   }
 
-  const categoryOrder = ['general', 'collections', 'documents', 'view', 'editing']
+  const categoryOrder = ['general', 'indexes', 'vectors', 'view', 'editing']
   const grouped: Record<string, KeyboardShortcut[]> = {}
 
   // Group shortcuts by category

@@ -28,7 +28,7 @@ interface VectorsViewProps {
   onSelectedVectorChange: (vector: LocalVectorRecord | null, isDraft: boolean) => void
   // Expose draft change handler for external updates (e.g., from detail panel)
   onExposeDraftHandler?: (handler: ((updates: { id?: string; metadata?: Record<string, unknown> }) => void) | null) => void
-  // Callback to notify parent if current draft is for the first vector (empty collection)
+  // Callback to notify parent if current draft is for the first vector (empty index)
   onIsFirstVectorChange?: (isFirst: boolean) => void
 }
 
@@ -149,7 +149,7 @@ export default function VectorsView({
     setEmbeddingTextField(effectiveTextField)
   }, [effectiveTextField, setEmbeddingTextField])
 
-  // Fetch embedding and text field overrides when collection changes
+  // Fetch embedding and text field overrides when index changes
   useEffect(() => {
     const fetchOverrides = async () => {
       if (!currentProfile?.id || !indexName) return
@@ -205,7 +205,7 @@ export default function VectorsView({
     setTextFieldOverride(null)
   }, [currentProfile?.id, indexName])
 
-  // Reset filters and deletion marks when collection changes
+  // Reset filters and deletion marks when index changes
   useEffect(() => {
     setFilterRows([createDefaultFilterRow()])
     setNResults(10)
@@ -369,7 +369,7 @@ export default function VectorsView({
   // Draft vector handlers
   const handleStartCreate = useCallback(() => {
     const newId = crypto.randomUUID()
-    // Check if this is the first vector (collection is empty)
+    // Check if this is the first vector (index is empty)
     const isFirstVector = vectors.length === 0
     // Initialize metadata with same keys as existing vectors (empty values)
     // If first vector, start with empty metadata (user will add fields)
@@ -654,7 +654,7 @@ export default function VectorsView({
         })
       }
 
-      // Add any metadata fields that exist in the collection but not in the pasted vector
+      // Add any metadata fields that exist in the index but not in the pasted vector
       Object.entries(existingTypes).forEach(([key, type]) => {
         if (!(key in typedMetadata)) {
           typedMetadata[key] = { value: '', type }
@@ -909,7 +909,7 @@ export default function VectorsView({
     <div className="flex flex-col h-full">
       {/* Toolbar area - calm floating control surface */}
       <div className="flex-shrink-0 bg-white/60 dark:bg-white/[0.03]">
-        {/* Row 1: Collection name and count */}
+        {/* Row 1: Namespace name and count */}
         <div className="px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0 overflow-hidden">
             {isNamespaceTruncated ? (

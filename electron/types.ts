@@ -329,6 +329,3 @@ export interface CloneNamespaceParams {
   targetNamespace: string
 }
 
-// Legacy type aliases for backwards compatibility during migration
-export type CollectionInfo = IndexInfo
-export type DocumentRecord = VectorRecord

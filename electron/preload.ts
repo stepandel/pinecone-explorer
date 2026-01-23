@@ -374,7 +374,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   menu: {
-    // Index menu events (replacing collection events)
+    // Index menu events
     onNewIndex: (callback: () => void): (() => void) => {
       const handler = () => callback()
       ipcRenderer.on('menu:new-index', handler)
@@ -394,16 +394,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = () => callback()
       ipcRenderer.on('menu:delete-index', handler)
       return () => ipcRenderer.removeListener('menu:delete-index', handler)
-    },
-    onCopyIndex: (callback: () => void): (() => void) => {
-      const handler = () => callback()
-      ipcRenderer.on('menu:copy-index', handler)
-      return () => ipcRenderer.removeListener('menu:copy-index', handler)
-    },
-    onPasteIndex: (callback: () => void): (() => void) => {
-      const handler = () => callback()
-      ipcRenderer.on('menu:paste-index', handler)
-      return () => ipcRenderer.removeListener('menu:paste-index', handler)
     },
     // Vector menu events (replacing document events)
     onNewVector: (callback: () => void): (() => void) => {

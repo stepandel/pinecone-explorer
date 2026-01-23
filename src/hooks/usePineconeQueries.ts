@@ -32,7 +32,7 @@ export function useProfileQuery(profileId: string) {
   })
 }
 
-// Indexes Query (replaces Collections Query)
+// Indexes Query
 export function useIndexesQuery(profileId: string | null, enabled: boolean = true) {
   return useQuery({
     queryKey: pineconeQueryKeys.indexes(profileId || ''),

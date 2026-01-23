@@ -201,7 +201,7 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
         },
         { type: 'separator' },
         {
-          label: 'Toggle Collections Panel',
+          label: 'Toggle Namespaces Panel',
           accelerator: 'CmdOrCtrl+1',
           click: () => {
             sendToFocusedWindow('menu:toggle-left-panel')
@@ -251,50 +251,38 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
       ],
     },
 
-    // Collection menu
+    // Index menu
     {
-      label: 'Collection',
+      label: 'Index',
       submenu: [
         {
-          label: 'New Collection...',
+          label: 'New Index...',
           accelerator: 'CmdOrCtrl+Shift+N',
           click: () => {
-            sendToFocusedWindow('menu:new-collection')
+            sendToFocusedWindow('menu:new-index')
           },
         },
         { type: 'separator' },
         {
-          label: 'Duplicate Collection',
+          label: 'Duplicate Index',
           click: () => {
-            sendToFocusedWindow('menu:duplicate-collection')
+            sendToFocusedWindow('menu:duplicate-index')
           },
         },
         {
-          label: 'Rename Collection',
+          label: 'Rename Index',
           click: () => {
-            sendToFocusedWindow('menu:rename-collection')
+            sendToFocusedWindow('menu:rename-index')
           },
         },
         { type: 'separator' },
         {
-          label: 'Delete Collection',
+          label: 'Delete Index',
           click: () => {
-            sendToFocusedWindow('menu:delete-collection')
+            sendToFocusedWindow('menu:delete-index')
           },
         },
         { type: 'separator' },
-        {
-          label: 'Copy Collection',
-          click: () => {
-            sendToFocusedWindow('menu:copy-collection')
-          },
-        },
-        {
-          label: 'Paste Collection',
-          click: () => {
-            sendToFocusedWindow('menu:paste-collection')
-          },
-        },
       ],
     },
 

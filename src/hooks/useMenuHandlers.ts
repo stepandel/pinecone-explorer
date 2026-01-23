@@ -31,7 +31,7 @@ export function useMenuHandlers() {
     window.dispatchEvent(new CustomEvent('menu:clear-filters'))
   }, [])
 
-  // Index menu handlers (formerly collection)
+  // Index menu handlers
   const handleNewIndex = useCallback(() => {
     startCreation()
   }, [startCreation])
@@ -39,35 +39,23 @@ export function useMenuHandlers() {
   const handleDuplicateIndex = useCallback(() => {
     // Dispatch event to duplicate the active index
     if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:duplicate-collection'))
+      window.dispatchEvent(new CustomEvent('menu:duplicate-index'))
     }
   }, [activeIndex])
 
   const handleRenameIndex = useCallback(() => {
     // Dispatch event to start renaming
     if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:rename-collection'))
+      window.dispatchEvent(new CustomEvent('menu:rename-index'))
     }
   }, [activeIndex])
 
   const handleDeleteIndex = useCallback(() => {
     // Dispatch event to delete the active index
     if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:delete-collection'))
+      window.dispatchEvent(new CustomEvent('menu:delete-index'))
     }
   }, [activeIndex])
-
-  const handleCopyIndex = useCallback(() => {
-    // Dispatch event to copy the active index
-    if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:copy-collection'))
-    }
-  }, [activeIndex])
-
-  const handlePasteIndex = useCallback(() => {
-    // Dispatch event to paste index
-    window.dispatchEvent(new CustomEvent('menu:paste-collection'))
-  }, [])
 
   // Vector menu handlers (formerly document)
   const handleNewVector = useCallback(() => {
@@ -131,8 +119,6 @@ export function useMenuHandlers() {
     const unsubDuplicateIndex = window.electronAPI.menu.onDuplicateIndex(handleDuplicateIndex)
     const unsubRenameIndex = window.electronAPI.menu.onRenameIndex(handleRenameIndex)
     const unsubDeleteIndex = window.electronAPI.menu.onDeleteIndex(handleDeleteIndex)
-    const unsubCopyIndex = window.electronAPI.menu.onCopyIndex(handleCopyIndex)
-    const unsubPasteIndex = window.electronAPI.menu.onPasteIndex(handlePasteIndex)
 
     // Vector menu
     const unsubNewVector = window.electronAPI.menu.onNewVector(handleNewVector)
@@ -158,8 +144,6 @@ export function useMenuHandlers() {
       unsubDuplicateIndex()
       unsubRenameIndex()
       unsubDeleteIndex()
-      unsubCopyIndex()
-      unsubPasteIndex()
       unsubNewVector()
       unsubEditVector()
       unsubDeleteSelected()
@@ -179,8 +163,6 @@ export function useMenuHandlers() {
     handleDuplicateIndex,
     handleRenameIndex,
     handleDeleteIndex,
-    handleCopyIndex,
-    handlePasteIndex,
     handleNewVector,
     handleEditVector,
     handleDeleteSelected,

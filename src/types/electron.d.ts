@@ -335,9 +335,6 @@ declare global {
     electronAPI: ElectronAPI
   }
 
-  // Legacy aliases for backwards compatibility
-  type CollectionInfo = IndexInfo
-  type DocumentRecord = VectorRecord
 }
 
 export {}

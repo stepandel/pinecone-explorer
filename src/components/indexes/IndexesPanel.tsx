@@ -112,8 +112,8 @@ export function IndexesPanel() {
       }
     }
 
-    window.addEventListener('menu:delete-collection', handleMenuDelete)
-    return () => window.removeEventListener('menu:delete-collection', handleMenuDelete)
+    window.addEventListener('menu:delete-index', handleMenuDelete)
+    return () => window.removeEventListener('menu:delete-index', handleMenuDelete)
   }, [activeIndex, openDeleteDialog])
 
   // Keyboard shortcut: Cmd+Delete or Cmd+Backspace to delete active index

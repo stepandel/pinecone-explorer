@@ -1,11 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 
-interface IndexClipboard {
-  type: 'collection'  // Keep 'collection' for internal compatibility
-  collection: IndexInfo
-  sourceProfileId: string
-}
-
 interface VectorsClipboard {
   type: 'vectors'
   vectors: Array<{
@@ -16,14 +10,10 @@ interface VectorsClipboard {
   sourceProfileId: string
 }
 
-type ClipboardItem = IndexClipboard | VectorsClipboard
+type ClipboardItem = VectorsClipboard
 
 interface ClipboardContextValue {
   clipboard: ClipboardItem | null
-
-  // Index methods (legacy name: collection)
-  copyCollection: (index: IndexInfo, profileId: string) => void
-  hasCopiedCollection: boolean
 
   // Vector methods
   copyVectors: (vectors: VectorRecord[], indexName: string, profileId: string) => void
@@ -42,9 +32,6 @@ interface ClipboardProviderProps {
 export function ClipboardProvider({ children }: ClipboardProviderProps) {
   const [clipboard, setClipboard] = useState<ClipboardItem | null>(null)
 
-  const copyCollection = useCallback((index: IndexInfo, profileId: string) => {
-    setClipboard({ type: 'collection', collection: index, sourceProfileId: profileId })
-  }, [])
 
   const copyVectors = useCallback((vectors: VectorRecord[], indexName: string, profileId: string) => {
     // Copy vectors without embeddings (they'll be regenerated on paste)
@@ -66,8 +53,6 @@ export function ClipboardProvider({ children }: ClipboardProviderProps) {
 
   const value: ClipboardContextValue = {
     clipboard,
-    copyCollection,
-    hasCopiedCollection: clipboard?.type === 'collection',
     copyVectors,
     hasCopiedVectors: clipboard?.type === 'vectors',
     clearClipboard,
