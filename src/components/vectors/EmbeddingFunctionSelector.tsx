@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, Lock } from 'lucide-react'
+import { ChevronDown, Lock, AlertTriangle } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
@@ -192,22 +192,40 @@ export function EmbeddingFunctionSelector({
     )
   }
 
+  // Check if text field needs configuration
+  const needsTextFieldConfig = availableTextFields.length > 0 && !clientTextFieldOverride
+  // Check if configured text field doesn't exist in data (stale config)
+  const textFieldMissing = clientTextFieldOverride && availableTextFields.length > 0 && !availableTextFields.includes(clientTextFieldOverride)
+  const hasWarning = needsTextFieldConfig || textFieldMissing
+
   // Standard editable selector for non-integrated inference indexes
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           data-embedding-selector
-          className={`text-xs px-2 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity ${
-            currentOverride
-              ? 'bg-primary/20 text-primary border border-primary/30'
-              : 'text-muted-foreground bg-muted'
+          className={`text-xs px-2 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 ${
+            hasWarning
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+              : currentOverride
+                ? 'bg-primary/20 text-primary border border-primary/30'
+                : 'text-muted-foreground bg-muted'
           }`}
-          title={currentOverride ? 'Override active - Click to change' : 'Click to override embedding function'}
+          title={
+            textFieldMissing ? `Text field "${clientTextFieldOverride}" not found in data` :
+            needsTextFieldConfig ? 'Select text field for embeddings' :
+            currentOverride ? 'Override active - Click to change' :
+            'Click to configure embedding'
+          }
         >
-          {currentOverride
-            ? `${currentOverride.provider}: ${currentOverride.modelName}`
-            : serverConfig?.name || 'Configure embedding'
+          {hasWarning && <AlertTriangle className="h-2.5 w-2.5" />}
+          {textFieldMissing
+            ? `"${clientTextFieldOverride}" not found`
+            : needsTextFieldConfig
+              ? 'Select text field'
+              : currentOverride
+                ? `${currentOverride.provider}: ${currentOverride.modelName}`
+                : serverConfig?.name || 'Configure embedding'
           }
         </button>
       </PopoverTrigger>

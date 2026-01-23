@@ -964,6 +964,7 @@ export default function VectorsView({
             />
           ))}
         </div>
+
       </div>
 
       {/* Table - primary content canvas */}
