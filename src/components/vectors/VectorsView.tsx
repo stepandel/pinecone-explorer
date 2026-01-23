@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { usePanel } from '../../context/PanelContext'
-import { useNamespaceSetup } from '../../context/NamespaceSetupContext'
 import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
@@ -59,7 +58,6 @@ export default function VectorsView({
 }: VectorsViewProps) {
   const { currentProfile } = usePinecone()
   const { setEmbeddingTextField } = usePanel()
-  const { pendingSetup, clearPendingSetup } = useNamespaceSetup()
   const [filterRows, setFilterRows] = useState<FilterRowType[]>([createDefaultFilterRow()])
   const [nResults, setNResults] = useState(10)
 
@@ -328,36 +326,6 @@ export default function VectorsView({
     })
     return Array.from(textFields).sort()
   }, [vectors])
-
-  // Handle pending namespace setup (from namespace/index creation flow)
-  useEffect(() => {
-    if (
-      pendingSetup &&
-      pendingSetup.indexName === collectionName &&
-      pendingSetup.namespace === (namespace || '') &&
-      rawVectors.length === 0 &&
-      draftVectors.length === 0 &&
-      !loading
-    ) {
-      // Create draft with pre-defined schema
-      const initialMetadata: TypedMetadataRecord = {}
-      pendingSetup.schema.forEach(field => {
-        if (field.key.trim()) {
-          initialMetadata[field.key] = { value: '', type: field.type }
-        }
-      })
-
-      const newId = crypto.randomUUID()
-      setDraftVectors([{
-        id: newId,
-        metadata: initialMetadata,
-      }])
-
-      onSingleSelect(newId)
-      onIsFirstVectorChange?.(true)
-      clearPendingSetup()
-    }
-  }, [pendingSetup, collectionName, namespace, rawVectors.length, draftVectors.length, loading, onSingleSelect, onIsFirstVectorChange, clearPendingSetup])
 
   // Filter row handlers
   const handleFilterRowChange = useCallback((id: string, updates: Partial<FilterRowType>) => {

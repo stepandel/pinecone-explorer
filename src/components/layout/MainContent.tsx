@@ -1,13 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
-import { useDraftNamespace } from '../../context/DraftNamespaceContext'
 import { usePanel } from '../../context/PanelContext'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { IndexesPanel } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
 import { IndexConfigView } from '../indexes/IndexConfigView'
-import { NamespaceConfigView } from '../namespaces/NamespaceConfigView'
 import VectorsView from '../vectors/VectorsView'
 import VectorDetailPanel from '../vectors/VectorDetailPanel'
 
@@ -20,7 +18,6 @@ interface VectorRecord {
 export function MainContent() {
   const { activeIndex, activeNamespace } = useSelection()
   const { draftIndex } = useDraftIndex()
-  const { draftNamespace } = useDraftNamespace()
   const { currentProfile } = usePinecone()
   const {
     indexesPanelWidth,
@@ -136,8 +133,6 @@ export function MainContent() {
       >
         {draftIndex ? (
           <IndexConfigView />
-        ) : draftNamespace ? (
-          <NamespaceConfigView />
         ) : showVectors ? (
           <VectorsView
             collectionName={activeIndex}

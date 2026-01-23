@@ -10,7 +10,6 @@ import {
   DEFAULT_EMBEDDING_FUNCTION_ID,
   type DistanceMetric,
 } from '../../constants/embedding-functions'
-import { SchemaEditor, SchemaField } from '../shared/SchemaEditor'
 
 const inputClassName = "w-full h-6 text-[11px] px-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
@@ -35,8 +34,6 @@ export function IndexConfigView() {
   // First namespace setup state (for non-copy mode only)
   const [showFirstNamespace, setShowFirstNamespace] = useState(false)
   const [firstNamespaceName, setFirstNamespaceName] = useState('')
-  const [firstNamespaceSchema, setFirstNamespaceSchema] = useState<SchemaField[]>([])
-  const [firstNamespaceTextField, setFirstNamespaceTextField] = useState<string | null>(null)
 
   // Derived state from selected embedding
   const selectedEmbedding = getEmbeddingFunctionById(selectedEmbeddingId)
@@ -68,15 +65,13 @@ export function IndexConfigView() {
       updateDraft({
         firstNamespace: {
           name: firstNamespaceName,
-          schema: firstNamespaceSchema,
-          textField: firstNamespaceTextField,
         },
       })
     } else {
       // Clear first namespace when section is collapsed
       updateDraft({ firstNamespace: undefined })
     }
-  }, [showFirstNamespace, firstNamespaceName, firstNamespaceSchema, firstNamespaceTextField])
+  }, [showFirstNamespace, firstNamespaceName])
 
   const handleSave = () => {
     if (draftIndex) saveDraft()
@@ -300,6 +295,26 @@ export function IndexConfigView() {
           </div>
         </div>
 
+        {/* Embedding Text Field - for new indexes (not copy mode) */}
+        {!draftIndex.sourceIndex && (
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-muted-foreground">
+              Embedding Text Field
+            </label>
+            <input
+              type="text"
+              value={draftIndex.textField || ''}
+              onChange={(e) => updateDraft({ textField: e.target.value || undefined })}
+              placeholder="_text"
+              className={inputClassName}
+              style={inputStyle}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Metadata field name that will contain text for embeddings
+            </p>
+          </div>
+        )}
+
         {/* First Namespace Setup (Optional) - only for non-copy mode */}
         {!draftIndex.sourceIndex && (
           <div className="space-y-2 pt-2 border-t border-border">
@@ -326,20 +341,6 @@ export function IndexConfigView() {
                     placeholder="my-namespace (leave empty for default)"
                     className={inputClassName}
                     style={inputStyle}
-                  />
-                </div>
-
-                {/* Schema Definition */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-medium text-muted-foreground">
-                    Vector Schema
-                  </label>
-                  <SchemaEditor
-                    fields={firstNamespaceSchema}
-                    onChange={setFirstNamespaceSchema}
-                    textField={firstNamespaceTextField}
-                    onTextFieldChange={setFirstNamespaceTextField}
-                    disabled={isCreating}
                   />
                 </div>
               </div>

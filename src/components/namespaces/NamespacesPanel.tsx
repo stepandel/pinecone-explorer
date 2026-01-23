@@ -2,12 +2,12 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
-import { useDraftNamespace } from '../../context/DraftNamespaceContext'
 import { useIndexStatsQuery, useDeleteNamespaceMutation } from '../../hooks/usePineconeQueries'
 import { Button } from '../ui/button'
 import { DeleteNamespaceDialog } from './DeleteNamespaceDialog'
 import { DuplicateNamespaceDialog } from './DuplicateNamespaceDialog'
 import { DuplicateNamespaceProgressDialog } from './DuplicateNamespaceProgressDialog'
+import { NewNamespaceDialog } from './NewNamespaceDialog'
 
 const inputClassName = "w-full h-6 text-[11px] py-0 px-1.5 pr-5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] placeholder:text-sidebar-foreground/50 text-sidebar-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-ring/50 transition-colors"
 const inputStyle = { boxShadow: 'inset 0 0.5px 1px 0 rgb(0 0 0 / 0.04)' }
@@ -27,10 +27,10 @@ interface CloneProgress {
 export function NamespacesPanel() {
   const { currentProfile } = usePinecone()
   const { activeIndex, activeNamespace, setActiveNamespace } = useSelection()
-  const { startCreation: startNamespaceCreation } = useDraftNamespace()
   const [searchTerm, setSearchTerm] = useState('')
 
   // Dialog states
+  const [newNamespaceDialogOpen, setNewNamespaceDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
   const [progressDialogOpen, setProgressDialogOpen] = useState(false)
@@ -308,7 +308,7 @@ export function NamespacesPanel() {
       {/* Footer - New namespace button and Index info */}
       <div className="px-3 py-2 border-t border-border space-y-2">
         <button
-          onClick={() => startNamespaceCreation(activeIndex)}
+          onClick={() => setNewNamespaceDialogOpen(true)}
           className="w-full h-6 flex items-center justify-center gap-1 text-[10px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] text-sidebar-foreground transition-colors"
         >
           <Plus className="h-3 w-3" />
@@ -318,6 +318,13 @@ export function NamespacesPanel() {
           Index: <span className="text-sidebar-foreground">{activeIndex}</span>
         </div>
       </div>
+
+      {/* New Namespace Dialog */}
+      <NewNamespaceDialog
+        open={newNamespaceDialogOpen}
+        onOpenChange={setNewNamespaceDialogOpen}
+        indexName={activeIndex}
+      />
 
       {/* Delete Namespace Dialog */}
       <DeleteNamespaceDialog
