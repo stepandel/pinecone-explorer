@@ -29,6 +29,10 @@ interface PanelContextType {
   addToSelection: (ids: string[]) => void // Add range to existing
   clearSelection: () => void
   setSelectionAnchor: (id: string | null) => void
+
+  // Embedding text field (for regeneration prompts)
+  embeddingTextField: string | null
+  setEmbeddingTextField: (field: string | null) => void
 }
 
 const PanelContext = createContext<PanelContextType | undefined>(undefined)
@@ -42,6 +46,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [selectedVectorIds, setSelectedVectorIds] = useState<Set<string>>(new Set())
   const [primarySelectedVectorId, setPrimarySelectedVectorId] = useState<string | null>(null)
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null)
+  const [embeddingTextField, setEmbeddingTextField] = useState<string | null>(null)
 
   // Single select - clears all others, sets this as primary and anchor
   const selectVector = useCallback((id: string) => {
@@ -125,6 +130,8 @@ export function PanelProvider({ children }: { children: ReactNode }) {
         addToSelection,
         clearSelection,
         setSelectionAnchor,
+        embeddingTextField,
+        setEmbeddingTextField,
       }}
     >
       {children}

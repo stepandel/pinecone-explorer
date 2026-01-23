@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
+import { usePanel } from '../../context/PanelContext'
 import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
@@ -56,6 +57,7 @@ export default function VectorsView({
   onIsFirstVectorChange,
 }: VectorsViewProps) {
   const { currentProfile } = usePinecone()
+  const { setEmbeddingTextField } = usePanel()
   const [filterRows, setFilterRows] = useState<FilterRowType[]>([createDefaultFilterRow()])
   const [nResults, setNResults] = useState(10)
 
@@ -133,22 +135,32 @@ export default function VectorsView({
 
   // Embedding function override state
   const [embeddingOverride, setEmbeddingOverride] = useState<EmbeddingConfig | null>(null)
+  const [textFieldOverride, setTextFieldOverride] = useState<string | null>(null)
 
-  // Fetch embedding override when collection changes
+  // Compute effective text field: index embed > client override > default '_text'
+  const effectiveTextField = currentIndex?.embed?.fieldMap?.text || textFieldOverride || '_text'
+
+  // Sync effective text field to context for VectorDetailPanel
   useEffect(() => {
-    const fetchOverride = async () => {
+    setEmbeddingTextField(effectiveTextField)
+  }, [effectiveTextField, setEmbeddingTextField])
+
+  // Fetch embedding and text field overrides when collection changes
+  useEffect(() => {
+    const fetchOverrides = async () => {
       if (!currentProfile?.id || !collectionName) return
       try {
-        const override = await window.electronAPI.profiles.getEmbeddingOverride(
-          currentProfile.id,
-          collectionName
-        )
-        setEmbeddingOverride(override)
+        const [embeddingOvr, textFieldOvr] = await Promise.all([
+          window.electronAPI.profiles.getEmbeddingOverride(currentProfile.id, collectionName),
+          window.electronAPI.profiles.getTextFieldOverride(currentProfile.id, collectionName),
+        ])
+        setEmbeddingOverride(embeddingOvr)
+        setTextFieldOverride(textFieldOvr)
       } catch (err) {
-        console.error('Failed to fetch embedding override:', err)
+        console.error('Failed to fetch overrides:', err)
       }
     }
-    fetchOverride()
+    fetchOverrides()
   }, [currentProfile?.id, collectionName])
 
   const handleSaveOverride = useCallback(async (override: EmbeddingConfig) => {
@@ -168,6 +180,25 @@ export default function VectorsView({
       collectionName
     )
     setEmbeddingOverride(null)
+  }, [currentProfile?.id, collectionName])
+
+  const handleSaveTextFieldOverride = useCallback(async (textField: string) => {
+    if (!currentProfile?.id) return
+    await window.electronAPI.profiles.setTextFieldOverride(
+      currentProfile.id,
+      collectionName,
+      textField
+    )
+    setTextFieldOverride(textField)
+  }, [currentProfile?.id, collectionName])
+
+  const handleClearTextFieldOverride = useCallback(async () => {
+    if (!currentProfile?.id) return
+    await window.electronAPI.profiles.clearTextFieldOverride(
+      currentProfile.id,
+      collectionName
+    )
+    setTextFieldOverride(null)
   }, [currentProfile?.id, collectionName])
 
   // Reset filters and deletion marks when collection changes
@@ -279,6 +310,21 @@ export default function VectorsView({
       }
     })
     return Array.from(fields).sort()
+  }, [vectors])
+
+  // Extract text fields (string-type metadata fields) for embedding text field dropdown
+  const availableTextFields = useMemo(() => {
+    const textFields = new Set<string>()
+    vectors.forEach((vec: LocalVectorRecord) => {
+      if (vec.metadata) {
+        Object.entries(vec.metadata).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            textFields.add(key)
+          }
+        })
+      }
+    })
+    return Array.from(textFields).sort()
   }, [vectors])
 
   // Filter row handlers
@@ -627,13 +673,15 @@ export default function VectorsView({
   // Inline vector update handler
   const handleInlineVectorUpdate = useCallback(async (
     vectorId: string,
-    updates: { metadata?: Record<string, unknown> }
+    updates: { metadata?: Record<string, unknown>; regenerateEmbedding?: boolean }
   ) => {
     await updateMutation.mutateAsync({
       id: vectorId,
       metadata: updates.metadata as Record<string, string | number | boolean> | undefined,
+      regenerateEmbedding: updates.regenerateEmbedding,
+      textField: effectiveTextField,
     })
-  }, [updateMutation])
+  }, [updateMutation, effectiveTextField])
 
   // Context menu action listener
   useEffect(() => {
@@ -881,6 +929,13 @@ export default function VectorsView({
                 onSave={handleSaveOverride}
                 onClear={handleClearOverride}
                 embeddingDimension={currentIndex?.dimension ?? null}
+                indexEmbedConfig={currentIndex?.embed ?? null}
+                textField={effectiveTextField}
+                canOverride={!currentIndex?.embed}
+                clientTextFieldOverride={textFieldOverride}
+                onTextFieldSave={handleSaveTextFieldOverride}
+                onTextFieldClear={handleClearTextFieldOverride}
+                availableTextFields={availableTextFields}
               />
             </div>
           </div>
@@ -909,6 +964,7 @@ export default function VectorsView({
             />
           ))}
         </div>
+
       </div>
 
       {/* Table - primary content canvas */}
@@ -935,6 +991,7 @@ export default function VectorsView({
           onVectorUpdate={handleInlineVectorUpdate}
           onVectorContextMenu={handleVectorContextMenu}
           onTableContextMenu={handleTableContextMenu}
+          embeddingTextField={effectiveTextField}
         />
       </div>
 

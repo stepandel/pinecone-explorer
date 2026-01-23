@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Lock, AlertTriangle } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
@@ -12,6 +12,15 @@ interface EmbeddingFunctionSelectorProps {
   onSave: (override: EmbeddingConfig) => Promise<void>
   onClear: () => Promise<void>
   embeddingDimension?: number | null
+  // Integrated inference support
+  indexEmbedConfig?: IndexEmbedConfig | null  // Index's embed config (if integrated inference)
+  textField?: string                           // Effective text field used for embedding
+  canOverride?: boolean                        // Whether override is allowed (false for integrated inference)
+  // Text field configuration
+  clientTextFieldOverride?: string | null      // Client-side text field override
+  onTextFieldSave?: (textField: string) => Promise<void>
+  onTextFieldClear?: () => Promise<void>
+  availableTextFields?: string[]               // Available string metadata fields from vectors
 }
 
 export function EmbeddingFunctionSelector({
@@ -21,10 +30,26 @@ export function EmbeddingFunctionSelector({
   onSave,
   onClear,
   embeddingDimension,
+  indexEmbedConfig,
+  textField = '_text',
+  canOverride = true,
+  clientTextFieldOverride,
+  onTextFieldSave,
+  onTextFieldClear,
+  availableTextFields = [],
 }: EmbeddingFunctionSelectorProps) {
   const [open, setOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string>('')
+  const [textFieldInput, setTextFieldInput] = useState(clientTextFieldOverride || '')
   const [saving, setSaving] = useState(false)
+
+  // Check if using integrated inference
+  const hasIntegratedInference = !!indexEmbedConfig
+
+  // Sync text field input when override changes
+  useEffect(() => {
+    setTextFieldInput(clientTextFieldOverride || '')
+  }, [clientTextFieldOverride, open])
 
   // Set initial selection based on current override
   useEffect(() => {
@@ -38,21 +63,45 @@ export function EmbeddingFunctionSelector({
     }
   }, [currentOverride, open])
 
+  // Auto-select text field when there's only one available and no override
+  useEffect(() => {
+    if (
+      availableTextFields.length === 1 &&
+      !clientTextFieldOverride &&
+      !indexEmbedConfig?.fieldMap?.text &&
+      onTextFieldSave
+    ) {
+      // Auto-save the only available text field
+      onTextFieldSave(availableTextFields[0])
+    }
+  }, [availableTextFields, clientTextFieldOverride, indexEmbedConfig, onTextFieldSave])
+
   const selectedEF = EMBEDDING_FUNCTIONS.find(ef => ef.id === selectedId)
 
   const serverFunction = EMBEDDING_FUNCTIONS.find(ef => ef.modelName === serverConfig?.config?.model_name)
 
   const handleSave = async () => {
-    if (!selectedEF) return
+    if (!canOverride) return
 
     setSaving(true)
     try {
-      await onSave({
-        provider: selectedEF.type as EmbeddingProviderType,
-        modelName: selectedEF.modelName,
-        vectorType: selectedEF.vectorType,
-        ...(selectedEF.defaultDimension && { dimensions: selectedEF.defaultDimension }),
-      })
+      // Save embedding config if selected
+      if (selectedEF) {
+        await onSave({
+          provider: selectedEF.type as EmbeddingProviderType,
+          modelName: selectedEF.modelName,
+          vectorType: selectedEF.vectorType,
+          ...(selectedEF.defaultDimension && { dimensions: selectedEF.defaultDimension }),
+        })
+      }
+      // Save text field if changed
+      const selectedField = textFieldInput.trim()
+      if (selectedField && selectedField !== clientTextFieldOverride && onTextFieldSave) {
+        await onTextFieldSave(selectedField)
+      } else if (!selectedField && clientTextFieldOverride && onTextFieldClear) {
+        // Clear if empty and there was an override
+        await onTextFieldClear()
+      }
       setOpen(false)
     } finally {
       setSaving(false)
@@ -60,30 +109,123 @@ export function EmbeddingFunctionSelector({
   }
 
   const handleClear = async () => {
+    if (!canOverride) return
     setSaving(true)
     try {
       await onClear()
+      if (onTextFieldClear) {
+        await onTextFieldClear()
+      }
+      setTextFieldInput('')
       setOpen(false)
     } finally {
       setSaving(false)
     }
   }
 
+  // Check if there are any changes to save
+  const hasEmbeddingChange = selectedEF !== undefined && selectedEF !== null
+  const selectedField = textFieldInput.trim()
+  const hasTextFieldChange = selectedField !== (clientTextFieldOverride || '') && selectedField !== ''
+  const canSave = hasEmbeddingChange || hasTextFieldChange
+
+  // For integrated inference, show a read-only display
+  if (hasIntegratedInference) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            data-embedding-selector
+            className="text-xs px-2 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
+            title="Using index's integrated inference"
+          >
+            <Lock className="h-2.5 w-2.5" />
+            {indexEmbedConfig.model}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-3" align="start">
+          {/* Header */}
+          <div className="px-1 mb-3">
+            <h4 className="font-medium text-[13px] text-foreground">Integrated Inference</h4>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              This index uses Pinecone's integrated inference. Embedding configuration is managed by the index.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {/* Index embed config info - read only */}
+            <div className="mx-1 text-[11px] px-2.5 py-2 rounded-[5px] space-y-0.5 bg-emerald-500/8 dark:bg-emerald-500/10 ring-1 ring-emerald-500/20 dark:ring-emerald-500/25 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.1)]">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Lock className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="font-medium text-[10px] text-emerald-700 dark:text-emerald-400">
+                  Index Configuration
+                </span>
+              </div>
+              <p className="text-muted-foreground"><span className="text-foreground/60">Provider:</span> pinecone</p>
+              <p className="text-muted-foreground"><span className="text-foreground/60">Model:</span> {indexEmbedConfig.model}</p>
+              <p className="text-muted-foreground"><span className="text-foreground/60">Type:</span> {indexEmbedConfig.vectorType || 'dense'}</p>
+              {indexEmbedConfig.dimension && (
+                <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {indexEmbedConfig.dimension}</p>
+              )}
+              {indexEmbedConfig.metric && (
+                <p className="text-muted-foreground"><span className="text-foreground/60">Metric:</span> {indexEmbedConfig.metric}</p>
+              )}
+              <p className="text-muted-foreground pt-1 border-t border-emerald-500/10 dark:border-emerald-500/15 mt-1">
+                <span className="text-foreground/60">Text field:</span> {textField}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer - just a close button */}
+          <div className="flex justify-end gap-2 mt-3 pt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[12px] px-2.5"
+              onClick={() => setOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
+  // Check if text field needs configuration
+  const needsTextFieldConfig = availableTextFields.length > 0 && !clientTextFieldOverride
+  // Check if configured text field doesn't exist in data (stale config)
+  const textFieldMissing = clientTextFieldOverride && availableTextFields.length > 0 && !availableTextFields.includes(clientTextFieldOverride)
+  const hasWarning = needsTextFieldConfig || textFieldMissing
+
+  // Standard editable selector for non-integrated inference indexes
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           data-embedding-selector
-          className={`text-xs px-2 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity ${
-            currentOverride
-              ? 'bg-primary/20 text-primary border border-primary/30'
-              : 'text-muted-foreground bg-muted'
+          className={`text-xs px-2 py-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 ${
+            hasWarning
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+              : currentOverride
+                ? 'bg-primary/20 text-primary border border-primary/30'
+                : 'text-muted-foreground bg-muted'
           }`}
-          title={currentOverride ? 'Override active - Click to change' : 'Click to override embedding function'}
+          title={
+            textFieldMissing ? `Text field "${clientTextFieldOverride}" not found in data` :
+            needsTextFieldConfig ? 'Select text field for embeddings' :
+            currentOverride ? 'Override active - Click to change' :
+            'Click to configure embedding'
+          }
         >
-          {currentOverride
-            ? `${currentOverride.provider}: ${currentOverride.modelName}`
-            : serverConfig?.name || 'Configure embedding'
+          {hasWarning && <AlertTriangle className="h-2.5 w-2.5" />}
+          {textFieldMissing
+            ? `"${clientTextFieldOverride}" not found`
+            : needsTextFieldConfig
+              ? 'Select text field'
+              : currentOverride
+                ? `${currentOverride.provider}: ${currentOverride.modelName}`
+                : serverConfig?.name || 'Configure embedding'
           }
         </button>
       </PopoverTrigger>
@@ -125,6 +267,35 @@ export function EmbeddingFunctionSelector({
               </select>
               <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/70" />
             </div>
+          </div>
+
+          {/* Text Field Selector */}
+          <div className="px-1 space-y-1.5">
+            <Label htmlFor="text-field" className="text-[11px] font-normal">Text Field</Label>
+            <div className="relative">
+              <select
+                id="text-field"
+                value={textFieldInput}
+                onChange={(e) => setTextFieldInput(e.target.value)}
+                className="w-full h-[22px] appearance-none rounded-[5px] border-none bg-white/10 dark:bg-white/5 pl-2 pr-6 text-[13px] text-foreground shadow-[0_0.5px_1px_rgba(0,0,0,0.1),inset_0_0.5px_0.5px_rgba(255,255,255,0.1)] ring-1 ring-black/10 dark:ring-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-default"
+              >
+                <option value="">Select field...</option>
+                {availableTextFields.map(field => (
+                  <option key={field} value={field}>{field}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/70" />
+            </div>
+            {availableTextFields.length === 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                No text fields found in vectors
+              </p>
+            )}
+            {availableTextFields.length > 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                Metadata field containing text for embeddings
+              </p>
+            )}
           </div>
 
           {/* Selected info */}
@@ -182,7 +353,7 @@ export function EmbeddingFunctionSelector({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 mt-3 pt-3">
-          {currentOverride && (
+          {(currentOverride || clientTextFieldOverride) && (
             <Button
               variant="ghost"
               size="sm"
@@ -190,14 +361,14 @@ export function EmbeddingFunctionSelector({
               onClick={handleClear}
               disabled={saving}
             >
-              Clear
+              Clear All
             </Button>
           )}
           <Button
             size="sm"
             className="h-7 text-[12px] px-3"
             onClick={handleSave}
-            disabled={!selectedEF || saving}
+            disabled={!canSave || saving}
           >
             {saving ? 'Saving...' : 'Apply'}
           </Button>

@@ -654,6 +654,36 @@ ipcMain.handle('profiles:clearEmbeddingOverride', async (_event, profileId: stri
   }
 })
 
+ipcMain.handle('profiles:getTextFieldOverride', async (_event, profileId: string, indexName: string) => {
+  try {
+    const textField = connectionStore.getTextFieldOverride(profileId, indexName)
+    return { success: true, data: textField }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get text field override'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:setTextFieldOverride', async (_event, profileId: string, indexName: string, textField: string) => {
+  try {
+    connectionStore.setTextFieldOverride(profileId, indexName, textField)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to set text field override'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:clearTextFieldOverride', async (_event, profileId: string, indexName: string) => {
+  try {
+    connectionStore.clearTextFieldOverride(profileId, indexName)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to clear text field override'
+    return { success: false, error: message }
+  }
+})
+
 // ============================================================================
 // Window Management IPC Handlers
 // ============================================================================

@@ -8,6 +8,19 @@ export type EmbeddingProviderType =
   | 'openai'
 
 /**
+ * Index-level embedding configuration from Pinecone API (for integrated inference indexes)
+ */
+export interface IndexEmbedConfig {
+  model: string                              // e.g., 'llama-text-embed-v2', 'multilingual-e5-large'
+  metric?: 'cosine' | 'euclidean' | 'dotproduct'
+  dimension?: number
+  vectorType?: 'dense' | 'sparse'
+  fieldMap?: { text: string }                // Maps record field name to text for embedding
+  readParameters?: Record<string, unknown>
+  writeParameters?: Record<string, unknown>
+}
+
+/**
  * Configuration for embedding generation
  */
 export interface EmbeddingConfig {
@@ -37,6 +50,10 @@ export interface ConnectionProfile {
 
   // Per-index embedding overrides
   embeddingOverrides?: Record<string, EmbeddingConfig>
+
+  // Per-index text field overrides (metadata field containing text for embedding)
+  // Default is '_text' if not specified
+  textFieldOverrides?: Record<string, string>
 }
 
 /**
@@ -65,6 +82,8 @@ export interface IndexInfo {
     }
   }
   deletionProtection?: 'enabled' | 'disabled'
+  vectorType?: 'dense' | 'sparse'            // Index vector type from API
+  embed?: IndexEmbedConfig                    // Integrated inference config (if enabled)
 }
 
 /**
@@ -153,6 +172,7 @@ export interface CreateVectorParams {
   text?: string // Or provide text to generate embedding
   metadata?: Record<string, unknown>
   generateEmbedding?: boolean // If true, generate embedding from text
+  textField?: string // Metadata field to store text (default: '_text')
 }
 
 /**
@@ -166,6 +186,7 @@ export interface UpdateVectorParams {
   metadata?: Record<string, unknown> // New metadata (merged with existing)
   text?: string // New text to store in metadata
   regenerateEmbedding?: boolean // If true, regenerate embedding from text
+  textField?: string // Metadata field to store text (default: '_text')
 }
 
 /**
@@ -257,6 +278,7 @@ export interface BatchImportParams {
     values?: number[]
   }>
   generateEmbeddings?: boolean
+  textField?: string // Metadata field to store text (default: '_text')
 }
 
 /**

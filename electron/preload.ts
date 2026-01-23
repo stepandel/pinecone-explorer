@@ -246,6 +246,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw new Error(result.error)
       }
     },
+    getTextFieldOverride: async (profileId: string, indexName: string): Promise<string | null> => {
+      const result = await ipcRenderer.invoke('profiles:getTextFieldOverride', profileId, indexName)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    setTextFieldOverride: async (profileId: string, indexName: string, textField: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:setTextFieldOverride', profileId, indexName, textField)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    clearTextFieldOverride: async (profileId: string, indexName: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:clearTextFieldOverride', profileId, indexName)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
   },
   window: {
     createConnection: async (profile: ConnectionProfile): Promise<{ windowId: string }> => {

@@ -5,6 +5,19 @@ declare global {
     | 'pinecone'
     | 'openai'
 
+  /**
+   * Index-level embedding configuration from Pinecone API (for integrated inference indexes)
+   */
+  interface IndexEmbedConfig {
+    model: string                              // e.g., 'llama-text-embed-v2', 'multilingual-e5-large'
+    metric?: 'cosine' | 'euclidean' | 'dotproduct'
+    dimension?: number
+    vectorType?: 'dense' | 'sparse'
+    fieldMap?: { text: string }                // Maps record field name to text for embedding
+    readParameters?: Record<string, unknown>
+    writeParameters?: Record<string, unknown>
+  }
+
   interface EmbeddingConfig {
     provider: EmbeddingProviderType
     modelName: string
@@ -22,6 +35,8 @@ declare global {
     lastUsed?: number
     defaultEmbeddingConfig?: EmbeddingConfig
     embeddingOverrides?: Record<string, EmbeddingConfig>
+    // Per-index text field overrides (metadata field containing text for embedding)
+    textFieldOverrides?: Record<string, string>
   }
 
   interface IndexInfo {
@@ -47,6 +62,8 @@ declare global {
       }
     }
     deletionProtection?: 'enabled' | 'disabled'
+    vectorType?: 'dense' | 'sparse'            // Index vector type from API
+    embed?: IndexEmbedConfig                    // Integrated inference config (if enabled)
   }
 
   interface IndexStats {
@@ -103,6 +120,7 @@ declare global {
     text?: string
     metadata?: Record<string, unknown>
     generateEmbedding?: boolean
+    textField?: string // Metadata field to store text (default: '_text')
   }
 
   interface UpdateVectorParams {
@@ -113,6 +131,7 @@ declare global {
     metadata?: Record<string, unknown>
     text?: string
     regenerateEmbedding?: boolean
+    textField?: string // Metadata field to store text (default: '_text')
   }
 
   interface DeleteVectorsParams {
@@ -133,6 +152,7 @@ declare global {
       values?: number[]
     }>
     generateEmbeddings?: boolean
+    textField?: string // Metadata field to store text (default: '_text')
   }
 
   interface BatchImportResult {
@@ -254,6 +274,9 @@ declare global {
       getEmbeddingOverride: (profileId: string, indexName: string) => Promise<EmbeddingConfig | null>
       setEmbeddingOverride: (profileId: string, indexName: string, override: EmbeddingConfig) => Promise<void>
       clearEmbeddingOverride: (profileId: string, indexName: string) => Promise<void>
+      getTextFieldOverride: (profileId: string, indexName: string) => Promise<string | null>
+      setTextFieldOverride: (profileId: string, indexName: string, textField: string) => Promise<void>
+      clearTextFieldOverride: (profileId: string, indexName: string) => Promise<void>
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>

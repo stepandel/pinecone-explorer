@@ -37,6 +37,7 @@ export function MainContent() {
     addToSelection,
     clearSelection,
     setSelectionAnchor,
+    embeddingTextField,
   } = usePanel()
   const [selectedVector, setSelectedVector] = useState<VectorRecord | null>(null)
   const [isSelectedDraft, setIsSelectedDraft] = useState(false)
@@ -210,6 +211,7 @@ export function MainContent() {
             isDraft={isSelectedDraft}
             isFirstVector={isFirstVector}
             onDraftChange={isSelectedDraft ? draftUpdateHandler ?? undefined : undefined}
+            embeddingTextField={embeddingTextField ?? undefined}
           />
         ) : (
           <div
