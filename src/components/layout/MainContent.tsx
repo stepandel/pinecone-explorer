@@ -23,6 +23,8 @@ export function MainContent() {
   const { draftNamespace } = useDraftNamespace()
   const { currentProfile } = usePinecone()
   const {
+    indexesPanelOpen,
+    setIndexesPanelOpen,
     indexesPanelWidth,
     setIndexesPanelWidth,
     leftPanelOpen,
@@ -72,13 +74,14 @@ export function MainContent() {
       setIndexesPanelWidth(newWidth)
     } else if (isResizingLeft) {
       // Adjust for the IndexesPanel width
-      const newWidth = Math.max(180, Math.min(400, e.clientX - indexesPanelWidth))
+      const effectiveIndexesWidth = indexesPanelOpen ? indexesPanelWidth : 0
+      const newWidth = Math.max(180, Math.min(400, e.clientX - effectiveIndexesWidth))
       setLeftPanelWidth(newWidth)
     } else if (isResizingRight) {
       const newWidth = Math.max(250, Math.min(600, window.innerWidth - e.clientX))
       setRightPanelWidth(newWidth)
     }
-  }, [isResizingIndexes, isResizingLeft, isResizingRight, indexesPanelWidth, setIndexesPanelWidth, setLeftPanelWidth, setRightPanelWidth])
+  }, [isResizingIndexes, isResizingLeft, isResizingRight, indexesPanelOpen, indexesPanelWidth, setIndexesPanelWidth, setLeftPanelWidth, setRightPanelWidth])
 
   // Handle mouse up to stop resizing
   const handleMouseUp = useCallback(() => {
@@ -104,8 +107,8 @@ export function MainContent() {
   }, [isResizingIndexes, isResizingLeft, isResizingRight, handleMouseMove, handleMouseUp])
 
   // Calculate main content padding based on open panels
-  // Always account for IndexesPanel, plus the namespaces panel if open
-  const leftPadding = indexesPanelWidth + (leftPanelOpen ? leftPanelWidth : 0)
+  const effectiveIndexesWidth = indexesPanelOpen ? indexesPanelWidth : 0
+  const leftPadding = effectiveIndexesWidth + (leftPanelOpen ? leftPanelWidth : 0)
   const rightPadding = rightPanelOpen ? rightPanelWidth : 0
 
   // Determine what to show in the main area
@@ -113,21 +116,25 @@ export function MainContent() {
 
   return (
     <main className="flex-1 relative overflow-hidden bg-content">
-      {/* IndexesPanel - always visible, resizable */}
-      <div
-        className="absolute top-0 left-0 h-full z-30"
+      {/* IndexesPanel - Collapsible */}
+      <aside
+        className={`absolute top-0 left-0 h-full z-30 transition-transform duration-200 ${
+          indexesPanelOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
         style={{ width: `${indexesPanelWidth}px` }}
       >
-        <IndexesPanel />
+        <IndexesPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
         {/* Resize handle */}
-        <div
-          className="absolute top-0 right-0 w-[5px] h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10"
-          onMouseDown={(e) => {
-            e.preventDefault()
-            setIsResizingIndexes(true)
-          }}
-        />
-      </div>
+        {indexesPanelOpen && (
+          <div
+            className="absolute top-0 right-0 w-[5px] h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              setIsResizingIndexes(true)
+            }}
+          />
+        )}
+      </aside>
 
       {/* Main content area */}
       <div
@@ -183,11 +190,14 @@ export function MainContent() {
           leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          left: `${indexesPanelWidth}px`,
+          left: `${effectiveIndexesWidth}px`,
           width: `${leftPanelWidth}px`,
         }}
       >
-        <NamespacesPanel />
+        <NamespacesPanel
+          showIndexesToggle={!indexesPanelOpen}
+          onToggleIndexesPanel={() => setIndexesPanelOpen(true)}
+        />
         {/* Resize handle */}
         {leftPanelOpen && (
           <div

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { ChevronsLeft } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
@@ -16,7 +17,11 @@ import { NewButton } from '../ui/new-button'
 import { cn } from '@/lib/utils'
 import { CloneIndexProgressDialog } from '../namespaces/CloneNamespaceProgressDialog'
 
-export function IndexesPanel() {
+interface IndexesPanelProps {
+  onToggleCollapse?: () => void
+}
+
+export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
   const { currentProfile, indexes, indexesLoading, indexesError } = usePinecone()
   const { activeIndex, setActiveIndex } = useSelection()
   const { startCreation, startCopyFromIndex, draftIndex, cloneProgress, cloneProgressOpen, setCloneProgressOpen, cancelClone } = useDraftIndex()
@@ -127,10 +132,19 @@ export function IndexesPanel() {
       onContextMenu={handlePanelContextMenu}
     >
       {/* Header */}
-      <div className="px-2 py-2">
+      <div className="px-2 py-2 flex items-center justify-between">
         <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Indexes
         </h2>
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-0.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors"
+            title="Collapse panel"
+          >
+            <ChevronsLeft className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* Indexes List */}
