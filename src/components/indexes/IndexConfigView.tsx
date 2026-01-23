@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, Info } from 'lucide-react'
+import { ChevronDown, ChevronRight, Info } from 'lucide-react'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut'
 import { SHORTCUTS } from '../../constants/keyboard-shortcuts'
@@ -10,6 +10,7 @@ import {
   DEFAULT_EMBEDDING_FUNCTION_ID,
   type DistanceMetric,
 } from '../../constants/embedding-functions'
+import { SchemaEditor, SchemaField } from '../shared/SchemaEditor'
 
 const inputClassName = "w-full h-6 text-[11px] px-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 const inputStyle = { boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }
@@ -30,6 +31,12 @@ export function IndexConfigView() {
 
   // Embedding function selection - default to Pinecone's llama-text-embed-v2
   const [selectedEmbeddingId, setSelectedEmbeddingId] = useState<string>(DEFAULT_EMBEDDING_FUNCTION_ID)
+
+  // First namespace setup state (for non-copy mode only)
+  const [showFirstNamespace, setShowFirstNamespace] = useState(false)
+  const [firstNamespaceName, setFirstNamespaceName] = useState('')
+  const [firstNamespaceSchema, setFirstNamespaceSchema] = useState<SchemaField[]>([])
+  const [firstNamespaceTextField, setFirstNamespaceTextField] = useState<string | null>(null)
 
   // Derived state from selected embedding
   const selectedEmbedding = getEmbeddingFunctionById(selectedEmbeddingId)
@@ -54,6 +61,22 @@ export function IndexConfigView() {
       ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
     })
   }, [selectedEmbeddingId])
+
+  // Sync first namespace state to draft
+  useEffect(() => {
+    if (showFirstNamespace) {
+      updateDraft({
+        firstNamespace: {
+          name: firstNamespaceName,
+          schema: firstNamespaceSchema,
+          textField: firstNamespaceTextField,
+        },
+      })
+    } else {
+      // Clear first namespace when section is collapsed
+      updateDraft({ firstNamespace: undefined })
+    }
+  }, [showFirstNamespace, firstNamespaceName, firstNamespaceSchema, firstNamespaceTextField])
 
   const handleSave = () => {
     if (draftIndex) saveDraft()
@@ -276,6 +299,53 @@ export function IndexConfigView() {
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
           </div>
         </div>
+
+        {/* First Namespace Setup (Optional) - only for non-copy mode */}
+        {!draftIndex.sourceIndex && (
+          <div className="space-y-2 pt-2 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setShowFirstNamespace(!showFirstNamespace)}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronRight className={`h-3 w-3 transition-transform ${showFirstNamespace ? 'rotate-90' : ''}`} />
+              Set up first namespace <span className="text-muted-foreground/60">(optional)</span>
+            </button>
+
+            {showFirstNamespace && (
+              <div className="space-y-3 pl-4 pt-2">
+                {/* Namespace Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground">
+                    Namespace Name
+                  </label>
+                  <input
+                    type="text"
+                    value={firstNamespaceName}
+                    onChange={(e) => setFirstNamespaceName(e.target.value)}
+                    placeholder="my-namespace (leave empty for default)"
+                    className={inputClassName}
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Schema Definition */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground">
+                    Vector Schema
+                  </label>
+                  <SchemaEditor
+                    fields={firstNamespaceSchema}
+                    onChange={setFirstNamespaceSchema}
+                    textField={firstNamespaceTextField}
+                    onTextFieldChange={setFirstNamespaceTextField}
+                    disabled={isCreating}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sparse model info */}

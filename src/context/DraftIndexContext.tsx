@@ -2,13 +2,21 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo, R
 import { usePinecone } from '../providers/PineconeProvider'
 import { useCreateIndexMutation } from '../hooks/usePineconeQueries'
 import { useSelection } from './SelectionContext'
+import { useNamespaceSetup } from './NamespaceSetupContext'
 import { getEmbeddingFunctionById, getEmbeddingFunctionByModelStrict, DEFAULT_EMBEDDING_FUNCTION_ID } from '../constants/embedding-functions'
+import { SchemaField } from '../components/shared/SchemaEditor'
 
 export interface CloneProgressState {
   phase: 'preparing' | 'copying' | 'complete' | 'error' | 'cancelled'
   totalVectors: number
   processedVectors: number
   message: string
+}
+
+export interface FirstNamespaceConfig {
+  name: string
+  schema: SchemaField[]
+  textField: string | null
 }
 
 export interface DraftIndex {
@@ -23,6 +31,7 @@ export interface DraftIndex {
   sourceIndex?: IndexInfo
   textField?: string
   availableTextFields?: string[]
+  firstNamespace?: FirstNamespaceConfig
 }
 
 interface DraftIndexContextValue {
@@ -148,6 +157,8 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
 
   const { currentProfile, refreshIndexes } = usePinecone()
   const { setActiveIndex } = useSelection()
+  const { selectIndexAndNamespace } = useSelection()
+  const { setPendingSetup } = useNamespaceSetup()
   const createMutation = useCreateIndexMutation(currentProfile?.id || '')
 
   // Listen for clone progress updates
@@ -288,6 +299,33 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
       // Handle copy mode
       if (draftIndex.sourceIndex) {
         await handleCloneOperation(newIndexName, draftIndex, currentProfile.id)
+      } else if (draftIndex.firstNamespace) {
+        // Handle first namespace setup
+        const { name: namespaceName, schema, textField } = draftIndex.firstNamespace
+
+        // Save text field override if specified
+        if (textField) {
+          await window.electronAPI.profiles.setTextFieldOverride(
+            currentProfile.id,
+            newIndexName,
+            textField
+          )
+        }
+
+        // Set up pending setup for VectorsView if schema is defined
+        if (schema.length > 0) {
+          setPendingSetup({
+            indexName: newIndexName,
+            namespace: namespaceName.trim(),
+            schema,
+            textField,
+          })
+        }
+
+        setDraftIndex(null)
+        setValidationErrors({})
+        // Navigate to the index and namespace
+        selectIndexAndNamespace(newIndexName, namespaceName.trim())
       } else {
         setDraftIndex(null)
         setValidationErrors({})
@@ -299,7 +337,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsCreating(false)
     }
-  }, [draftIndex, currentProfile, createMutation, setActiveIndex, refreshIndexes])
+  }, [draftIndex, currentProfile, createMutation, setActiveIndex, selectIndexAndNamespace, setPendingSetup, refreshIndexes])
 
   // Helper for clone operation (kept inside provider for access to state setters)
   const handleCloneOperation = async (newIndexName: string, draft: DraftIndex, profileId: string) => {
