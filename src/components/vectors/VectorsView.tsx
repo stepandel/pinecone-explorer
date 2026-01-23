@@ -11,6 +11,7 @@ import { LocalVectorRecord, DraftVector, parseFilterValue } from '../../types/ve
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
 import { FilterRow } from '../filters/FilterRow'
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover'
+import { NewButton } from '../ui/new-button'
 
 interface VectorsViewProps {
   indexName: string
@@ -1016,14 +1017,13 @@ export default function VectorsView({
 
       {/* Bottom Toolbar */}
       <div className="px-4 py-1.5 flex items-center justify-between">
-        <button
+        <NewButton
           onClick={handleStartCreate}
           disabled={hasDrafts || markedForDeletion.size > 0}
-          className="h-6 w-6 p-0 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
           title="Add vector"
-        >
-          +
-        </button>
+          label="New Vector"
+          className="w-auto px-2"
+        />
         {hasDrafts && (
           <div className="flex items-center gap-3">
             {draftError && (

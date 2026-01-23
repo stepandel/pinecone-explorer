@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
@@ -13,6 +12,7 @@ import {
   DialogFooter,
 } from '../ui/dialog'
 import { Button } from '../ui/button'
+import { NewButton } from '../ui/new-button'
 import { cn } from '@/lib/utils'
 import { CloneIndexProgressDialog } from '../namespaces/CloneNamespaceProgressDialog'
 
@@ -186,15 +186,11 @@ export function IndexesPanel() {
 
       {/* Footer with Create button */}
       <div className="px-2 py-2 border-t border-border">
-        <button
+        <NewButton
           onClick={startCreation}
           disabled={draftIndex !== null}
-          className="w-full h-6 flex items-center justify-center gap-1 text-[10px] rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title="Create new index"
-        >
-          <Plus className="h-3 w-3" />
-          <span>New</span>
-        </button>
+        />
       </div>
 
       {/* Delete Confirmation Dialog */}

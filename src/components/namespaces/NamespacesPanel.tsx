@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftNamespace } from '../../context/DraftNamespaceContext'
 import { useIndexStatsQuery, useDeleteNamespaceMutation } from '../../hooks/usePineconeQueries'
 import { Button } from '../ui/button'
+import { NewButton } from '../ui/new-button'
 import { DeleteNamespaceDialog } from './DeleteNamespaceDialog'
 import { DuplicateNamespaceDialog } from './DuplicateNamespaceDialog'
 import { DuplicateNamespaceProgressDialog } from './DuplicateNamespaceProgressDialog'
@@ -332,13 +332,11 @@ export function NamespacesPanel() {
 
       {/* Footer - New namespace button and Index info */}
       <div className="px-3 py-2 border-t border-border space-y-2">
-        <button
+        <NewButton
           onClick={() => startNamespaceCreation(activeIndex)}
-          className="w-full h-6 flex items-center justify-center gap-1 text-[10px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] text-sidebar-foreground transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-          <span>New Namespace</span>
-        </button>
+          label="New Namespace"
+          title="Create new namespace"
+        />
         <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
           Index: <span className="text-sidebar-foreground">{activeIndex}</span>
         </div>

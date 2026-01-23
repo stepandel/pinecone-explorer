@@ -1,5 +1,6 @@
 import { useState, FormEvent, useEffect, useCallback } from 'react'
 import { ConnectionProfile } from '../../../electron/types'
+import { NewButton } from '../ui/new-button'
 
 interface ConnectionModalProps {
   isOpen: boolean
@@ -352,16 +353,11 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
 
         {/* New connection button */}
         <div className="p-2">
-          <button
+          <NewButton
             onClick={() => handleProfileSelect('')}
-            className={`w-full h-6 text-[11px] rounded transition-colors ${
-              !selectedProfileId
-                ? 'bg-black/[0.08] dark:bg-white/[0.10] text-foreground/70'
-                : 'text-foreground/40 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-foreground/60'
-            }`}
-          >
-            + New
-          </button>
+            label="New"
+            title="Create new connection"
+          />
         </div>
       </div>
     </div>
