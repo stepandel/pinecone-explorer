@@ -5,9 +5,9 @@ import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVec
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import VectorsTable from './VectorsTable'
-import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filters'
+import { FilterRow as FilterRowType } from '../../types/filters'
 import { TypedMetadataRecord, TypedMetadataField, typedMetadataToPineconeFormat, validateMetadataValue } from '../../types/metadata'
-import { LocalVectorRecord, DraftVector, parseFilterValue } from '../../types/vectors'
+import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
 import { FilterRow } from '../filters/FilterRow'
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover'
@@ -228,20 +228,6 @@ export default function VectorsView({
       return
     }
 
-    // Build metadata filter from filter rows
-    const metadataRows = filterRows.filter(
-      r => r.type === 'metadata' && r.metadataKey?.trim() && r.metadataValue?.trim()
-    )
-
-    const metadataFilter = metadataRows.length > 0
-      ? metadataRows.reduce((acc, row) => ({
-          ...acc,
-          [row.metadataKey!]: {
-            [row.operator || '$eq']: parseFilterValue(row.metadataValue!, row.operator || '$eq')
-          },
-        }), {})
-      : undefined
-
     setIsSearching(true)
     try {
       const result = await queryMutation.mutateAsync({
@@ -249,7 +235,6 @@ export default function VectorsView({
         namespace,
         queryText,
         topK: nResults || 10,
-        filter: metadataFilter,
         includeValues: true,
         includeMetadata: true,
       })
@@ -260,6 +245,7 @@ export default function VectorsView({
         metadata: match.metadata || null,
         embedding: match.values || null,
         sparseEmbedding: match.sparseValues || null,
+        distance: match.score,
       }))
       setSearchResults(results)
     } catch (error) {
@@ -309,15 +295,12 @@ export default function VectorsView({
   }, [rawVectors, searchResults, idFilterValue])
 
   // Extract unique metadata fields from vectors (needed for draft creation)
-  const metadataFields = useMemo(() => {
-    const fields = new Set<string>()
-    vectors.forEach((vec: LocalVectorRecord) => {
-      if (vec.metadata) {
-        Object.keys(vec.metadata).forEach(key => fields.add(key))
-      }
-    })
-    return Array.from(fields).sort()
-  }, [vectors])
+  const metadataFields = useMemo(() =>
+    Array.from(new Set(vectors.flatMap((vec: LocalVectorRecord) =>
+      vec.metadata ? Object.keys(vec.metadata) : []
+    ))).sort(),
+    [vectors]
+  )
 
   // Extract text fields (string-type metadata fields) for embedding text field dropdown
   const availableTextFields = useMemo(() => {
@@ -348,10 +331,9 @@ export default function VectorsView({
   const handleAddFilterRow = useCallback(() => {
     setFilterRows(prev => [...prev, {
       id: crypto.randomUUID(),
-      type: 'metadata',
-      metadataKey: '',
-      operator: '$eq' as MetadataOperator,
-      metadataValue: '',
+      type: 'select',
+      selectField: 'id',
+      selectValue: '',
     }])
   }, [])
 
@@ -365,7 +347,6 @@ export default function VectorsView({
 
   const hasActiveFilters = filterRows.some(row =>
     (row.type === 'search' && row.searchValue?.trim()) ||
-    (row.type === 'metadata' && row.metadataKey?.trim() && row.metadataValue?.trim()) ||
     (row.type === 'select' && row.selectValue?.trim())
   )
 
@@ -980,7 +961,6 @@ export default function VectorsView({
               onSearch={handleSearch}
               nResults={nResults}
               onNResultsChange={setNResults}
-              metadataFields={metadataFields}
             />
           ))}
         </div>
