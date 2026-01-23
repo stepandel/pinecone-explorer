@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { RefreshCw, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { RefreshCw, Trash2, Plus, ChevronDown, ChevronRight, Info } from 'lucide-react'
 import { useDraftNamespace } from '../../context/DraftNamespaceContext'
+import { usePinecone } from '../../providers/PineconeProvider'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcut'
 import { SHORTCUTS } from '../../constants/keyboard-shortcuts'
 import { MetadataFieldList } from '../shared/MetadataFieldEditor'
@@ -22,8 +23,29 @@ export function NamespaceConfigView() {
     isSaving,
     validationErrors,
   } = useDraftNamespace()
+  const { currentProfile } = usePinecone()
 
   const [expandedVectors, setExpandedVectors] = useState<Set<number>>(new Set([0]))
+  const [embeddingTextField, setEmbeddingTextField] = useState<string | null>(null)
+
+  // Fetch embedding text field configuration for this index
+  useEffect(() => {
+    if (!currentProfile || !draftNamespace) return
+
+    const fetchTextField = async () => {
+      try {
+        const textField = await window.electronAPI.profiles.getTextFieldOverride(
+          currentProfile.id,
+          draftNamespace.indexName
+        )
+        setEmbeddingTextField(textField || null)
+      } catch {
+        setEmbeddingTextField(null)
+      }
+    }
+
+    fetchTextField()
+  }, [currentProfile, draftNamespace?.indexName])
 
   const handleSave = () => {
     if (draftNamespace) saveDraft()
@@ -117,6 +139,32 @@ export function NamespaceConfigView() {
               ? 'Paste JSON to create one or more vectors'
               : 'Define the first vector(s) to create the namespace'}
           </p>
+
+          {/* Embedding Text Field Info */}
+          {embeddingTextField ? (
+            <div className="flex items-start gap-2 p-2 mb-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
+              <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="text-[11px] text-blue-600 dark:text-blue-400">
+                <span className="font-medium">Embedding field:</span>{' '}
+                <code className="px-1 py-0.5 bg-blue-500/10 rounded text-[10px] font-mono">
+                  {embeddingTextField}
+                </code>
+                <p className="mt-1 text-[10px] opacity-80">
+                  This field has been pre-added to your metadata. Fill it with text to auto-generate embeddings.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 p-2 mb-3 bg-amber-500/10 border border-amber-500/20 rounded-md">
+              <Info className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                <span className="font-medium">No embedding text field configured</span>
+                <p className="mt-1 text-[10px] opacity-80">
+                  Vectors will be created without embeddings. Configure an embedding text field in the index settings to enable auto-generation.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* JSON Mode */}

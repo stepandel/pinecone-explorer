@@ -34,7 +34,7 @@ interface DraftNamespaceContextValue {
   draftNamespace: DraftNamespace | null
   validationErrors: Record<string, string>
   isSaving: boolean
-  startCreation: (indexName: string) => void
+  startCreation: (indexName: string) => Promise<void>
   updateDraft: (updates: Partial<DraftNamespace>) => void
   updateVector: (index: number, updates: Partial<DraftVector>) => void
   addVector: () => void
@@ -51,15 +51,19 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
-// Create initial draft with one vector
-function createInitialDraft(indexName: string): DraftNamespace {
+// Create initial draft with one vector, optionally pre-populated with embedding text field
+function createInitialDraft(indexName: string, embeddingTextField?: string | null): DraftNamespace {
+  const initialMetadataFields: MetadataField[] = embeddingTextField
+    ? [{ key: embeddingTextField, type: 'string', value: '' }]
+    : []
+
   return {
     indexName,
     name: '',
     vectors: [
       {
         id: generateUUID(),
-        metadataFields: [],
+        metadataFields: initialMetadataFields,
       },
     ],
     jsonMode: false,
@@ -124,10 +128,23 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
   const { selectIndexAndNamespace } = useSelection()
   const queryClient = useQueryClient()
 
-  const startCreation = useCallback((indexName: string) => {
-    setDraftNamespace(createInitialDraft(indexName))
+  const startCreation = useCallback(async (indexName: string) => {
+    // Fetch embedding text field for this index to pre-populate
+    let embeddingTextField: string | null = null
+    if (currentProfile) {
+      try {
+        embeddingTextField = await window.electronAPI.profiles.getTextFieldOverride(
+          currentProfile.id,
+          indexName
+        )
+      } catch {
+        // No text field configured, that's fine
+      }
+    }
+
+    setDraftNamespace(createInitialDraft(indexName, embeddingTextField))
     setValidationErrors({})
-  }, [])
+  }, [currentProfile])
 
   const updateDraft = useCallback((updates: Partial<DraftNamespace>) => {
     setDraftNamespace((prev) => (prev ? { ...prev, ...updates } : prev))
@@ -154,13 +171,21 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
   const addVector = useCallback(() => {
     setDraftNamespace((prev) => {
       if (!prev) return prev
+      // Copy field structure from first vector (but with empty values)
+      const templateFields = prev.vectors[0]?.metadataFields || []
+      const newFields: MetadataField[] = templateFields.map((f) => ({
+        key: f.key,
+        type: f.type,
+        value: f.type === 'boolean' ? 'false' : f.type === 'number' ? '0' : f.type === 'string[]' ? '[]' : '',
+      }))
+
       return {
         ...prev,
         vectors: [
           ...prev.vectors,
           {
             id: generateUUID(),
-            metadataFields: [],
+            metadataFields: newFields,
           },
         ],
       }
