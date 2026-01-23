@@ -856,18 +856,18 @@ export default function VectorsView({
         setDeleteError(null)
       }
       // Command+Delete/Backspace to toggle deletion mark
-      if (matchesShortcut(e, SHORTCUTS.DELETE_DOCUMENTS) && !hasDrafts) {
+      if (matchesShortcut(e, SHORTCUTS.DELETE_VECTORS) && !hasDrafts) {
         if (isInputting) return
         e.preventDefault()
         handleToggleDeletion()
       }
       // Command+C to copy selected vectors (but not if text is selected - let native copy work)
-      if (matchesShortcut(e, SHORTCUTS.COPY_DOCUMENTS) && selectedVectorIds.size > 0 && !hasDrafts && !isInputting && !hasTextSelection) {
+      if (matchesShortcut(e, SHORTCUTS.COPY_VECTORS) && selectedVectorIds.size > 0 && !hasDrafts && !isInputting && !hasTextSelection) {
         e.preventDefault()
         handleCopyVectors()
       }
       // Command+V to paste vectors
-      if (matchesShortcut(e, SHORTCUTS.PASTE_DOCUMENTS) && hasCopiedVectors && !hasDrafts && !isInputting) {
+      if (matchesShortcut(e, SHORTCUTS.PASTE_VECTORS) && hasCopiedVectors && !hasDrafts && !isInputting) {
         e.preventDefault()
         handlePasteVectors()
       }

@@ -116,23 +116,6 @@ export function IndexesPanel() {
     return () => window.removeEventListener('menu:delete-index', handleMenuDelete)
   }, [activeIndex, openDeleteDialog])
 
-  // Keyboard shortcut: Cmd+Delete or Cmd+Backspace to delete active index
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
-        // Only trigger if not in an input/textarea and we have an active index
-        const target = e.target as HTMLElement
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && activeIndex) {
-          e.preventDefault()
-          openDeleteDialog(activeIndex)
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeIndex, openDeleteDialog])
-
   return (
     <aside
       className="h-full w-full flex flex-col flex-shrink-0"
