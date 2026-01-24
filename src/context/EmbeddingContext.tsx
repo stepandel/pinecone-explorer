@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, R
 import { usePinecone } from '../providers/PineconeProvider'
 import { useSelection } from './SelectionContext'
 import { useIndexesQuery } from '../hooks/usePineconeQueries'
-import { getEmbeddingFunctionByModel, resolveDimensionForIndex } from '../constants/embedding-functions'
 
 interface EmbeddingContextType {
   // Index's embed config from API (for integrated inference indexes)
@@ -113,25 +112,14 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
     // Don't allow override for integrated inference indexes
     if (!currentProfile?.id || !activeIndex || !canOverride) return
 
-    // Auto-resolve dimension based on index
-    const indexDimension = currentIndexInfo?.dimension
-    const embeddingFunc = getEmbeddingFunctionByModel(override.provider, override.modelName)
-
-    let resolvedOverride = override
-    if (embeddingFunc && indexDimension) {
-      const resolvedDimension = resolveDimensionForIndex(embeddingFunc, indexDimension)
-      if (resolvedDimension) {
-        resolvedOverride = { ...override, dimensions: resolvedDimension }
-      }
-    }
-
+    // Just save the provider/model selection - server auto-resolves dimension at query time
     await window.electronAPI.profiles.setEmbeddingOverride(
       currentProfile.id,
       activeIndex,
-      resolvedOverride
+      override
     )
-    setClientOverride(resolvedOverride)
-  }, [currentProfile?.id, activeIndex, canOverride, currentIndexInfo])
+    setClientOverride(override)
+  }, [currentProfile?.id, activeIndex, canOverride])
 
   const clearOverride = useCallback(async () => {
     if (!currentProfile?.id || !activeIndex) return
