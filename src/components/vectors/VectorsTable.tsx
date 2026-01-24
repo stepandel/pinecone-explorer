@@ -6,6 +6,7 @@ import {
   flexRender,
   HeaderGroup,
 } from '@tanstack/react-table'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { useTableSelection } from '../../hooks/useTableSelection'
 import { useInlineEditing } from '../../hooks/useInlineEditing'
@@ -30,6 +31,11 @@ interface VectorsTableProps {
   onTableContextMenu?: (e: React.MouseEvent) => void
   // Embedding text field (for highlighting the column used for embeddings)
   embeddingTextField?: string
+  // Pagination props
+  hasMore?: boolean
+  isFetchingMore?: boolean
+  onLoadMore?: () => void
+  totalVectorCount?: number
 }
 
 export default function VectorsTable({
@@ -50,10 +56,15 @@ export default function VectorsTable({
   onVectorContextMenu,
   onTableContextMenu,
   embeddingTextField,
+  hasMore = false,
+  isFetchingMore = false,
+  onLoadMore,
+  totalVectorCount,
 }: VectorsTableProps) {
-  // Refs for auto-focus
+  // Refs for auto-focus and virtualization
   const draftIdInputRef = useRef<HTMLInputElement>(null)
   const prevDraftCountRef = useRef<number>(0)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
 
   // Auto-focus draft input when drafts are first created
   useEffect(() => {
@@ -208,6 +219,20 @@ export default function VectorsTable({
     getCoreRowModel: getCoreRowModel(),
   })
 
+  // Total rows including drafts
+  const totalRows = draftVectors.length + vectors.length
+
+  // Virtual row height estimation
+  const ROW_HEIGHT = 32
+
+  // Virtualizer for efficient rendering
+  const rowVirtualizer = useVirtualizer({
+    count: totalRows,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  })
+
   // Loading state
   if (loading) {
     return (
@@ -260,9 +285,14 @@ export default function VectorsTable({
 
   const headerGroup = table.getHeaderGroups()[0]
   const idColIndex = hasDistances ? 1 : 0
+  const tableRows = table.getRowModel().rows
 
   return (
-    <div className="overflow-auto h-full" onContextMenu={onTableContextMenu}>
+    <div
+      ref={tableContainerRef}
+      className="overflow-auto h-full"
+      onContextMenu={onTableContextMenu}
+    >
       {/* Regenerate embedding dialog */}
       <RegenerateEmbeddingDialog
         open={pendingEmbeddingSave !== null}
@@ -273,83 +303,116 @@ export default function VectorsTable({
         isLoading={isRegenerating}
       />
 
-      <table style={{ minWidth: '100%', width: table.getCenterTotalSize() }}>
-        <thead className="sticky top-0 z-10" style={{ background: 'var(--canvas-background)', boxShadow: '0 1px 0 var(--border)' }}>
-          {table.getHeaderGroups().map(hg => (
-            <tr key={hg.id}>
-              {hg.headers.map(header => (
-                <th
-                  key={header.id}
-                  className="px-3 py-1.5 text-left text-[11px] font-medium text-muted-foreground/70 relative"
-                  style={{ width: header.getSize(), background: 'var(--canvas-background)' }}
-                >
-                  {!header.isPlaceholder && flexRender(header.column.columnDef.header, header.getContext())}
-                  <div
-                    onMouseDown={header.getResizeHandler()}
-                    onTouchStart={header.getResizeHandler()}
-                    className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-primary/40 ${
-                      header.column.getIsResizing() ? 'bg-primary/50' : ''
-                    }`}
-                  />
-                </th>
-              ))}
-              <th style={{ background: 'var(--canvas-background)' }} />
-            </tr>
-          ))}
-        </thead>
-        <tbody className="select-none">
-          {/* Draft rows */}
-          {draftVectors.map((draft, idx) => (
-            <DraftRow
-              key={`draft-${idx}`}
-              draft={draft}
-              index={idx}
-              isSelected={selectedVectorIds.has(draft.id)}
-              metadataKeys={metadataKeys}
-              hasDistances={hasDistances}
-              headerGroup={headerGroup}
-              idColIndex={idColIndex}
-              inputRef={idx === 0 ? draftIdInputRef : undefined}
-              onDraftChange={onDraftChange}
-              onRowClick={handleRowClick}
-              onRowDoubleClick={handleRowDoubleClick}
-              onMouseDown={handleMouseDown}
-              onMouseEnter={handleMouseEnter}
+      {/* Header row */}
+      <div
+        className="sticky top-0 z-10 flex"
+        style={{
+          background: 'var(--canvas-background)',
+          boxShadow: '0 1px 0 var(--border)',
+          minWidth: table.getCenterTotalSize(),
+        }}
+      >
+        {headerGroup.headers.map(header => (
+          <div
+            key={header.id}
+            className="px-3 py-1.5 text-left text-[11px] font-medium text-muted-foreground/70 relative flex-shrink-0"
+            style={{ width: header.getSize() }}
+          >
+            {!header.isPlaceholder && flexRender(header.column.columnDef.header, header.getContext())}
+            <div
+              onMouseDown={header.getResizeHandler()}
+              onTouchStart={header.getResizeHandler()}
+              className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-primary/40 ${
+                header.column.getIsResizing() ? 'bg-primary/50' : ''
+              }`}
             />
-          ))}
-          {/* Data rows */}
-          {table.getRowModel().rows.map((row, index) => {
-            const rowIndex = draftVectors.length + index
-            const adjustedIndex = draftVectors.length > 0 ? index + draftVectors.length : index
+          </div>
+        ))}
+        <div className="flex-1" />
+      </div>
 
+      {/* Virtual rows container */}
+      <div
+        className="select-none relative"
+        style={{
+          height: rowVirtualizer.getTotalSize(),
+          minWidth: table.getCenterTotalSize(),
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const isDraft = virtualRow.index < draftVectors.length
+
+          if (isDraft) {
+            const draft = draftVectors[virtualRow.index]
             return (
-              <DataRow
-                key={row.id}
-                row={row}
-                rowIndex={rowIndex}
-                adjustedIndex={adjustedIndex}
-                isSelected={selectedVectorIds.has(row.original.id)}
-                isMarkedForDeletion={markedForDeletion.has(row.original.id)}
-                isEditing={isEditing(row.original.id)}
-                editingState={editingState}
-                editingInputRef={editingInputRef}
+              <DraftRow
+                key={`draft-${virtualRow.index}`}
+                draft={draft}
+                index={virtualRow.index}
+                isSelected={selectedVectorIds.has(draft.id)}
                 metadataKeys={metadataKeys}
                 hasDistances={hasDistances}
                 headerGroup={headerGroup}
                 idColIndex={idColIndex}
+                inputRef={virtualRow.index === 0 ? draftIdInputRef : undefined}
+                onDraftChange={onDraftChange}
                 onRowClick={handleRowClick}
                 onRowDoubleClick={handleRowDoubleClick}
                 onMouseDown={handleMouseDown}
                 onMouseEnter={handleMouseEnter}
-                onContextMenu={onVectorContextMenu}
-                onEditChange={handleEditChange}
-                onEditKeyDown={handleEditKeyDown}
-                onEditBlur={saveEditing}
+                virtualTop={virtualRow.start}
+                virtualHeight={virtualRow.size}
               />
             )
-          })}
-        </tbody>
-      </table>
+          }
+
+          // Data row
+          const dataIndex = virtualRow.index - draftVectors.length
+          const row = tableRows[dataIndex]
+          if (!row) return null
+
+          return (
+            <DataRow
+              key={row.id}
+              row={row}
+              rowIndex={virtualRow.index}
+              adjustedIndex={virtualRow.index}
+              isSelected={selectedVectorIds.has(row.original.id)}
+              isMarkedForDeletion={markedForDeletion.has(row.original.id)}
+              isEditing={isEditing(row.original.id)}
+              editingState={editingState}
+              editingInputRef={editingInputRef}
+              metadataKeys={metadataKeys}
+              hasDistances={hasDistances}
+              headerGroup={headerGroup}
+              idColIndex={idColIndex}
+              onRowClick={handleRowClick}
+              onRowDoubleClick={handleRowDoubleClick}
+              onMouseDown={handleMouseDown}
+              onMouseEnter={handleMouseEnter}
+              onContextMenu={onVectorContextMenu}
+              onEditChange={handleEditChange}
+              onEditKeyDown={handleEditKeyDown}
+              onEditBlur={saveEditing}
+              virtualTop={virtualRow.start}
+              virtualHeight={virtualRow.size}
+            />
+          )
+        })}
+      </div>
+
+      {/* Load More button */}
+      {hasMore && (
+        <div className="flex justify-center py-3">
+          <button
+            onClick={onLoadMore}
+            disabled={isFetchingMore}
+            className="h-6 px-3 text-[11px] rounded-md border border-black/[0.08] dark:border-white/[0.1] bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] active:bg-black/[0.08] dark:active:bg-white/[0.1] text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isFetchingMore ? 'Loading...' : 'Load More'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -369,6 +432,8 @@ interface DraftRowProps {
   onRowDoubleClick: (e: React.MouseEvent, id: string) => void
   onMouseDown: (e: React.MouseEvent, index: number) => void
   onMouseEnter: (index: number) => void
+  virtualTop: number
+  virtualHeight: number
 }
 
 function DraftRow({
@@ -385,21 +450,31 @@ function DraftRow({
   onRowDoubleClick,
   onMouseDown,
   onMouseEnter,
+  virtualTop,
+  virtualHeight,
 }: DraftRowProps) {
   return (
-    <tr
-      className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/20 dark:bg-primary/30' : 'bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 dark:hover:bg-primary/20'}`}
+    <div
+      className={`flex cursor-pointer transition-colors ${isSelected ? 'bg-primary/20 dark:bg-primary/30' : 'bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 dark:hover:bg-primary/20'}`}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: virtualHeight,
+        transform: `translateY(${virtualTop}px)`,
+      }}
       onClick={e => onRowClick(e, draft.id, index)}
       onDoubleClick={e => onRowDoubleClick(e, draft.id)}
       onMouseDown={e => onMouseDown(e, index)}
       onMouseEnter={() => onMouseEnter(index)}
     >
       {hasDistances && (
-        <td className="pl-3 py-0.5 align-top" style={{ width: headerGroup?.headers[0]?.getSize() }}>
+        <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[0]?.getSize() }}>
           <div className="text-xs font-mono text-muted-foreground text-center">-</div>
-        </td>
+        </div>
       )}
-      <td className="pl-3 py-0.5 align-top" style={{ width: headerGroup?.headers[idColIndex]?.getSize() }}>
+      <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[idColIndex]?.getSize() }}>
         <input
           ref={inputRef}
           type="text"
@@ -408,9 +483,13 @@ function DraftRow({
           placeholder="Enter vector ID"
           className="w-full text-xs font-mono bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/50"
         />
-      </td>
-      {metadataKeys.map(key => (
-        <td key={key} className="pl-3 py-0.5 align-top">
+      </div>
+      {metadataKeys.map((key, idx) => (
+        <div
+          key={key}
+          className="pl-3 py-0.5 flex-shrink-0"
+          style={{ width: headerGroup?.headers[idColIndex + 1 + idx]?.getSize() }}
+        >
           <input
             type="text"
             value={draft.metadata[key]?.value || ''}
@@ -421,10 +500,10 @@ function DraftRow({
             placeholder="-"
             className="w-full text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/50 placeholder:italic"
           />
-        </td>
+        </div>
       ))}
-      <td />
-    </tr>
+      <div className="flex-1" />
+    </div>
   )
 }
 
@@ -450,6 +529,8 @@ interface DataRowProps {
   onEditChange: (field: string, value: string) => void
   onEditKeyDown: (e: React.KeyboardEvent) => void
   onEditBlur: () => void
+  virtualTop: number
+  virtualHeight: number
 }
 
 function DataRow({
@@ -473,6 +554,8 @@ function DataRow({
   onEditChange,
   onEditKeyDown,
   onEditBlur,
+  virtualTop,
+  virtualHeight,
 }: DataRowProps) {
   // Determine row background - using CSS variables for proper dark mode support
   let rowBgClass: string
@@ -491,28 +574,41 @@ function DataRow({
   }
 
   const vec = row.original
+  const rowStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: virtualHeight,
+    transform: `translateY(${virtualTop}px)`,
+  }
 
   // Editing row
   if (isEditing && editingState) {
     return (
-      <tr
-        className={`transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
+      <div
+        className={`flex transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
+        style={rowStyle}
         onContextMenu={e => onContextMenu?.(e, vec.id)}
       >
         {hasDistances && (
-          <td className="pl-3 py-0.5 align-top" style={{ width: headerGroup?.headers[0]?.getSize() }}>
+          <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[0]?.getSize() }}>
             <div className="text-xs font-mono text-muted-foreground text-center">
               {vec.distance !== null && vec.distance !== undefined ? vec.distance.toFixed(3) : '-'}
             </div>
-          </td>
+          </div>
         )}
-        <td className="pl-3 py-0.5 align-top" style={{ width: headerGroup?.headers[idColIndex]?.getSize() }}>
+        <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[idColIndex]?.getSize() }}>
           <div className="text-xs font-mono text-foreground">{vec.id}</div>
-        </td>
+        </div>
         {metadataKeys.map((key, idx) => {
           const value = editingState.metadata[key]
           return (
-            <td key={key} className="pl-3 py-0.5 align-top">
+            <div
+              key={key}
+              className="pl-3 py-0.5 flex-shrink-0"
+              style={{ width: headerGroup?.headers[idColIndex + 1 + idx]?.getSize() }}
+            >
               <input
                 ref={idx === 0 ? editingInputRef : undefined}
                 type="text"
@@ -523,18 +619,19 @@ function DataRow({
                 placeholder="-"
                 className="w-full text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/50 placeholder:italic"
               />
-            </td>
+            </div>
           )
         })}
-        <td />
-      </tr>
+        <div className="flex-1" />
+      </div>
     )
   }
 
   // Normal row
   return (
-    <tr
-      className={`transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
+    <div
+      className={`flex transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
+      style={rowStyle}
       onClick={e => onRowClick(e, vec.id, rowIndex)}
       onDoubleClick={e => onRowDoubleClick(e, vec.id)}
       onMouseDown={e => onMouseDown(e, rowIndex)}
@@ -542,11 +639,15 @@ function DataRow({
       onContextMenu={e => onContextMenu?.(e, vec.id)}
     >
       {row.getVisibleCells().map(cell => (
-        <td key={cell.id} className="pl-3 py-0.5 align-top" style={{ width: cell.column.getSize() }}>
+        <div
+          key={cell.id}
+          className="pl-3 py-0.5 flex-shrink-0"
+          style={{ width: cell.column.getSize() }}
+        >
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </td>
+        </div>
       ))}
-      <td />
-    </tr>
+      <div className="flex-1" />
+    </div>
   )
 }

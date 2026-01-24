@@ -24,6 +24,7 @@ import {
   FetchVectorsParams,
   EmbeddingConfig,
   HybridEmbeddingConfig,
+  GetVectorsPaginatedParams,
 } from './types'
 import { initAutoUpdater, checkForUpdates } from './auto-updater'
 
@@ -179,6 +180,25 @@ ipcMain.handle('pinecone:getAllVectors', async (_event, profileId: string, index
     }
     const vectors = await service.getAllVectors(indexName, namespace, limit)
     return { success: true, data: vectors }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch vectors'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('pinecone:getVectorsPaginated', async (_event, profileId: string, params: GetVectorsPaginatedParams) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const result = await service.getVectorsPaginated(
+      params.indexName,
+      params.namespace,
+      params.pageSize,
+      params.cursor
+    )
+    return { success: true, data: result }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch vectors'
     return { success: false, error: message }

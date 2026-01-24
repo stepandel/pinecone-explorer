@@ -22,6 +22,7 @@ import {
   CloneResult,
   EmbeddingConfig,
   HybridEmbeddingConfig,
+  PaginatedVectorsResult,
 } from './types'
 import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-service'
 
@@ -1049,6 +1050,7 @@ class PineconeService {
   /**
    * Clone vectors from one namespace to another.
    * Can be used independently or as part of cloneIndex.
+   * Uses parallel batch processing (3 concurrent upserts) for ~3x speedup.
    */
   async cloneNamespace(params: {
     sourceIndexName: string
@@ -1074,6 +1076,9 @@ class PineconeService {
       signal,
     } = params
 
+    // Number of concurrent upsert operations (3x parallelization)
+    const PARALLEL_UPSERTS = 3
+
     // Auto-resolve dimension based on target index dimension
     let embeddingConfig = params.embeddingConfig
     if (embeddingConfig) {
@@ -1087,22 +1092,30 @@ class PineconeService {
     let dimensionValidated = !validateDimensions
     let paginationToken: string | undefined
 
+    // Track pending upsert operations for parallel processing
+    const pendingUpserts: Promise<{ count: number }>[] = []
+
     try {
       do {
         if (signal?.aborted) {
+          // Wait for any pending upserts before returning
+          await Promise.allSettled(pendingUpserts)
           return { success: false, copiedVectors, error: 'Operation cancelled' }
         }
 
+        // List next batch of vector IDs
         const listResult = await sourceNs.listPaginated({ limit: PineconeService.BATCH_SIZE, paginationToken })
         const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
         paginationToken = listResult.pagination?.next
 
         if (ids.length === 0) break
 
+        // Fetch vector data
         const fetchResult = await sourceNs.fetch(ids)
         const records = Object.values(fetchResult.records || {})
         if (records.length === 0) continue
 
+        // Prepare vectors (may include embedding regeneration)
         const vectorsToUpsert = await this.prepareCloneVectors(
           records,
           regenerateEmbeddings,
@@ -1110,21 +1123,59 @@ class PineconeService {
           textField
         )
 
-        // Validate dimensions on first batch if requested
-        if (!dimensionValidated && vectorsToUpsert.length > 0) {
+        if (vectorsToUpsert.length === 0) continue
+
+        // Validate dimensions on first batch if requested (must be sync)
+        if (!dimensionValidated) {
           await this.validateCloneDimensions(vectorsToUpsert, targetIndexName)
           dimensionValidated = true
         }
 
-        await targetNs.upsert(vectorsToUpsert as PineconeRecord[])
-        copiedVectors += vectorsToUpsert.length
-        onProgress?.(copiedVectors)
+        // If we have max parallel upserts in flight, wait for one to complete
+        if (pendingUpserts.length >= PARALLEL_UPSERTS) {
+          const completed = await Promise.race(pendingUpserts)
+          copiedVectors += completed.count
+          onProgress?.(copiedVectors)
+          // Remove completed promise from array
+          const idx = pendingUpserts.findIndex(p => p === Promise.race([p]).then(() => p))
+          if (idx >= 0) pendingUpserts.splice(idx, 1)
+        }
+
+        // Queue the upsert operation (don't await)
+        const upsertCount = vectorsToUpsert.length
+        const upsertPromise = targetNs.upsert(vectorsToUpsert as PineconeRecord[])
+          .then(() => ({ count: upsertCount }))
+
+        pendingUpserts.push(upsertPromise)
+
+        // Clean up completed promises from the array
+        const stillPending: Promise<{ count: number }>[] = []
+        for (const p of pendingUpserts) {
+          const result = await Promise.race([p, Promise.resolve(null)])
+          if (result === null) {
+            stillPending.push(p)
+          } else {
+            copiedVectors += result.count
+            onProgress?.(copiedVectors)
+          }
+        }
+        pendingUpserts.length = 0
+        pendingUpserts.push(...stillPending)
 
       } while (paginationToken)
+
+      // Wait for all remaining upserts to complete
+      const finalResults = await Promise.all(pendingUpserts)
+      for (const result of finalResults) {
+        copiedVectors += result.count
+      }
+      onProgress?.(copiedVectors)
 
       return { success: true, copiedVectors }
 
     } catch (error) {
+      // Wait for pending operations before reporting error
+      await Promise.allSettled(pendingUpserts)
       const message = error instanceof Error ? error.message : 'Failed to clone namespace'
       return { success: false, copiedVectors, error: message }
     }
@@ -1251,6 +1302,44 @@ class PineconeService {
     } while (paginationToken)
 
     return allVectors
+  }
+
+  /**
+   * Get vectors with server-side pagination
+   * Returns a page of vectors with cursor for next page
+   */
+  async getVectorsPaginated(
+    indexName: string,
+    namespace?: string,
+    pageSize: number = 100,
+    cursor?: string
+  ): Promise<PaginatedVectorsResult> {
+    const ns = this.getNamespace(indexName, namespace)
+
+    const listResult = await ns.listPaginated({
+      limit: Math.min(pageSize, PineconeService.BATCH_SIZE),
+      paginationToken: cursor,
+    })
+
+    const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
+
+    if (ids.length === 0) {
+      return { vectors: [], nextCursor: undefined, hasMore: false }
+    }
+
+    const fetchResult = await ns.fetch(ids)
+    const vectors = Object.values(fetchResult.records || {}).map(record => ({
+      id: record.id,
+      values: record.values || [],
+      metadata: record.metadata || null,
+      sparseValues: record.sparseValues,
+    }))
+
+    return {
+      vectors,
+      nextCursor: listResult.pagination?.next,
+      hasMore: !!listResult.pagination?.next,
+    }
   }
 }
 

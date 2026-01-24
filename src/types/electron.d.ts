@@ -228,6 +228,19 @@ declare global {
     error?: string
   }
 
+  interface PaginatedVectorsResult {
+    vectors: VectorRecord[]
+    nextCursor: string | undefined
+    hasMore: boolean
+  }
+
+  interface GetVectorsPaginatedParams {
+    indexName: string
+    namespace?: string
+    pageSize?: number
+    cursor?: string
+  }
+
   interface UpdateInfo {
     version: string
     releaseDate?: string
@@ -252,6 +265,7 @@ declare global {
       listIndexes: (profileId: string) => Promise<IndexInfo[]>
       getIndexStats: (profileId: string, indexName: string) => Promise<IndexStats>
       getAllVectors: (profileId: string, indexName: string, namespace?: string, limit?: number) => Promise<VectorRecord[]>
+      getVectorsPaginated: (profileId: string, params: GetVectorsPaginatedParams) => Promise<PaginatedVectorsResult>
       queryVectors: (profileId: string, params: QueryVectorsParams) => Promise<QueryResult>
       createVector: (profileId: string, params: CreateVectorParams) => Promise<void>
       updateVector: (profileId: string, params: UpdateVectorParams) => Promise<void>
