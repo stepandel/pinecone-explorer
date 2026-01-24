@@ -20,6 +20,7 @@ import {
   ListVectorsResult,
   FetchVectorsParams,
   EmbeddingConfig,
+  HybridEmbeddingConfig,
 } from './types'
 
 console.log('Preload script is running!')
@@ -261,6 +262,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     clearTextFieldOverride: async (profileId: string, indexName: string): Promise<void> => {
       const result = await ipcRenderer.invoke('profiles:clearTextFieldOverride', profileId, indexName)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    getHybridEmbeddingOverride: async (profileId: string, indexName: string): Promise<HybridEmbeddingConfig | null> => {
+      const result = await ipcRenderer.invoke('profiles:getHybridEmbeddingOverride', profileId, indexName)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    setHybridEmbeddingOverride: async (profileId: string, indexName: string, override: HybridEmbeddingConfig): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:setHybridEmbeddingOverride', profileId, indexName, override)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    clearHybridEmbeddingOverride: async (profileId: string, indexName: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:clearHybridEmbeddingOverride', profileId, indexName)
       if (!result.success) {
         throw new Error(result.error)
       }

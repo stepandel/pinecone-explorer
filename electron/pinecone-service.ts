@@ -21,6 +21,7 @@ import {
   CloneProgress,
   CloneResult,
   EmbeddingConfig,
+  HybridEmbeddingConfig,
 } from './types'
 import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-service'
 
@@ -155,6 +156,43 @@ class PineconeService {
   hasIntegratedInference(indexName: string): boolean {
     const indexInfo = this.indexInfoCache.get(indexName)
     return !!indexInfo?.embed
+  }
+
+  /**
+   * Check if an index supports hybrid search.
+   * Hybrid search requires: dense vector type + dotproduct metric
+   */
+  isHybridCapable(indexName: string): boolean {
+    const info = this.indexInfoCache.get(indexName)
+    if (!info) return false
+    const isDense = !info.vectorType || info.vectorType === 'dense'
+    return isDense && info.metric === 'dotproduct'
+  }
+
+  /**
+   * Get hybrid embedding config for an index from profile overrides
+   */
+  getHybridEmbeddingConfig(indexName: string): HybridEmbeddingConfig | null {
+    return this.profile?.hybridEmbeddingOverrides?.[indexName] ?? null
+  }
+
+  /**
+   * Apply alpha weighting to dense and sparse vectors for hybrid search.
+   * alpha=1.0 → pure semantic (dense only)
+   * alpha=0.0 → pure keyword (sparse only)
+   */
+  private applyAlphaWeighting(
+    denseVector: number[],
+    sparseVector: SparseVector,
+    alpha: number
+  ): { vector: number[]; sparseVector: SparseVector } {
+    return {
+      vector: denseVector.map(v => v * alpha),
+      sparseVector: {
+        indices: sparseVector.indices,
+        values: sparseVector.values.map(v => v * (1 - alpha)),
+      },
+    }
   }
 
   /**
@@ -378,10 +416,14 @@ class PineconeService {
    * 1. Query by vector/text within a namespace (namespace specified)
    * 2. Query by vector/text across all namespaces (namespace omitted)
    * 3. Query by existing vector ID (id specified) - finds similar vectors using that vector's embedding
+   *
+   * For hybrid indexes (dense + dotproduct), if hybrid config is set and alpha is provided,
+   * generates both dense and sparse embeddings and applies alpha weighting.
    */
   async queryVectors(
     params: QueryVectorsParams,
-    embeddingConfigOverride?: EmbeddingConfig
+    embeddingConfigOverride?: EmbeddingConfig,
+    hybridConfigOverride?: HybridEmbeddingConfig
   ): Promise<QueryResult> {
     const index = this.getIndex(params.indexName)
 
@@ -419,25 +461,51 @@ class PineconeService {
 
     // If queryText is provided, generate embedding
     if (params.queryText && !queryVector && !querySparseVector) {
-      let embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
-      if (!embeddingConfig) {
-        throw new Error(
-          'No embedding configuration found. Please configure an embedding provider to search by text.'
+      // Check for hybrid query: if index is hybrid-capable and we have a hybrid config + alpha
+      const hybridConfig = hybridConfigOverride || this.getHybridEmbeddingConfig(params.indexName)
+      const alpha = params.alpha
+
+      if (this.isHybridCapable(params.indexName) && hybridConfig && alpha !== undefined) {
+        // Hybrid query: generate both dense and sparse embeddings
+        const denseConfig = this.resolveEmbeddingDimension(hybridConfig.denseConfig, params.indexName)
+        const sparseConfig = hybridConfig.sparseConfig
+
+        const hybridResult = await this.embeddingService!.generateHybridEmbeddings(
+          [params.queryText],
+          { ...denseConfig, inputType: 'query' },
+          { ...sparseConfig, inputType: 'query' }
         )
-      }
 
-      // Auto-resolve dimension based on index dimension
-      embeddingConfig = this.resolveEmbeddingDimension(embeddingConfig, params.indexName)
-
-      // Use inputType: 'query' for search operations
-      const embeddingResult = await this.embeddingService!.generateEmbeddings(
-        [params.queryText],
-        { ...embeddingConfig, inputType: 'query' }
-      )
-      if (embeddingResult.type === 'dense') {
-        queryVector = embeddingResult.values[0]
+        // Apply alpha weighting
+        const weighted = this.applyAlphaWeighting(
+          hybridResult.dense.values[0],
+          hybridResult.sparse.sparseValues[0],
+          alpha
+        )
+        queryVector = weighted.vector
+        querySparseVector = weighted.sparseVector
       } else {
-        querySparseVector = embeddingResult.sparseValues[0]
+        // Standard query: single embedding type
+        let embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+        if (!embeddingConfig) {
+          throw new Error(
+            'No embedding configuration found. Please configure an embedding provider to search by text.'
+          )
+        }
+
+        // Auto-resolve dimension based on index dimension
+        embeddingConfig = this.resolveEmbeddingDimension(embeddingConfig, params.indexName)
+
+        // Use inputType: 'query' for search operations
+        const embeddingResult = await this.embeddingService!.generateEmbeddings(
+          [params.queryText],
+          { ...embeddingConfig, inputType: 'query' }
+        )
+        if (embeddingResult.type === 'dense') {
+          queryVector = embeddingResult.values[0]
+        } else {
+          querySparseVector = embeddingResult.sparseValues[0]
+        }
       }
     }
 
@@ -509,10 +577,12 @@ class PineconeService {
 
   /**
    * Create a single vector (with optional embedding generation)
+   * For hybrid indexes, generates both dense and sparse embeddings if hybrid config is set.
    */
   async createVector(
     params: CreateVectorParams,
-    embeddingConfigOverride?: EmbeddingConfig
+    embeddingConfigOverride?: EmbeddingConfig,
+    hybridConfigOverride?: HybridEmbeddingConfig
   ): Promise<void> {
     const metadata: Record<string, unknown> = { ...params.metadata }
     // Use params.textField if provided, otherwise fall back to index's embed config or '_text'
@@ -522,13 +592,34 @@ class PineconeService {
     let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
 
     if (params.generateEmbedding && params.text) {
-      let config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
-      if (!config) {
-        throw new Error('No embedding configuration found. Please configure an embedding provider.')
+      // Check for hybrid mode: if index is hybrid-capable and we have hybrid config
+      const hybridConfig = hybridConfigOverride || this.getHybridEmbeddingConfig(params.indexName)
+
+      if (this.isHybridCapable(params.indexName) && hybridConfig) {
+        // Hybrid upsert: generate both dense and sparse embeddings
+        const denseConfig = this.resolveEmbeddingDimension(hybridConfig.denseConfig, params.indexName)
+        const sparseConfig = hybridConfig.sparseConfig
+
+        const hybridResult = await this.embeddingService!.generateHybridEmbeddings(
+          [params.text],
+          { ...denseConfig, inputType: 'passage' },
+          { ...sparseConfig, inputType: 'passage' }
+        )
+
+        embedding = {
+          values: hybridResult.dense.values[0],
+          sparseValues: hybridResult.sparse.sparseValues[0],
+        }
+      } else {
+        // Standard embedding: single type
+        let config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+        if (!config) {
+          throw new Error('No embedding configuration found. Please configure an embedding provider.')
+        }
+        // Auto-resolve dimension based on index dimension
+        config = this.resolveEmbeddingDimension(config, params.indexName)
+        embedding = await this.generateSingleEmbedding(params.text, config)
       }
-      // Auto-resolve dimension based on index dimension
-      config = this.resolveEmbeddingDimension(config, params.indexName)
-      embedding = await this.generateSingleEmbedding(params.text, config)
     }
 
     if (!embedding.values && !embedding.sparseValues) {
@@ -544,10 +635,12 @@ class PineconeService {
 
   /**
    * Update a vector
+   * For hybrid indexes, regenerates both dense and sparse embeddings if hybrid config is set.
    */
   async updateVector(
     params: UpdateVectorParams,
-    embeddingConfigOverride?: EmbeddingConfig
+    embeddingConfigOverride?: EmbeddingConfig,
+    hybridConfigOverride?: HybridEmbeddingConfig
   ): Promise<void> {
     const ns = this.getNamespace(params.indexName, params.namespace)
 
@@ -562,13 +655,34 @@ class PineconeService {
       // Get text to embed: explicit params.text, or from metadata field
       const textToEmbed = params.text || (metadata[textField] as string | undefined)
       if (textToEmbed && typeof textToEmbed === 'string') {
-        let config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
-        if (!config) {
-          throw new Error('No embedding configuration found. Please configure an embedding provider.')
+        // Check for hybrid mode
+        const hybridConfig = hybridConfigOverride || this.getHybridEmbeddingConfig(params.indexName)
+
+        if (this.isHybridCapable(params.indexName) && hybridConfig) {
+          // Hybrid update: generate both dense and sparse embeddings
+          const denseConfig = this.resolveEmbeddingDimension(hybridConfig.denseConfig, params.indexName)
+          const sparseConfig = hybridConfig.sparseConfig
+
+          const hybridResult = await this.embeddingService!.generateHybridEmbeddings(
+            [textToEmbed],
+            { ...denseConfig, inputType: 'passage' },
+            { ...sparseConfig, inputType: 'passage' }
+          )
+
+          embedding = {
+            values: hybridResult.dense.values[0],
+            sparseValues: hybridResult.sparse.sparseValues[0],
+          }
+        } else {
+          // Standard update: single embedding type
+          let config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+          if (!config) {
+            throw new Error('No embedding configuration found. Please configure an embedding provider.')
+          }
+          // Auto-resolve dimension based on index dimension
+          config = this.resolveEmbeddingDimension(config, params.indexName)
+          embedding = await this.generateSingleEmbedding(textToEmbed, config)
         }
-        // Auto-resolve dimension based on index dimension
-        config = this.resolveEmbeddingDimension(config, params.indexName)
-        embedding = await this.generateSingleEmbedding(textToEmbed, config)
       }
     }
 
@@ -615,11 +729,13 @@ class PineconeService {
 
   /**
    * Batch import vectors with optional embedding generation
+   * For hybrid indexes, generates both dense and sparse embeddings if hybrid config is set.
    */
   async batchImport(
     params: BatchImportParams,
     embeddingConfigOverride?: EmbeddingConfig,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    hybridConfigOverride?: HybridEmbeddingConfig
   ): Promise<BatchImportResult> {
     const errors: string[] = []
     let upsertedCount = 0
@@ -628,6 +744,11 @@ class PineconeService {
     if (embeddingConfig) {
       embeddingConfig = this.resolveEmbeddingDimension(embeddingConfig, params.indexName)
     }
+
+    // Check for hybrid mode
+    const hybridConfig = hybridConfigOverride || this.getHybridEmbeddingConfig(params.indexName)
+    const useHybrid = this.isHybridCapable(params.indexName) && hybridConfig
+
     // Use params.textField if provided, otherwise fall back to index's embed config or '_text'
     const textField = params.textField || this.getTextFieldForIndex(params.indexName)
 
@@ -635,7 +756,9 @@ class PineconeService {
       const batch = params.vectors.slice(i, i + PineconeService.BATCH_SIZE)
 
       try {
-        const vectorsToUpsert = await this.prepareBatchVectors(batch, params.generateEmbeddings, embeddingConfig, textField)
+        const vectorsToUpsert = useHybrid
+          ? await this.prepareBatchVectorsHybrid(batch, params.generateEmbeddings, hybridConfig!, textField, params.indexName)
+          : await this.prepareBatchVectors(batch, params.generateEmbeddings, embeddingConfig, textField)
 
         if (vectorsToUpsert.length > 0) {
           await this.upsertVectors({
@@ -687,6 +810,71 @@ class PineconeService {
         return { id: v.id, values: embeddingResult.values[embeddingIndex++], metadata }
       } else if (embeddingResult?.type === 'sparse') {
         return { id: v.id, sparseValues: embeddingResult.sparseValues[embeddingIndex++], metadata }
+      }
+      return { id: v.id, metadata }
+    })
+  }
+
+  /**
+   * Prepare a batch of vectors for hybrid upsert, generating both dense and sparse embeddings
+   */
+  private async prepareBatchVectorsHybrid(
+    batch: Array<{ id: string; text?: string; values?: number[]; metadata?: Record<string, unknown> }>,
+    generateEmbeddings?: boolean,
+    hybridConfig?: HybridEmbeddingConfig,
+    textField: string = '_text',
+    indexName?: string
+  ): Promise<Array<{ id: string; values?: number[]; sparseValues?: SparseVector; metadata?: Record<string, unknown> }>> {
+    if (!generateEmbeddings || !hybridConfig) {
+      return batch.filter(v => v.values).map(v => ({
+        id: v.id,
+        values: v.values!,
+        metadata: v.metadata,
+      }))
+    }
+
+    // Get vectors that need embeddings (have text but no values)
+    const textsToEmbed = batch.filter(v => v.text && !v.values).map(v => v.text!)
+
+    if (textsToEmbed.length === 0) {
+      // No text to embed, just return vectors with existing values
+      return batch.filter(v => v.values).map(v => ({
+        id: v.id,
+        values: v.values!,
+        metadata: v.metadata,
+      }))
+    }
+
+    // Auto-resolve dimension for dense config
+    const denseConfig = indexName
+      ? this.resolveEmbeddingDimension(hybridConfig.denseConfig, indexName)
+      : hybridConfig.denseConfig
+
+    // Generate both dense and sparse embeddings
+    const hybridResult = await this.embeddingService!.generateHybridEmbeddings(
+      textsToEmbed,
+      { ...denseConfig, inputType: 'passage' },
+      { ...hybridConfig.sparseConfig, inputType: 'passage' }
+    )
+
+    let embeddingIndex = 0
+    return batch.map(v => {
+      const metadata: Record<string, unknown> = { ...v.metadata }
+      if (v.text) metadata[textField] = v.text
+
+      if (v.values) {
+        // Use existing values
+        return { id: v.id, values: v.values, metadata }
+      } else if (v.text) {
+        // Use generated hybrid embeddings
+        const result = {
+          id: v.id,
+          values: hybridResult.dense.values[embeddingIndex],
+          sparseValues: hybridResult.sparse.sparseValues[embeddingIndex],
+          metadata,
+        }
+        embeddingIndex++
+        return result
       }
       return { id: v.id, metadata }
     })

@@ -24,6 +24,10 @@ interface QueryToolbarProps {
   // Loading/error state
   isSearching?: boolean
   error?: string | null
+  // Hybrid search support
+  isHybridEnabled?: boolean
+  alpha?: number
+  onAlphaChange?: (alpha: number) => void
 }
 
 const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
@@ -48,6 +52,9 @@ export function QueryToolbar({
   onSearch,
   isSearching,
   error,
+  isHybridEnabled,
+  alpha = 0.5,
+  onAlphaChange,
 }: QueryToolbarProps) {
   // Handle filter changes
   const handleFilterChange = useCallback((id: string, updates: Partial<MetadataFilter>) => {
@@ -156,6 +163,25 @@ export function QueryToolbar({
           {isSearching ? 'Searching...' : 'Search'}
         </button>
       </div>
+
+      {/* Hybrid search alpha slider */}
+      {isHybridEnabled && scope !== 'id' && (
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-[11px] text-muted-foreground whitespace-nowrap">Keyword</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            value={alpha}
+            onChange={(e) => onAlphaChange?.(parseFloat(e.target.value))}
+            className="flex-1 h-1 bg-black/[0.1] dark:bg-white/[0.1] rounded-lg appearance-none cursor-pointer accent-[#007AFF]"
+            style={{ maxWidth: '120px' }}
+          />
+          <span className="text-[11px] text-muted-foreground whitespace-nowrap">Semantic</span>
+          <span className="text-[11px] text-muted-foreground/70 ml-1 tabular-nums">{alpha.toFixed(1)}</span>
+        </div>
+      )}
 
       {/* Error display */}
       {error && (

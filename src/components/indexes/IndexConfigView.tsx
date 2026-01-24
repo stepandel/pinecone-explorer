@@ -49,6 +49,10 @@ export function IndexConfigView() {
   const [firstVectorJsonValue, setFirstVectorJsonValue] = useState('')
   const [firstVectorJsonError, setFirstVectorJsonError] = useState<string | null>(null)
 
+  // Hybrid search state
+  const [isHybridEnabled, setIsHybridEnabled] = useState(false)
+  const [sparseEmbeddingId, setSparseEmbeddingId] = useState('pinecone-sparse-english-v0')
+
   // Derived state from selected embedding
   const selectedEmbedding = getEmbeddingFunctionById(selectedEmbeddingId)
   const isSparseModel = selectedEmbedding?.vectorType === 'sparse'
@@ -56,6 +60,12 @@ export function IndexConfigView() {
   const availableDimensions = isSparseModel || !selectedEmbedding
     ? []
     : selectedEmbedding.availableDimensions ?? (selectedEmbedding.defaultDimension ? [selectedEmbedding.defaultDimension] : [])
+
+  // Check if hybrid is possible (dense model + dotproduct metric)
+  const canEnableHybrid = !isSparseModel && draftIndex?.metric === 'dotproduct'
+
+  // Get sparse embedding functions for hybrid mode
+  const sparseEmbeddingFunctions = EMBEDDING_FUNCTIONS.filter(ef => ef.vectorType === 'sparse')
 
   // Derived cloud/region from draft (single source of truth)
   const cloud = (draftIndex?.serverlessSpec?.cloud as CloudProvider) || 'aws'
@@ -72,6 +82,31 @@ export function IndexConfigView() {
       ...(isSparse ? { serverlessSpec: { cloud: 'aws', region: 'us-east-1' } } : {}),
     })
   }, [selectedEmbeddingId])
+
+  // Disable hybrid when it's no longer possible (e.g., metric changed from dotproduct)
+  useEffect(() => {
+    if (!canEnableHybrid && isHybridEnabled) {
+      setIsHybridEnabled(false)
+    }
+  }, [canEnableHybrid, isHybridEnabled])
+
+  // Sync hybrid state to draft
+  useEffect(() => {
+    if (isHybridEnabled && canEnableHybrid) {
+      updateDraft({
+        isHybridEnabled: true,
+        hybridConfig: {
+          denseEmbeddingFunctionId: selectedEmbeddingId,
+          sparseEmbeddingFunctionId: sparseEmbeddingId,
+        },
+      })
+    } else {
+      updateDraft({
+        isHybridEnabled: false,
+        hybridConfig: undefined,
+      })
+    }
+  }, [isHybridEnabled, canEnableHybrid, selectedEmbeddingId, sparseEmbeddingId])
 
   // Sync first namespace state to draft
   useEffect(() => {
@@ -300,6 +335,45 @@ export function IndexConfigView() {
             {selectedEmbedding?.label} supports: {supportedMetrics.join(', ')}
           </p>
         </div>
+
+        {/* Hybrid Search - only shown when dense model + dotproduct metric */}
+        {canEnableHybrid && (
+          <div className="space-y-2 p-2 bg-blue-500/5 border border-blue-500/20 rounded-md">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isHybridEnabled}
+                onChange={(e) => setIsHybridEnabled(e.target.checked)}
+                className="h-3 w-3 rounded"
+              />
+              <span className="text-[11px] font-medium text-foreground">Enable Hybrid Search</span>
+            </label>
+            <p className="text-[10px] text-muted-foreground pl-5">
+              Combines semantic (dense) and keyword (sparse) vectors for improved retrieval
+            </p>
+
+            {isHybridEnabled && (
+              <div className="space-y-1 pl-5 pt-1">
+                <label className="text-[10px] font-medium text-muted-foreground">
+                  Sparse Model
+                </label>
+                <div className="relative">
+                  <select
+                    value={sparseEmbeddingId}
+                    onChange={(e) => setSparseEmbeddingId(e.target.value)}
+                    className="w-full h-6 appearance-none rounded-md border border-input bg-background pl-1.5 pr-6 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                    style={inputStyle}
+                  >
+                    {sparseEmbeddingFunctions.map(ef => (
+                      <option key={ef.id} value={ef.id}>{ef.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Cloud Provider */}
         <div className="space-y-1">

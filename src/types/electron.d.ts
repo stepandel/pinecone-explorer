@@ -27,6 +27,15 @@ declare global {
     inputType?: 'query' | 'passage' // For Pinecone inference: 'query' for search, 'passage' for upsert (set at call time)
   }
 
+  /**
+   * Hybrid embedding configuration for indexes that support both dense and sparse vectors
+   */
+  interface HybridEmbeddingConfig {
+    denseConfig: EmbeddingConfig    // Dense model (e.g., llama-text-embed-v2)
+    sparseConfig: EmbeddingConfig   // Sparse model (pinecone-sparse-english-v0)
+    defaultAlpha?: number           // Default alpha for queries (0.5 if not set)
+  }
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -35,6 +44,8 @@ declare global {
     lastUsed?: number
     defaultEmbeddingConfig?: EmbeddingConfig
     embeddingOverrides?: Record<string, EmbeddingConfig>
+    // Per-index hybrid embedding overrides (for indexes with dotproduct metric)
+    hybridEmbeddingOverrides?: Record<string, HybridEmbeddingConfig>
     // Per-index text field overrides (metadata field containing text for embedding)
     textFieldOverrides?: Record<string, string>
   }
@@ -93,6 +104,7 @@ declare global {
     filter?: Record<string, unknown>
     includeValues?: boolean
     includeMetadata?: boolean
+    alpha?: number // Hybrid query alpha (0.0-1.0): 1.0 = pure semantic, 0.0 = pure keyword
   }
 
   interface QueryResult {
@@ -274,6 +286,9 @@ declare global {
       getEmbeddingOverride: (profileId: string, indexName: string) => Promise<EmbeddingConfig | null>
       setEmbeddingOverride: (profileId: string, indexName: string, override: EmbeddingConfig) => Promise<void>
       clearEmbeddingOverride: (profileId: string, indexName: string) => Promise<void>
+      getHybridEmbeddingOverride: (profileId: string, indexName: string) => Promise<HybridEmbeddingConfig | null>
+      setHybridEmbeddingOverride: (profileId: string, indexName: string, override: HybridEmbeddingConfig) => Promise<void>
+      clearHybridEmbeddingOverride: (profileId: string, indexName: string) => Promise<void>
       getTextFieldOverride: (profileId: string, indexName: string) => Promise<string | null>
       setTextFieldOverride: (profileId: string, indexName: string, textField: string) => Promise<void>
       clearTextFieldOverride: (profileId: string, indexName: string) => Promise<void>
