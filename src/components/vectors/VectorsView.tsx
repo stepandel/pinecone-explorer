@@ -144,6 +144,7 @@ export default function VectorsView({
   // Search results state
   const [searchResults, setSearchResults] = useState<LocalVectorRecord[] | null>(null)
   const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
 
   // Clipboard context
   const { clipboard, copyVectors, hasCopiedVectors } = useClipboard()
@@ -231,6 +232,7 @@ export default function VectorsView({
     setDraftVectors([])
     setDraftError(null)
     setSearchResults(null)
+    setSearchError(null)
     setIsSearching(false)
   }, [indexName])
 
@@ -244,6 +246,7 @@ export default function VectorsView({
     // Validate that we have query input
     if (!queryText && !queryId) {
       setSearchResults(null)
+      setSearchError(null)
       return
     }
 
@@ -256,6 +259,7 @@ export default function VectorsView({
     const namespaceParam = queryScope === 'namespace' ? namespace : undefined
 
     setIsSearching(true)
+    setSearchError(null)
     try {
       const result = await queryMutation.mutateAsync({
         indexName: indexName,
@@ -279,6 +283,8 @@ export default function VectorsView({
       setSearchResults(results)
     } catch (error) {
       console.error('Search failed:', error)
+      const message = error instanceof Error ? error.message : 'Search failed'
+      setSearchError(message)
       setSearchResults(null)
     } finally {
       setIsSearching(false)
@@ -979,6 +985,7 @@ export default function VectorsView({
             onFiltersChange={setMetadataFilters}
             onSearch={handleSearch}
             isSearching={isSearching}
+            error={searchError}
           />
         </div>
 

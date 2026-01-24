@@ -21,8 +21,9 @@ interface QueryToolbarProps {
   onTopKChange: (topK: number) => void
   onFiltersChange: (filters: MetadataFilter[]) => void
   onSearch: () => void
-  // Loading state
+  // Loading/error state
   isSearching?: boolean
+  error?: string | null
 }
 
 const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
@@ -46,6 +47,7 @@ export function QueryToolbar({
   onFiltersChange,
   onSearch,
   isSearching,
+  error,
 }: QueryToolbarProps) {
   // Handle filter changes
   const handleFilterChange = useCallback((id: string, updates: Partial<MetadataFilter>) => {
@@ -154,6 +156,13 @@ export function QueryToolbar({
           {isSearching ? 'Searching...' : 'Search'}
         </button>
       </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="px-2 py-1.5 text-[11px] text-destructive bg-destructive/10 rounded-md">
+          {error}
+        </div>
+      )}
 
       {/* Metadata filters section */}
       <div className="space-y-2">
