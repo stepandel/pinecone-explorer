@@ -165,6 +165,43 @@ class PineconeService {
   }
 
   /**
+   * Resolve the dimension for an embedding config based on the index dimension.
+   * This ensures the embedding model generates vectors matching the index dimension.
+   * For models with variable dimensions, uses the index dimension if supported.
+   * For fixed dimension models, returns the model's dimension (caller should validate compatibility).
+   */
+  private resolveEmbeddingDimension(config: EmbeddingConfig, indexName: string): EmbeddingConfig {
+    const indexInfo = this.indexInfoCache.get(indexName)
+    const indexDimension = indexInfo?.dimension
+
+    // Sparse models have no dimension
+    if (config.vectorType === 'sparse') {
+      return config
+    }
+
+    // If no index dimension or config already has matching dimension, return as-is
+    if (!indexDimension || config.dimensions === indexDimension) {
+      return config
+    }
+
+    // Models with variable dimensions that support the index dimension
+    const variableDimensionModels: Record<string, number[]> = {
+      'llama-text-embed-v2': [384, 512, 768, 1024, 2048],
+      'text-embedding-3-small': [512, 1536],
+      'text-embedding-3-large': [256, 1024, 3072],
+    }
+
+    const availableDimensions = variableDimensionModels[config.modelName]
+    if (availableDimensions && availableDimensions.includes(indexDimension)) {
+      return { ...config, dimensions: indexDimension }
+    }
+
+    // For fixed dimension models or unsupported dimensions, return original config
+    // The embedding service will generate the model's default dimension
+    return config
+  }
+
+  /**
    * Get namespace reference for an index
    */
   private getNamespace(indexName: string, namespace?: string) {
@@ -337,22 +374,60 @@ class PineconeService {
 
   /**
    * Query vectors by similarity
+   * Supports three modes:
+   * 1. Query by vector/text within a namespace (namespace specified)
+   * 2. Query by vector/text across all namespaces (namespace omitted)
+   * 3. Query by existing vector ID (id specified) - finds similar vectors using that vector's embedding
    */
   async queryVectors(
     params: QueryVectorsParams,
     embeddingConfigOverride?: EmbeddingConfig
   ): Promise<QueryResult> {
-    const ns = this.getNamespace(params.indexName, params.namespace)
+    const index = this.getIndex(params.indexName)
+
+    // Only scope to namespace if explicitly provided
+    const target = params.namespace !== undefined
+      ? index.namespace(params.namespace)
+      : index
+
+    // Query by ID mode - use existing vector's embedding as query vector
+    if (params.id) {
+      const response = await target.query({
+        id: params.id,
+        topK: params.topK || 10,
+        filter: params.filter,
+        includeValues: params.includeValues ?? false,
+        includeMetadata: params.includeMetadata ?? true,
+      })
+
+      return {
+        matches: response.matches.map((match) => ({
+          id: match.id,
+          score: match.score || 0,
+          values: match.values,
+          metadata: match.metadata,
+          sparseValues: match.sparseValues,
+        })),
+        namespace: params.namespace ?? '',
+        usage: response.usage ? { readUnits: response.usage.readUnits || 0 } : undefined,
+      }
+    }
+
+    // Query by vector or text
     let queryVector = params.vector
+    let querySparseVector: SparseVector | undefined
 
     // If queryText is provided, generate embedding
-    if (params.queryText && !queryVector) {
-      const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+    if (params.queryText && !queryVector && !querySparseVector) {
+      let embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
       if (!embeddingConfig) {
         throw new Error(
           'No embedding configuration found. Please configure an embedding provider to search by text.'
         )
       }
+
+      // Auto-resolve dimension based on index dimension
+      embeddingConfig = this.resolveEmbeddingDimension(embeddingConfig, params.indexName)
 
       // Use inputType: 'query' for search operations
       const embeddingResult = await this.embeddingService!.generateEmbeddings(
@@ -362,23 +437,28 @@ class PineconeService {
       if (embeddingResult.type === 'dense') {
         queryVector = embeddingResult.values[0]
       } else {
-        // Sparse-only queries require hybrid search with a dense vector
-        // For now, throw an error - user should provide vector directly for sparse indexes
-        throw new Error('Text-based queries are not yet supported for sparse indexes. Please provide a vector directly.')
+        querySparseVector = embeddingResult.sparseValues[0]
       }
     }
 
-    if (!queryVector) {
-      throw new Error('Either vector or queryText must be provided for querying.')
+    if (!queryVector && !querySparseVector) {
+      throw new Error('Either vector, queryText, or id must be provided for querying.')
     }
 
-    const response = await ns.query({
-      vector: queryVector,
+    // Build query params
+    // Note: The Pinecone REST API supports sparse-only queries, but the SDK types
+    // incorrectly require a dense vector. We use type assertion to work around this.
+    const queryParams = {
       topK: params.topK || 10,
       filter: params.filter,
       includeValues: params.includeValues ?? false,
       includeMetadata: params.includeMetadata ?? true,
-    })
+      ...(queryVector && { vector: queryVector }),
+      ...(querySparseVector && { sparseVector: querySparseVector }),
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await target.query(queryParams as any)
 
     return {
       matches: response.matches.map((match) => ({
@@ -388,7 +468,7 @@ class PineconeService {
         metadata: match.metadata,
         sparseValues: match.sparseValues,
       })),
-      namespace: params.namespace || '',
+      namespace: params.namespace ?? '',
       usage: response.usage ? { readUnits: response.usage.readUnits || 0 } : undefined,
     }
   }
@@ -442,10 +522,12 @@ class PineconeService {
     let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
 
     if (params.generateEmbedding && params.text) {
-      const config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+      let config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
       if (!config) {
         throw new Error('No embedding configuration found. Please configure an embedding provider.')
       }
+      // Auto-resolve dimension based on index dimension
+      config = this.resolveEmbeddingDimension(config, params.indexName)
       embedding = await this.generateSingleEmbedding(params.text, config)
     }
 
@@ -480,10 +562,12 @@ class PineconeService {
       // Get text to embed: explicit params.text, or from metadata field
       const textToEmbed = params.text || (metadata[textField] as string | undefined)
       if (textToEmbed && typeof textToEmbed === 'string') {
-        const config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+        let config = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
         if (!config) {
           throw new Error('No embedding configuration found. Please configure an embedding provider.')
         }
+        // Auto-resolve dimension based on index dimension
+        config = this.resolveEmbeddingDimension(config, params.indexName)
         embedding = await this.generateSingleEmbedding(textToEmbed, config)
       }
     }
@@ -539,7 +623,11 @@ class PineconeService {
   ): Promise<BatchImportResult> {
     const errors: string[] = []
     let upsertedCount = 0
-    const embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+    let embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+    // Auto-resolve dimension based on index dimension
+    if (embeddingConfig) {
+      embeddingConfig = this.resolveEmbeddingDimension(embeddingConfig, params.indexName)
+    }
     // Use params.textField if provided, otherwise fall back to index's embed config or '_text'
     const textField = params.textField || this.getTextFieldForIndex(params.indexName)
 
@@ -790,11 +878,16 @@ class PineconeService {
       targetNamespace,
       regenerateEmbeddings,
       textField,
-      embeddingConfig,
       validateDimensions = true,
       onProgress,
       signal,
     } = params
+
+    // Auto-resolve dimension based on target index dimension
+    let embeddingConfig = params.embeddingConfig
+    if (embeddingConfig) {
+      embeddingConfig = this.resolveEmbeddingDimension(embeddingConfig, targetIndexName)
+    }
 
     const sourceNs = this.getNamespace(sourceIndexName, sourceNamespace)
     const targetNs = this.getNamespace(targetIndexName, targetNamespace)

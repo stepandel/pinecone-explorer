@@ -5,11 +5,11 @@ import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVec
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import VectorsTable from './VectorsTable'
-import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filters'
+import { QueryScope, MetadataFilter, buildPineconeFilter } from '../../types/filters'
 import { TypedMetadataRecord, TypedMetadataField, typedMetadataToPineconeFormat, validateMetadataValue } from '../../types/metadata'
-import { LocalVectorRecord, DraftVector, parseFilterValue } from '../../types/vectors'
+import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { EmbeddingFunctionSelector } from './EmbeddingFunctionSelector'
-import { FilterRow } from '../filters/FilterRow'
+import { QueryToolbar } from '../query/QueryToolbar'
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover'
 import { NewButton } from '../ui/new-button'
 
@@ -33,11 +33,20 @@ interface VectorsViewProps {
   onIsFirstVectorChange?: (isFirst: boolean) => void
 }
 
-function createDefaultFilterRow(): FilterRowType {
+// Initial query state
+function createInitialQueryState(): {
+  scope: QueryScope
+  searchText: string
+  idSearch: string
+  topK: number
+  filters: MetadataFilter[]
+} {
   return {
-    id: crypto.randomUUID(),
-    type: 'search',
-    searchValue: '',
+    scope: 'namespace',
+    searchText: '',
+    idSearch: '',
+    topK: 10,
+    filters: [],
   }
 }
 
@@ -59,8 +68,13 @@ export default function VectorsView({
 }: VectorsViewProps) {
   const { currentProfile } = usePinecone()
   const { setEmbeddingTextField } = usePanel()
-  const [filterRows, setFilterRows] = useState<FilterRowType[]>([createDefaultFilterRow()])
-  const [nResults, setNResults] = useState(10)
+
+  // Query state
+  const [queryScope, setQueryScope] = useState<QueryScope>('namespace')
+  const [searchText, setSearchText] = useState('')
+  const [idSearch, setIdSearch] = useState('')
+  const [topK, setTopK] = useState(10)
+  const [metadataFilters, setMetadataFilters] = useState<MetadataFilter[]>([])
 
   // Draft vectors state - supports single new vector or multiple pasted vectors
   const [draftVectors, setDraftVectors] = useState<DraftVector[]>([])
@@ -130,6 +144,7 @@ export default function VectorsView({
   // Search results state
   const [searchResults, setSearchResults] = useState<LocalVectorRecord[] | null>(null)
   const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
 
   // Clipboard context
   const { clipboard, copyVectors, hasCopiedVectors } = useClipboard()
@@ -206,50 +221,53 @@ export default function VectorsView({
     setTextFieldOverride(null)
   }, [currentProfile?.id, indexName])
 
-  // Reset filters and deletion marks when index changes
+  // Reset query state and deletion marks when index changes
   useEffect(() => {
-    setFilterRows([createDefaultFilterRow()])
-    setNResults(10)
+    setQueryScope('namespace')
+    setSearchText('')
+    setIdSearch('')
+    setTopK(10)
+    setMetadataFilters([])
     setMarkedForDeletion(new Set())
     setDraftVectors([])
     setDraftError(null)
     setSearchResults(null)
+    setSearchError(null)
     setIsSearching(false)
   }, [indexName])
 
-  // Handle search execution
+  // Handle search execution based on query scope
   const handleSearch = useCallback(async () => {
-    const searchRow = filterRows.find(r => r.type === 'search' && r.searchValue?.trim())
-    const queryText = searchRow?.searchValue?.trim()
+    // Determine the query parameters based on scope
+    const isIdQuery = queryScope === 'id'
+    const queryText = isIdQuery ? undefined : searchText.trim()
+    const queryId = isIdQuery ? idSearch.trim() : undefined
 
-    if (!queryText) {
-      // Clear search results if no query
+    // Validate that we have query input
+    if (!queryText && !queryId) {
       setSearchResults(null)
+      setSearchError(null)
       return
     }
 
     // Build metadata filter from filter rows
-    const metadataRows = filterRows.filter(
-      r => r.type === 'metadata' && r.metadataKey?.trim() && r.metadataValue?.trim()
-    )
+    const filter = buildPineconeFilter(metadataFilters)
 
-    const metadataFilter = metadataRows.length > 0
-      ? metadataRows.reduce((acc, row) => ({
-          ...acc,
-          [row.metadataKey!]: {
-            [row.operator || '$eq']: parseFilterValue(row.metadataValue!, row.operator || '$eq')
-          },
-        }), {})
-      : undefined
+    // Determine namespace parameter based on scope
+    // 'namespace' scope: use current namespace
+    // 'index' or 'id' scope: query across all namespaces (omit namespace param)
+    const namespaceParam = queryScope === 'namespace' ? namespace : undefined
 
     setIsSearching(true)
+    setSearchError(null)
     try {
       const result = await queryMutation.mutateAsync({
         indexName: indexName,
-        namespace,
+        namespace: namespaceParam,
         queryText,
-        topK: nResults || 10,
-        filter: metadataFilter,
+        id: queryId,
+        topK: topK || 10,
+        filter,
         includeValues: true,
         includeMetadata: true,
       })
@@ -260,15 +278,18 @@ export default function VectorsView({
         metadata: match.metadata || null,
         embedding: match.values || null,
         sparseEmbedding: match.sparseValues || null,
+        distance: match.score,
       }))
       setSearchResults(results)
     } catch (error) {
       console.error('Search failed:', error)
+      const message = error instanceof Error ? error.message : 'Search failed'
+      setSearchError(message)
       setSearchResults(null)
     } finally {
       setIsSearching(false)
     }
-  }, [filterRows, indexName, namespace, nResults, queryMutation])
+  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation])
 
   // Use React Query for vectors with debouncing via staleTime
   const {
@@ -290,11 +311,8 @@ export default function VectorsView({
   }, [queryData?.vectors])
   const fetchTimeMs = queryData?.fetchTimeMs ?? null
 
-  // Extract ID filter value for client-side filtering
-  const idFilterValue = useMemo(() => {
-    const selectRow = filterRows.find(r => r.type === 'select' && r.selectValue?.trim())
-    return selectRow?.selectValue?.trim().toLowerCase() || ''
-  }, [filterRows])
+  // Extract ID filter value for client-side filtering (from id search when in 'id' scope)
+  const idFilterValue = ''
 
   // Apply client-side ID filter (case-insensitive "includes" match)
   // Use search results if available, otherwise use raw vectors
@@ -309,15 +327,12 @@ export default function VectorsView({
   }, [rawVectors, searchResults, idFilterValue])
 
   // Extract unique metadata fields from vectors (needed for draft creation)
-  const metadataFields = useMemo(() => {
-    const fields = new Set<string>()
-    vectors.forEach((vec: LocalVectorRecord) => {
-      if (vec.metadata) {
-        Object.keys(vec.metadata).forEach(key => fields.add(key))
-      }
-    })
-    return Array.from(fields).sort()
-  }, [vectors])
+  const metadataFields = useMemo(() =>
+    Array.from(new Set(vectors.flatMap((vec: LocalVectorRecord) =>
+      vec.metadata ? Object.keys(vec.metadata) : []
+    ))).sort(),
+    [vectors]
+  )
 
   // Extract text fields (string-type metadata fields) for embedding text field dropdown
   const availableTextFields = useMemo(() => {
@@ -334,40 +349,25 @@ export default function VectorsView({
     return Array.from(textFields).sort()
   }, [vectors])
 
-  // Filter row handlers
-  const handleFilterRowChange = useCallback((id: string, updates: Partial<FilterRowType>) => {
-    setFilterRows(prev => prev.map(row =>
-      row.id === id ? { ...row, ...updates } : row
-    ))
-    // Clear search results if search value is cleared
-    if ('searchValue' in updates && !updates.searchValue?.trim()) {
-      setSearchResults(null)
-    }
-  }, [])
+  // Check if there are active filters or search results
+  const hasActiveFilters = searchText.trim() !== '' || idSearch.trim() !== '' || metadataFilters.some(f => f.field.trim() && f.value.trim())
 
-  const handleAddFilterRow = useCallback(() => {
-    setFilterRows(prev => [...prev, {
-      id: crypto.randomUUID(),
-      type: 'metadata',
-      metadataKey: '',
-      operator: '$eq' as MetadataOperator,
-      metadataValue: '',
-    }])
-  }, [])
-
-  const handleRemoveFilterRow = useCallback((id: string) => {
-    setFilterRows(prev => {
-      const filtered = prev.filter(row => row.id !== id)
-      // Always keep at least one row
-      return filtered.length > 0 ? filtered : [createDefaultFilterRow()]
+  // Extract metadata field types from vectors (for filter dropdowns)
+  const metadataFieldTypes = useMemo(() => {
+    const types: Record<string, 'string' | 'number' | 'boolean'> = {}
+    vectors.forEach((vec: LocalVectorRecord) => {
+      if (vec.metadata) {
+        Object.entries(vec.metadata).forEach(([key, value]) => {
+          if (!(key in types)) {
+            if (typeof value === 'number') types[key] = 'number'
+            else if (typeof value === 'boolean') types[key] = 'boolean'
+            else types[key] = 'string'
+          }
+        })
+      }
     })
-  }, [])
-
-  const hasActiveFilters = filterRows.some(row =>
-    (row.type === 'search' && row.searchValue?.trim()) ||
-    (row.type === 'metadata' && row.metadataKey?.trim() && row.metadataValue?.trim()) ||
-    (row.type === 'select' && row.selectValue?.trim())
-  )
+    return types
+  }, [vectors])
 
   // Draft vector handlers
   const handleStartCreate = useCallback(() => {
@@ -729,8 +729,11 @@ export default function VectorsView({
 
   // Clear all filters handler
   const handleClearAllFilters = useCallback(() => {
-    setFilterRows([createDefaultFilterRow()])
-    setNResults(10)
+    setQueryScope('namespace')
+    setSearchText('')
+    setIdSearch('')
+    setTopK(10)
+    setMetadataFilters([])
     setSearchResults(null)
   }, [])
 
@@ -964,25 +967,26 @@ export default function VectorsView({
           </span>
         </div>
 
-        {/* Row 2: Filters */}
-        <div className="px-4 py-2 pb-3 space-y-2">
-          {/* Filter rows */}
-          {filterRows.map((row, index) => (
-            <FilterRow
-              key={row.id}
-              row={row}
-              isFirst={index === 0}
-              isLast={index === filterRows.length - 1}
-              canRemove={filterRows.length > 1}
-              onChange={handleFilterRowChange}
-              onAdd={handleAddFilterRow}
-              onRemove={handleRemoveFilterRow}
-              onSearch={handleSearch}
-              nResults={nResults}
-              onNResultsChange={setNResults}
-              metadataFields={metadataFields}
-            />
-          ))}
+        {/* Row 2: Query Toolbar */}
+        <div className="px-4 py-2 pb-3">
+          <QueryToolbar
+            scope={queryScope}
+            searchText={searchText}
+            idSearch={idSearch}
+            topK={topK}
+            filters={metadataFilters}
+            currentNamespace={namespace}
+            availableFields={metadataFields}
+            fieldTypes={metadataFieldTypes}
+            onScopeChange={setQueryScope}
+            onSearchTextChange={setSearchText}
+            onIdSearchChange={setIdSearch}
+            onTopKChange={setTopK}
+            onFiltersChange={setMetadataFilters}
+            onSearch={handleSearch}
+            isSearching={isSearching}
+            error={searchError}
+          />
         </div>
 
       </div>

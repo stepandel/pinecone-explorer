@@ -113,3 +113,54 @@ export const getEmbeddingFunctionsByGroup = (group: string) =>
 
 // Default embedding function ID
 export const DEFAULT_EMBEDDING_FUNCTION_ID = 'pinecone-llama-text-embed-v2'
+
+/**
+ * Resolve the dimension to use for an embedding function given an index dimension.
+ * Returns the dimension to use, or null if incompatible.
+ */
+export function resolveDimensionForIndex(
+  embeddingFunction: EmbeddingFunctionConfig,
+  indexDimension: number | undefined
+): number | null {
+  // Sparse models have no dimension
+  if (embeddingFunction.vectorType === 'sparse') {
+    return null
+  }
+
+  // If no index dimension provided, use default
+  if (!indexDimension) {
+    return embeddingFunction.defaultDimension || null
+  }
+
+  // If model has variable dimensions, check if index dimension is supported
+  if (embeddingFunction.availableDimensions) {
+    if (embeddingFunction.availableDimensions.includes(indexDimension)) {
+      return indexDimension
+    }
+    // Index dimension not supported - incompatible
+    return null
+  }
+
+  // Fixed dimension model - only compatible if dimensions match
+  if (embeddingFunction.defaultDimension === indexDimension) {
+    return indexDimension
+  }
+
+  return null
+}
+
+/**
+ * Check if an embedding function is compatible with an index dimension
+ */
+export function isCompatibleWithIndex(
+  embeddingFunction: EmbeddingFunctionConfig,
+  indexDimension: number | undefined
+): boolean {
+  if (embeddingFunction.vectorType === 'sparse') {
+    return true // Sparse always compatible
+  }
+  if (!indexDimension) {
+    return true // No dimension to check against
+  }
+  return resolveDimensionForIndex(embeddingFunction, indexDimension) !== null
+}

@@ -1,4 +1,4 @@
-import { FilterRow as FilterRowType, MetadataOperator } from '../../types/filters'
+import { FilterRow as FilterRowType } from '../../types/filters'
 
 interface FilterRowProps {
   row: FilterRowType
@@ -11,16 +11,6 @@ interface FilterRowProps {
   onSearch?: () => void
   nResults?: number
   onNResultsChange?: (n: number) => void
-  metadataFields?: string[]
-}
-
-const operatorLabels: Record<MetadataOperator, string> = {
-  $eq: '=',
-  $ne: '!=',
-  $gt: '>',
-  $gte: '>=',
-  $lt: '<',
-  $lte: '<=',
 }
 
 const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
@@ -39,16 +29,12 @@ export function FilterRow({
   onSearch,
   nResults,
   onNResultsChange,
-  metadataFields = [],
 }: FilterRowProps) {
   const handleTypeChange = (value: string) => {
     if (value === 'search') {
       onChange(row.id, {
         type: 'search',
         searchValue: '',
-        metadataKey: undefined,
-        operator: undefined,
-        metadataValue: undefined,
         selectField: undefined,
         selectValue: undefined,
       })
@@ -56,37 +42,16 @@ export function FilterRow({
       onChange(row.id, {
         type: 'select',
         searchValue: undefined,
-        metadataKey: undefined,
-        operator: undefined,
-        metadataValue: undefined,
         selectField: 'id',
         selectValue: '',
-      })
-    } else {
-      // value is a metadata field name
-      onChange(row.id, {
-        type: 'metadata',
-        searchValue: undefined,
-        metadataKey: value,
-        operator: '$eq',
-        metadataValue: '',
-        selectField: undefined,
-        selectValue: undefined,
       })
     }
   }
 
-  // Get current select value: 'search', 'select:id', or the metadata key
+  // Get current select value: 'search' or 'select:id'
   const selectValue = row.type === 'search'
     ? 'search'
-    : row.type === 'select'
-      ? `select:${row.selectField || 'id'}`
-      : (row.metadataKey || '')
-
-  // Ensure current metadataKey is always in the options (in case filtered docs don't have it)
-  const allFields = row.metadataKey && !metadataFields.includes(row.metadataKey)
-    ? [row.metadataKey, ...metadataFields]
-    : metadataFields
+    : `select:${row.selectField || 'id'}`
 
   return (
     <div className="flex gap-2 items-center w-full">
@@ -97,19 +62,8 @@ export function FilterRow({
         className={`w-28 ${selectClassName}`}
         style={inputStyle}
       >
-        <optgroup label="Search">
-          <option value="search">Query</option>
-        </optgroup>
-        <optgroup label="Select">
-          <option value="select:id">ID</option>
-        </optgroup>
-        {allFields.length > 0 && (
-          <optgroup label="Filter">
-            {allFields.map(field => (
-              <option key={field} value={field}>{field}</option>
-            ))}
-          </optgroup>
-        )}
+        <option value="search">Query</option>
+        <option value="select:id">ID</option>
       </select>
 
       {/* Conditional inputs based on type */}
@@ -128,7 +82,7 @@ export function FilterRow({
           className={`flex-1 ${inputClassName}`}
           style={inputStyle}
         />
-      ) : row.type === 'select' ? (
+      ) : (
         <input
           type="text"
           value={row.selectValue || ''}
@@ -137,31 +91,6 @@ export function FilterRow({
           className={`flex-1 ${inputClassName}`}
           style={inputStyle}
         />
-      ) : (
-        <>
-          {/* Operator selector */}
-          <select
-            value={row.operator || '$eq'}
-            onChange={(e) => onChange(row.id, { operator: e.target.value as MetadataOperator })}
-            className={`w-18 ${selectClassName}`}
-            style={inputStyle}
-          >
-            {Object.entries(operatorLabels).map(([op, label]) => (
-              <option key={op} value={op}>
-                {label}
-              </option>
-            ))}
-          </select>
-          {/* Value input */}
-          <input
-            type="text"
-            value={row.metadataValue || ''}
-            onChange={(e) => onChange(row.id, { metadataValue: e.target.value })}
-            placeholder="Value"
-            className={`flex-1 ${inputClassName}`}
-            style={inputStyle}
-          />
-        </>
       )}
 
       {/* Limit selector - only show on first row */}

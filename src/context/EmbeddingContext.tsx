@@ -112,6 +112,7 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
     // Don't allow override for integrated inference indexes
     if (!currentProfile?.id || !activeIndex || !canOverride) return
 
+    // Just save the provider/model selection - server auto-resolves dimension at query time
     await window.electronAPI.profiles.setEmbeddingOverride(
       currentProfile.id,
       activeIndex,

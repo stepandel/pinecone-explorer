@@ -115,9 +115,10 @@ export interface VectorRecord {
  */
 export interface QueryVectorsParams {
   indexName: string
-  namespace?: string
+  namespace?: string // If omitted, query across all namespaces in index
   vector?: number[] // Query vector
   queryText?: string // Text to embed and query (requires embedding config)
+  id?: string // Query by existing vector ID (find similar vectors using this vector's embedding)
   topK?: number // Max results (default: 10)
   filter?: Record<string, unknown> // Metadata filter
   includeValues?: boolean // Include vector values in response
@@ -137,6 +138,7 @@ export interface QueryResult {
       indices: number[]
       values: number[]
     }
+    namespace?: string // Source namespace (for cross-index queries)
   }>
   namespace: string
   usage?: {
