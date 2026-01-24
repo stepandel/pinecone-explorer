@@ -23,6 +23,7 @@ import {
   ListVectorsParams,
   FetchVectorsParams,
   EmbeddingConfig,
+  HybridEmbeddingConfig,
   GetVectorsPaginatedParams,
 } from './types'
 import { initAutoUpdater, checkForUpdates } from './auto-updater'
@@ -210,9 +211,10 @@ ipcMain.handle('pinecone:queryVectors', async (_event, profileId: string, params
     if (!service) {
       return { success: false, error: 'Not connected to Pinecone' }
     }
-    // Check for user embedding override
+    // Check for user embedding override and hybrid config
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
-    const result = await service.queryVectors(params, embeddingOverride || undefined)
+    const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
+    const result = await service.queryVectors(params, embeddingOverride || undefined, hybridOverride || undefined)
     return { success: true, data: result }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to query vectors'
@@ -226,9 +228,10 @@ ipcMain.handle('pinecone:createVector', async (_event, profileId: string, params
     if (!service) {
       return { success: false, error: 'Not connected to Pinecone' }
     }
-    // Check for user embedding override (needed for embedding generation)
+    // Check for user embedding override and hybrid config (needed for embedding generation)
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
-    await service.createVector(params, embeddingOverride || undefined)
+    const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
+    await service.createVector(params, embeddingOverride || undefined, hybridOverride || undefined)
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create vector'
@@ -242,9 +245,10 @@ ipcMain.handle('pinecone:updateVector', async (_event, profileId: string, params
     if (!service) {
       return { success: false, error: 'Not connected to Pinecone' }
     }
-    // Check for user embedding override (needed for regeneration)
+    // Check for user embedding override and hybrid config (needed for regeneration)
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
-    await service.updateVector(params, embeddingOverride || undefined)
+    const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
+    await service.updateVector(params, embeddingOverride || undefined, hybridOverride || undefined)
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update vector'
@@ -272,9 +276,10 @@ ipcMain.handle('pinecone:batchImport', async (_event, profileId: string, params:
     if (!service) {
       return { success: false, error: 'Not connected to Pinecone' }
     }
-    // Check for user embedding override
+    // Check for user embedding override and hybrid config
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
-    const result = await service.batchImport(params, embeddingOverride || undefined)
+    const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
+    const result = await service.batchImport(params, embeddingOverride || undefined, undefined, hybridOverride || undefined)
     return { success: true, data: result }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to import vectors'
@@ -700,6 +705,36 @@ ipcMain.handle('profiles:clearTextFieldOverride', async (_event, profileId: stri
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to clear text field override'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:getHybridEmbeddingOverride', async (_event, profileId: string, indexName: string) => {
+  try {
+    const override = connectionStore.getHybridEmbeddingOverride(profileId, indexName)
+    return { success: true, data: override }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get hybrid embedding override'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:setHybridEmbeddingOverride', async (_event, profileId: string, indexName: string, override: HybridEmbeddingConfig) => {
+  try {
+    connectionStore.setHybridEmbeddingOverride(profileId, indexName, override)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to set hybrid embedding override'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:clearHybridEmbeddingOverride', async (_event, profileId: string, indexName: string) => {
+  try {
+    connectionStore.clearHybridEmbeddingOverride(profileId, indexName)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to clear hybrid embedding override'
     return { success: false, error: message }
   }
 })

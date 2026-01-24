@@ -1,5 +1,6 @@
 import { PineconeProvider } from '../providers/PineconeProvider'
 import { SelectionProvider } from '../context/SelectionContext'
+import { EmbeddingProvider } from '../context/EmbeddingContext'
 import { DraftIndexProvider } from '../context/DraftIndexContext'
 import { DraftNamespaceProvider } from '../context/DraftNamespaceContext'
 import { ClipboardProvider } from '../context/ClipboardContext'
@@ -36,11 +37,13 @@ export function ConnectionWindow({ windowId, profileId }: ConnectionWindowProps)
     <PineconeProvider profile={profile} windowId={windowId}>
       <ClipboardProvider>
         <SelectionProvider>
-          <DraftIndexProvider>
-            <DraftNamespaceProvider>
-              <AppLayout />
-            </DraftNamespaceProvider>
-          </DraftIndexProvider>
+          <EmbeddingProvider>
+            <DraftIndexProvider>
+              <DraftNamespaceProvider>
+                <AppLayout />
+              </DraftNamespaceProvider>
+            </DraftIndexProvider>
+          </EmbeddingProvider>
         </SelectionProvider>
       </ClipboardProvider>
     </PineconeProvider>

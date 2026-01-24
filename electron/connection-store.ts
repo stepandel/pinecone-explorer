@@ -2,7 +2,7 @@ import Store from 'electron-store'
 import { app } from 'electron'
 import path from 'path'
 import { existsSync } from 'fs'
-import { ConnectionProfile, EmbeddingConfig } from './types'
+import { ConnectionProfile, EmbeddingConfig, HybridEmbeddingConfig } from './types'
 import { getEncryptionKey } from './secure-key-manager'
 
 interface StoreSchema {
@@ -11,6 +11,9 @@ interface StoreSchema {
   // Store embedding overrides separately so they persist even for unsaved profiles
   // Key format: "profileId:indexName"
   embeddingOverrides: Record<string, EmbeddingConfig>
+  // Store hybrid embedding overrides separately
+  // Key format: "profileId:indexName"
+  hybridEmbeddingOverrides: Record<string, HybridEmbeddingConfig>
 }
 
 // Lazy-initialized store (requires app to be ready for keychain access)
@@ -25,6 +28,7 @@ function getStore(): Store<StoreSchema> {
           profiles: [],
           lastActiveProfileId: null,
           embeddingOverrides: {},
+          hybridEmbeddingOverrides: {},
         },
         encryptionKey: getEncryptionKey(),
       })
@@ -57,6 +61,7 @@ function getStore(): Store<StoreSchema> {
           profiles: [],
           lastActiveProfileId: null,
           embeddingOverrides: {},
+          hybridEmbeddingOverrides: {},
         },
         encryptionKey: getEncryptionKey(),
       })
@@ -138,6 +143,16 @@ export class ConnectionStore {
       }
     }
     getStore().set('embeddingOverrides', newOverrides)
+
+    // Clear any hybrid embedding overrides for this profile
+    const hybridOverrides = getStore().get('hybridEmbeddingOverrides', {})
+    const newHybridOverrides: Record<string, HybridEmbeddingConfig> = {}
+    for (const [key, value] of Object.entries(hybridOverrides)) {
+      if (!key.startsWith(`${id}:`)) {
+        newHybridOverrides[key] = value
+      }
+    }
+    getStore().set('hybridEmbeddingOverrides', newHybridOverrides)
   }
 
   getLastActiveProfileId(): string | null {
@@ -235,6 +250,52 @@ export class ConnectionStore {
     const overrides = getStore().get('textFieldOverrides', {}) as Record<string, string>
     delete overrides[key]
     getStore().set('textFieldOverrides', overrides)
+  }
+
+  /**
+   * Get hybrid embedding override for a specific profile and index
+   */
+  getHybridEmbeddingOverride(profileId: string, indexName: string): HybridEmbeddingConfig | null {
+    const key = `${profileId}:${indexName}`
+    const overrides = getStore().get('hybridEmbeddingOverrides', {})
+    return overrides[key] ?? null
+  }
+
+  /**
+   * Set hybrid embedding override for a specific profile and index
+   */
+  setHybridEmbeddingOverride(profileId: string, indexName: string, override: HybridEmbeddingConfig): void {
+    const key = `${profileId}:${indexName}`
+    const overrides = getStore().get('hybridEmbeddingOverrides', {})
+    overrides[key] = override
+    getStore().set('hybridEmbeddingOverrides', overrides)
+  }
+
+  /**
+   * Clear hybrid embedding override for a specific profile and index
+   */
+  clearHybridEmbeddingOverride(profileId: string, indexName: string): void {
+    const key = `${profileId}:${indexName}`
+    const overrides = getStore().get('hybridEmbeddingOverrides', {})
+    delete overrides[key]
+    getStore().set('hybridEmbeddingOverrides', overrides)
+  }
+
+  /**
+   * Get all hybrid embedding overrides for a profile
+   */
+  getProfileHybridEmbeddingOverrides(profileId: string): Record<string, HybridEmbeddingConfig> {
+    const overrides = getStore().get('hybridEmbeddingOverrides', {})
+    const result: Record<string, HybridEmbeddingConfig> = {}
+
+    for (const [key, value] of Object.entries(overrides)) {
+      if (key.startsWith(`${profileId}:`)) {
+        const indexName = key.substring(profileId.length + 1)
+        result[indexName] = value
+      }
+    }
+
+    return result
   }
 }
 

@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { usePanel } from '../../context/PanelContext'
+import { useEmbedding } from '../../context/EmbeddingContext'
 import { useInfiniteVectorsQuery, useIndexStatsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
@@ -68,6 +69,7 @@ export default function VectorsView({
 }: VectorsViewProps) {
   const { currentProfile } = usePinecone()
   const { setEmbeddingTextField } = usePanel()
+  const { isHybridEnabled, hybridConfig } = useEmbedding()
 
   // Query state
   const [queryScope, setQueryScope] = useState<QueryScope>('namespace')
@@ -75,6 +77,7 @@ export default function VectorsView({
   const [idSearch, setIdSearch] = useState('')
   const [topK, setTopK] = useState(10)
   const [metadataFilters, setMetadataFilters] = useState<MetadataFilter[]>([])
+  const [alpha, setAlpha] = useState(hybridConfig?.defaultAlpha ?? 0.5)
 
   // Draft vectors state - supports single new vector or multiple pasted vectors
   const [draftVectors, setDraftVectors] = useState<DraftVector[]>([])
@@ -270,6 +273,8 @@ export default function VectorsView({
         filter,
         includeValues: true,
         includeMetadata: true,
+        // Pass alpha for hybrid search (only used when hybrid is enabled on the index)
+        alpha: isHybridEnabled ? alpha : undefined,
       })
 
       // Convert query results to LocalVectorRecord format
@@ -289,7 +294,7 @@ export default function VectorsView({
     } finally {
       setIsSearching(false)
     }
-  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation])
+  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha])
 
   // Use React Query for vectors with infinite pagination
   const {
@@ -1003,6 +1008,9 @@ export default function VectorsView({
             onSearch={handleSearch}
             isSearching={isSearching}
             error={searchError}
+            isHybridEnabled={isHybridEnabled}
+            alpha={alpha}
+            onAlphaChange={setAlpha}
           />
         </div>
 

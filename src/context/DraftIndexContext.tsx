@@ -35,6 +35,12 @@ export interface DraftIndex {
   textField?: string
   availableTextFields?: string[]
   firstNamespace?: FirstNamespaceConfig
+  // Hybrid search support
+  isHybridEnabled?: boolean
+  hybridConfig?: {
+    denseEmbeddingFunctionId: string
+    sparseEmbeddingFunctionId: string  // Default: pinecone-sparse-english-v0
+  }
 }
 
 interface DraftIndexContextValue {
@@ -311,6 +317,34 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
           newIndexName,
           draftIndex.textField.trim()
         )
+      }
+
+      // Save hybrid embedding config if enabled
+      if (draftIndex.isHybridEnabled && draftIndex.hybridConfig) {
+        const denseFunc = getEmbeddingFunctionById(draftIndex.hybridConfig.denseEmbeddingFunctionId)
+        const sparseFunc = getEmbeddingFunctionById(draftIndex.hybridConfig.sparseEmbeddingFunctionId)
+
+        if (denseFunc && sparseFunc) {
+          const dimension = parseInt(draftIndex.dimensionOverride, 10)
+          await window.electronAPI.profiles.setHybridEmbeddingOverride(
+            currentProfile.id,
+            newIndexName,
+            {
+              denseConfig: {
+                provider: denseFunc.type as EmbeddingProviderType,
+                modelName: denseFunc.modelName,
+                vectorType: 'dense',
+                dimensions: dimension || denseFunc.defaultDimension,
+              },
+              sparseConfig: {
+                provider: sparseFunc.type as EmbeddingProviderType,
+                modelName: sparseFunc.modelName,
+                vectorType: 'sparse',
+              },
+              defaultAlpha: 0.5,
+            }
+          )
+        }
       }
 
       // Handle copy mode

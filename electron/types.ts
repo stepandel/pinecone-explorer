@@ -8,6 +8,14 @@ export type EmbeddingProviderType =
   | 'openai'
 
 /**
+ * Sparse vector representation (indices and values)
+ */
+export interface SparseVector {
+  indices: number[]
+  values: number[]
+}
+
+/**
  * Index-level embedding configuration from Pinecone API (for integrated inference indexes)
  */
 export interface IndexEmbedConfig {
@@ -33,6 +41,16 @@ export interface EmbeddingConfig {
 }
 
 /**
+ * Hybrid embedding configuration for indexes that support both dense and sparse vectors
+ * Hybrid search combines semantic (dense) and keyword (sparse) vectors for improved retrieval
+ */
+export interface HybridEmbeddingConfig {
+  denseConfig: EmbeddingConfig    // Dense model (e.g., llama-text-embed-v2)
+  sparseConfig: EmbeddingConfig   // Sparse model (pinecone-sparse-english-v0)
+  defaultAlpha?: number           // Default alpha for queries (0.5 if not set)
+}
+
+/**
  * Connection profile for Pinecone
  */
 export interface ConnectionProfile {
@@ -50,6 +68,9 @@ export interface ConnectionProfile {
 
   // Per-index embedding overrides
   embeddingOverrides?: Record<string, EmbeddingConfig>
+
+  // Per-index hybrid embedding overrides (for indexes with dotproduct metric)
+  hybridEmbeddingOverrides?: Record<string, HybridEmbeddingConfig>
 
   // Per-index text field overrides (metadata field containing text for embedding)
   // Default is '_text' if not specified
@@ -123,6 +144,7 @@ export interface QueryVectorsParams {
   filter?: Record<string, unknown> // Metadata filter
   includeValues?: boolean // Include vector values in response
   includeMetadata?: boolean // Include metadata in response
+  alpha?: number // Hybrid query alpha (0.0-1.0): 1.0 = pure semantic, 0.0 = pure keyword
 }
 
 /**
@@ -184,7 +206,8 @@ export interface UpdateVectorParams {
   indexName: string
   namespace?: string
   id: string
-  values?: number[] // New embedding values
+  values?: number[] // New dense embedding values
+  sparseValues?: SparseVector // New sparse embedding values (for hybrid indexes)
   metadata?: Record<string, unknown> // New metadata (merged with existing)
   text?: string // New text to store in metadata
   regenerateEmbedding?: boolean // If true, regenerate embedding from text

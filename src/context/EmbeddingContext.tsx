@@ -36,6 +36,15 @@ interface EmbeddingContextType {
 
   // Loading state
   isLoading: boolean
+
+  // Hybrid search support
+  isHybridCapable: boolean          // Index supports hybrid (dense + dotproduct metric)
+  isHybridEnabled: boolean          // User has configured hybrid embeddings
+  hybridConfig: HybridEmbeddingConfig | null
+
+  // Hybrid actions
+  setHybridOverride: (config: HybridEmbeddingConfig) => Promise<void>
+  clearHybridOverride: () => Promise<void>
 }
 
 const EmbeddingContext = createContext<EmbeddingContextType | undefined>(undefined)
@@ -59,6 +68,7 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
 
   const [clientOverride, setClientOverride] = useState<EmbeddingConfig | null>(null)
   const [clientTextFieldOverride, setClientTextFieldOverrideState] = useState<string | null>(null)
+  const [hybridConfig, setHybridConfig] = useState<HybridEmbeddingConfig | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   // Fetch indexes to get embed config for active index
@@ -73,6 +83,16 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
   // Index's embed config (null if not an integrated inference index)
   const indexEmbedConfig = currentIndexInfo?.embed || null
 
+  // Check if index is hybrid capable (dense + dotproduct metric)
+  const isHybridCapable = useMemo(() => {
+    if (!currentIndexInfo) return false
+    const isDense = !currentIndexInfo.vectorType || currentIndexInfo.vectorType === 'dense'
+    return isDense && currentIndexInfo.metric === 'dotproduct'
+  }, [currentIndexInfo])
+
+  // Hybrid is enabled when there's a hybrid config for this index
+  const isHybridEnabled = !!hybridConfig
+
   // Text field to use - priority: index embed fieldMap > client override > default '_text'
   const textField = indexEmbedConfig?.fieldMap?.text || clientTextFieldOverride || '_text'
 
@@ -85,21 +105,25 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
       if (!currentProfile?.id || !activeIndex) {
         setClientOverride(null)
         setClientTextFieldOverrideState(null)
+        setHybridConfig(null)
         return
       }
 
       setIsLoading(true)
       try {
-        const [embeddingOverride, textFieldOverride] = await Promise.all([
+        const [embeddingOverride, textFieldOverride, hybridOverride] = await Promise.all([
           window.electronAPI.profiles.getEmbeddingOverride(currentProfile.id, activeIndex),
           window.electronAPI.profiles.getTextFieldOverride(currentProfile.id, activeIndex),
+          window.electronAPI.profiles.getHybridEmbeddingOverride(currentProfile.id, activeIndex),
         ])
         setClientOverride(embeddingOverride)
         setClientTextFieldOverrideState(textFieldOverride)
+        setHybridConfig(hybridOverride)
       } catch (err) {
         console.error('Failed to fetch overrides:', err)
         setClientOverride(null)
         setClientTextFieldOverrideState(null)
+        setHybridConfig(null)
       } finally {
         setIsLoading(false)
       }
@@ -153,6 +177,28 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
     setClientTextFieldOverrideState(null)
   }, [currentProfile?.id, activeIndex])
 
+  const setHybridOverride = useCallback(async (config: HybridEmbeddingConfig) => {
+    // Only allow for hybrid-capable indexes
+    if (!currentProfile?.id || !activeIndex || !isHybridCapable) return
+
+    await window.electronAPI.profiles.setHybridEmbeddingOverride(
+      currentProfile.id,
+      activeIndex,
+      config
+    )
+    setHybridConfig(config)
+  }, [currentProfile?.id, activeIndex, isHybridCapable])
+
+  const clearHybridOverride = useCallback(async () => {
+    if (!currentProfile?.id || !activeIndex) return
+
+    await window.electronAPI.profiles.clearHybridEmbeddingOverride(
+      currentProfile.id,
+      activeIndex
+    )
+    setHybridConfig(null)
+  }, [currentProfile?.id, activeIndex])
+
   // Determine active config - priority: index embed > client override > profile default
   const defaultConfig = currentProfile?.defaultEmbeddingConfig || null
 
@@ -183,6 +229,11 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
         clearTextFieldOverride,
         canOverride,
         isLoading,
+        isHybridCapable,
+        isHybridEnabled,
+        hybridConfig,
+        setHybridOverride,
+        clearHybridOverride,
       }}
     >
       {children}

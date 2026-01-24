@@ -1,6 +1,9 @@
 import OpenAI from 'openai'
 import { Pinecone } from '@pinecone-database/pinecone'
-import { EmbeddingConfig } from './types'
+import { EmbeddingConfig, SparseVector } from './types'
+
+// Re-export SparseVector for backwards compatibility
+export type { SparseVector }
 
 /**
  * Custom error for missing API credentials
@@ -14,14 +17,6 @@ export class EmbeddingCredentialsError extends Error {
     super(message || `${provider} API key not configured. Set the ${envVar} in Settings.`)
     this.name = 'EmbeddingCredentialsError'
   }
-}
-
-/**
- * Sparse vector representation
- */
-export interface SparseVector {
-  indices: number[]
-  values: number[]
 }
 
 /**
@@ -64,6 +59,46 @@ export class EmbeddingService {
         return this.generateOpenAIEmbeddings(texts, config)
       default:
         throw new Error(`Unsupported embedding provider: ${config.provider}`)
+    }
+  }
+
+  /**
+   * Generate both dense and sparse embeddings in parallel for hybrid search.
+   * Used for indexes that support hybrid queries (dense + dotproduct metric).
+   */
+  async generateHybridEmbeddings(
+    texts: string[],
+    denseConfig: EmbeddingConfig,
+    sparseConfig: EmbeddingConfig
+  ): Promise<{
+    dense: { type: 'dense'; values: number[][] }
+    sparse: { type: 'sparse'; sparseValues: SparseVector[] }
+  }> {
+    // Validate configs
+    if (denseConfig.vectorType !== 'dense') {
+      throw new Error('Dense config must have vectorType "dense"')
+    }
+    if (sparseConfig.vectorType !== 'sparse') {
+      throw new Error('Sparse config must have vectorType "sparse"')
+    }
+
+    // Generate both embeddings in parallel
+    const [denseResult, sparseResult] = await Promise.all([
+      this.generateEmbeddings(texts, denseConfig),
+      this.generateEmbeddings(texts, sparseConfig),
+    ])
+
+    // Type guards
+    if (denseResult.type !== 'dense') {
+      throw new Error('Expected dense embeddings but got sparse')
+    }
+    if (sparseResult.type !== 'sparse') {
+      throw new Error('Expected sparse embeddings but got dense')
+    }
+
+    return {
+      dense: denseResult,
+      sparse: sparseResult,
     }
   }
 

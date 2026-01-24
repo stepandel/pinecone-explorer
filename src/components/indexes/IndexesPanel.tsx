@@ -167,6 +167,9 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
           <div className="space-y-0.5">
             {indexes.map((index) => {
               const isActive = index.name === activeIndex
+              // Check if index is hybrid-capable (dense + dotproduct)
+              const isDense = !index.vectorType || index.vectorType === 'dense'
+              const isHybridCapable = isDense && index.metric === 'dotproduct'
 
               return (
                 <div
@@ -178,16 +181,26 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
                   }`}
                   onClick={() => handleIndexClick(index.name)}
                   onContextMenu={(e) => handleIndexContextMenu(e, index.name)}
-                  title={`${index.name}\n${index.dimension ? `${index.dimension}d · ` : ''}${index.metric}`}
+                  title={`${index.name}\n${index.dimension ? `${index.dimension}d · ` : ''}${index.metric}${isHybridCapable ? ' · Hybrid-capable' : ''}`}
                 >
-                  <div
-                    className={`text-[11px] truncate ${
-                      isActive
-                        ? 'text-sidebar-foreground font-medium'
-                        : 'text-sidebar-foreground'
-                    }`}
-                  >
-                    {index.name}
+                  <div className="flex items-center gap-1">
+                    <div
+                      className={`text-[11px] truncate flex-1 ${
+                        isActive
+                          ? 'text-sidebar-foreground font-medium'
+                          : 'text-sidebar-foreground'
+                      }`}
+                    >
+                      {index.name}
+                    </div>
+                    {isHybridCapable && (
+                      <span
+                        className="flex-shrink-0 px-1 py-0.5 text-[8px] font-medium rounded bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                        title="Hybrid-capable: supports both semantic and keyword search"
+                      >
+                        H
+                      </span>
+                    )}
                   </div>
                   <div className="text-[9px] text-muted-foreground truncate">
                     {index.dimension ? `${index.dimension}d` : 'sparse'}
