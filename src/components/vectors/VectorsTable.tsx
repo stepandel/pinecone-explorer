@@ -6,6 +6,7 @@ import {
   flexRender,
   HeaderGroup,
 } from '@tanstack/react-table'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { useTableSelection } from '../../hooks/useTableSelection'
 import { useInlineEditing } from '../../hooks/useInlineEditing'
@@ -30,6 +31,11 @@ interface VectorsTableProps {
   onTableContextMenu?: (e: React.MouseEvent) => void
   // Embedding text field (for highlighting the column used for embeddings)
   embeddingTextField?: string
+  // Pagination props
+  hasMore?: boolean
+  isFetchingMore?: boolean
+  onLoadMore?: () => void
+  totalVectorCount?: number
 }
 
 export default function VectorsTable({
@@ -50,10 +56,15 @@ export default function VectorsTable({
   onVectorContextMenu,
   onTableContextMenu,
   embeddingTextField,
+  hasMore = false,
+  isFetchingMore = false,
+  onLoadMore,
+  totalVectorCount,
 }: VectorsTableProps) {
-  // Refs for auto-focus
+  // Refs for auto-focus and virtualization
   const draftIdInputRef = useRef<HTMLInputElement>(null)
   const prevDraftCountRef = useRef<number>(0)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
 
   // Auto-focus draft input when drafts are first created
   useEffect(() => {
@@ -208,6 +219,20 @@ export default function VectorsTable({
     getCoreRowModel: getCoreRowModel(),
   })
 
+  // Total rows including drafts
+  const totalRows = draftVectors.length + vectors.length
+
+  // Virtual row height estimation
+  const ROW_HEIGHT = 32
+
+  // Virtualizer for efficient rendering
+  const rowVirtualizer = useVirtualizer({
+    count: totalRows,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  })
+
   // Loading state
   if (loading) {
     return (
@@ -260,9 +285,14 @@ export default function VectorsTable({
 
   const headerGroup = table.getHeaderGroups()[0]
   const idColIndex = hasDistances ? 1 : 0
+  const tableRows = table.getRowModel().rows
 
   return (
-    <div className="overflow-auto h-full" onContextMenu={onTableContextMenu}>
+    <div
+      ref={tableContainerRef}
+      className="overflow-auto h-full"
+      onContextMenu={onTableContextMenu}
+    >
       {/* Regenerate embedding dialog */}
       <RegenerateEmbeddingDialog
         open={pendingEmbeddingSave !== null}
@@ -297,37 +327,54 @@ export default function VectorsTable({
             </tr>
           ))}
         </thead>
-        <tbody className="select-none">
-          {/* Draft rows */}
-          {draftVectors.map((draft, idx) => (
-            <DraftRow
-              key={`draft-${idx}`}
-              draft={draft}
-              index={idx}
-              isSelected={selectedVectorIds.has(draft.id)}
-              metadataKeys={metadataKeys}
-              hasDistances={hasDistances}
-              headerGroup={headerGroup}
-              idColIndex={idColIndex}
-              inputRef={idx === 0 ? draftIdInputRef : undefined}
-              onDraftChange={onDraftChange}
-              onRowClick={handleRowClick}
-              onRowDoubleClick={handleRowDoubleClick}
-              onMouseDown={handleMouseDown}
-              onMouseEnter={handleMouseEnter}
-            />
-          ))}
-          {/* Data rows */}
-          {table.getRowModel().rows.map((row, index) => {
-            const rowIndex = draftVectors.length + index
-            const adjustedIndex = draftVectors.length > 0 ? index + draftVectors.length : index
+        <tbody
+          className="select-none relative"
+          style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const isDraft = virtualRow.index < draftVectors.length
+
+            if (isDraft) {
+              const draft = draftVectors[virtualRow.index]
+              return (
+                <DraftRow
+                  key={`draft-${virtualRow.index}`}
+                  draft={draft}
+                  index={virtualRow.index}
+                  isSelected={selectedVectorIds.has(draft.id)}
+                  metadataKeys={metadataKeys}
+                  hasDistances={hasDistances}
+                  headerGroup={headerGroup}
+                  idColIndex={idColIndex}
+                  inputRef={virtualRow.index === 0 ? draftIdInputRef : undefined}
+                  onDraftChange={onDraftChange}
+                  onRowClick={handleRowClick}
+                  onRowDoubleClick={handleRowDoubleClick}
+                  onMouseDown={handleMouseDown}
+                  onMouseEnter={handleMouseEnter}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                />
+              )
+            }
+
+            // Data row
+            const dataIndex = virtualRow.index - draftVectors.length
+            const row = tableRows[dataIndex]
+            if (!row) return null
 
             return (
               <DataRow
                 key={row.id}
                 row={row}
-                rowIndex={rowIndex}
-                adjustedIndex={adjustedIndex}
+                rowIndex={virtualRow.index}
+                adjustedIndex={virtualRow.index}
                 isSelected={selectedVectorIds.has(row.original.id)}
                 isMarkedForDeletion={markedForDeletion.has(row.original.id)}
                 isEditing={isEditing(row.original.id)}
@@ -345,11 +392,32 @@ export default function VectorsTable({
                 onEditChange={handleEditChange}
                 onEditKeyDown={handleEditKeyDown}
                 onEditBlur={saveEditing}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
               />
             )
           })}
         </tbody>
       </table>
+
+      {/* Load More button */}
+      {hasMore && (
+        <div className="flex justify-center py-4">
+          <button
+            onClick={onLoadMore}
+            disabled={isFetchingMore}
+            className="h-8 px-4 text-[13px] font-medium rounded-md bg-primary/10 hover:bg-primary/20 text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isFetchingMore ? 'Loading...' : 'Load More'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -369,6 +437,7 @@ interface DraftRowProps {
   onRowDoubleClick: (e: React.MouseEvent, id: string) => void
   onMouseDown: (e: React.MouseEvent, index: number) => void
   onMouseEnter: (index: number) => void
+  style?: React.CSSProperties
 }
 
 function DraftRow({
@@ -385,10 +454,12 @@ function DraftRow({
   onRowDoubleClick,
   onMouseDown,
   onMouseEnter,
+  style,
 }: DraftRowProps) {
   return (
     <tr
       className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/20 dark:bg-primary/30' : 'bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 dark:hover:bg-primary/20'}`}
+      style={style}
       onClick={e => onRowClick(e, draft.id, index)}
       onDoubleClick={e => onRowDoubleClick(e, draft.id)}
       onMouseDown={e => onMouseDown(e, index)}
@@ -450,6 +521,7 @@ interface DataRowProps {
   onEditChange: (field: string, value: string) => void
   onEditKeyDown: (e: React.KeyboardEvent) => void
   onEditBlur: () => void
+  style?: React.CSSProperties
 }
 
 function DataRow({
@@ -473,6 +545,7 @@ function DataRow({
   onEditChange,
   onEditKeyDown,
   onEditBlur,
+  style,
 }: DataRowProps) {
   // Determine row background - using CSS variables for proper dark mode support
   let rowBgClass: string
@@ -497,6 +570,7 @@ function DataRow({
     return (
       <tr
         className={`transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
+        style={style}
         onContextMenu={e => onContextMenu?.(e, vec.id)}
       >
         {hasDistances && (
@@ -535,6 +609,7 @@ function DataRow({
   return (
     <tr
       className={`transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
+      style={style}
       onClick={e => onRowClick(e, vec.id, rowIndex)}
       onDoubleClick={e => onRowDoubleClick(e, vec.id)}
       onMouseDown={e => onMouseDown(e, rowIndex)}

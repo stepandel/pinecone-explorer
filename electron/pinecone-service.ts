@@ -21,6 +21,7 @@ import {
   CloneProgress,
   CloneResult,
   EmbeddingConfig,
+  PaginatedVectorsResult,
 } from './types'
 import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-service'
 
@@ -1060,6 +1061,44 @@ class PineconeService {
     } while (paginationToken)
 
     return allVectors
+  }
+
+  /**
+   * Get vectors with server-side pagination
+   * Returns a page of vectors with cursor for next page
+   */
+  async getVectorsPaginated(
+    indexName: string,
+    namespace?: string,
+    pageSize: number = 100,
+    cursor?: string
+  ): Promise<PaginatedVectorsResult> {
+    const ns = this.getNamespace(indexName, namespace)
+
+    const listResult = await ns.listPaginated({
+      limit: Math.min(pageSize, PineconeService.BATCH_SIZE),
+      paginationToken: cursor,
+    })
+
+    const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
+
+    if (ids.length === 0) {
+      return { vectors: [], nextCursor: undefined, hasMore: false }
+    }
+
+    const fetchResult = await ns.fetch(ids)
+    const vectors = Object.values(fetchResult.records || {}).map(record => ({
+      id: record.id,
+      values: record.values || [],
+      metadata: record.metadata || null,
+      sparseValues: record.sparseValues,
+    }))
+
+    return {
+      vectors,
+      nextCursor: listResult.pagination?.next,
+      hasMore: !!listResult.pagination?.next,
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { usePanel } from '../../context/PanelContext'
-import { useVectorsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
+import { useInfiniteVectorsQuery, useIndexStatsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import VectorsTable from './VectorsTable'
@@ -291,25 +291,36 @@ export default function VectorsView({
     }
   }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation])
 
-  // Use React Query for vectors with debouncing via staleTime
+  // Use React Query for vectors with infinite pagination
   const {
-    data: queryData,
+    data: infiniteData,
     isLoading: loading,
     error,
     isFetching,
-  } = useVectorsQuery(currentProfile?.id || null, indexName, namespace)
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useInfiniteVectorsQuery(currentProfile?.id || null, indexName, namespace)
 
-  // Map vectors to record format
+  // Fetch index stats for total vector count
+  const { data: indexStats } = useIndexStatsQuery(currentProfile?.id || null, indexName)
+  const totalVectorCount = indexStats?.namespaces?.[namespace || '']?.vectorCount ?? undefined
+
+  // Map vectors to record format (flatten pages)
   const rawVectors: LocalVectorRecord[] = useMemo(() => {
-    const vecs = queryData?.vectors ?? []
-    return vecs.map((vec: VectorRecord) => ({
-      id: vec.id,
-      metadata: vec.metadata || null,
-      embedding: vec.values || null,
-      sparseEmbedding: vec.sparseValues || null,
-    }))
-  }, [queryData?.vectors])
-  const fetchTimeMs = queryData?.fetchTimeMs ?? null
+    if (!infiniteData?.pages) return []
+    return infiniteData.pages.flatMap(page =>
+      page.vectors.map((vec: VectorRecord) => ({
+        id: vec.id,
+        metadata: vec.metadata || null,
+        embedding: vec.values || null,
+        sparseEmbedding: vec.sparseValues || null,
+      }))
+    )
+  }, [infiniteData?.pages])
+
+  // Get fetch time from the most recent page
+  const fetchTimeMs = infiniteData?.pages?.[infiniteData.pages.length - 1]?.fetchTimeMs ?? null
 
   // Extract ID filter value for client-side filtering (from id search when in 'id' scope)
   const idFilterValue = ''
@@ -963,7 +974,13 @@ export default function VectorsView({
             </div>
           </div>
           <span className="text-xs text-muted-foreground flex-shrink-0">
-            {!loading && !error && `${vectors.length} vector${vectors.length !== 1 ? 's' : ''}`}
+            {!loading && !error && (
+              searchResults !== null
+                ? `${vectors.length} result${vectors.length !== 1 ? 's' : ''}`
+                : totalVectorCount !== undefined
+                  ? `${vectors.length} of ~${totalVectorCount.toLocaleString()} loaded`
+                  : `${vectors.length} vector${vectors.length !== 1 ? 's' : ''}`
+            )}
           </span>
         </div>
 
@@ -1017,6 +1034,10 @@ export default function VectorsView({
           onVectorContextMenu={handleVectorContextMenu}
           onTableContextMenu={handleTableContextMenu}
           embeddingTextField={effectiveTextField}
+          hasMore={searchResults === null ? hasNextPage : false}
+          isFetchingMore={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
+          totalVectorCount={searchResults === null ? totalVectorCount : undefined}
         />
       </div>
 
