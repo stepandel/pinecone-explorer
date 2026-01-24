@@ -112,6 +112,8 @@ interface PaginatedVectorsPage {
 }
 
 // Infinite Vectors Query (for pagination with Load More)
+// Uses longer cache times for large datasets - users browsing 10M+ vectors
+// don't need constant refetches during a browsing session
 export function useInfiniteVectorsQuery(
   profileId: string | null,
   indexName: string | null,
@@ -142,7 +144,8 @@ export function useInfiniteVectorsQuery(
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: enabled && !!profileId && !!indexName,
-    staleTime: 1000 * 15, // 15 seconds
+    staleTime: 1000 * 60 * 5,   // 5 minutes - large datasets don't change often during browsing
+    gcTime: 1000 * 60 * 10,     // 10 minutes - clean up old pages to limit memory growth
   })
 }
 
