@@ -403,11 +403,11 @@ export default function VectorsTable({
 
       {/* Load More button */}
       {hasMore && (
-        <div className="flex justify-center py-4">
+        <div className="flex justify-center py-3">
           <button
             onClick={onLoadMore}
             disabled={isFetchingMore}
-            className="h-8 px-4 text-[13px] font-medium rounded-md bg-primary/10 hover:bg-primary/20 text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="h-6 px-3 text-[11px] rounded-md border border-black/[0.08] dark:border-white/[0.1] bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.08] active:bg-black/[0.08] dark:active:bg-white/[0.1] text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isFetchingMore ? 'Loading...' : 'Load More'}
           </button>
