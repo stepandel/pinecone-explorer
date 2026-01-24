@@ -24,6 +24,7 @@ import {
   PaginatedVectorsResult,
 } from './types'
 import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-service'
+import { withRetry } from './retry-utils'
 
 /**
  * Main Pinecone service class
@@ -248,7 +249,7 @@ class PineconeService {
       throw new Error('Pinecone client not connected. Please connect first.')
     }
 
-    const response = await this.client.listIndexes()
+    const response = await withRetry(() => this.client!.listIndexes())
     const indexes = response.indexes || []
 
     const indexInfoList = indexes.map((idx) => {
@@ -318,7 +319,7 @@ class PineconeService {
    */
   async getIndexStats(indexName: string): Promise<IndexStats> {
     const index = this.getIndex(indexName)
-    const stats = await index.describeIndexStats()
+    const stats = await withRetry(() => index.describeIndexStats())
 
     return {
       namespaces: stats.namespaces
@@ -341,11 +342,11 @@ class PineconeService {
   async listVectors(params: ListVectorsParams): Promise<ListVectorsResult> {
     const ns = this.getNamespace(params.indexName, params.namespace)
 
-    const response = await ns.listPaginated({
+    const response = await withRetry(() => ns.listPaginated({
       prefix: params.prefix,
       limit: params.limit || 100,
       paginationToken: params.paginationToken,
-    })
+    }))
 
     return {
       vectors: response.vectors?.map((v) => ({ id: v.id || '' })) || [],
@@ -361,7 +362,7 @@ class PineconeService {
   async fetchVectors(params: FetchVectorsParams): Promise<VectorRecord[]> {
     const ns = this.getNamespace(params.indexName, params.namespace)
 
-    const response = await ns.fetch(params.ids)
+    const response = await withRetry(() => ns.fetch(params.ids))
 
     if (!response.records) return []
 
@@ -393,13 +394,13 @@ class PineconeService {
 
     // Query by ID mode - use existing vector's embedding as query vector
     if (params.id) {
-      const response = await target.query({
-        id: params.id,
+      const response = await withRetry(() => target.query({
+        id: params.id!,
         topK: params.topK || 10,
         filter: params.filter,
         includeValues: params.includeValues ?? false,
         includeMetadata: params.includeMetadata ?? true,
-      })
+      }))
 
       return {
         matches: response.matches.map((match) => ({
@@ -459,7 +460,7 @@ class PineconeService {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await target.query(queryParams as any)
+    const response = await withRetry(() => target.query(queryParams as any))
 
     return {
       matches: response.matches.map((match) => ({
@@ -504,7 +505,7 @@ class PineconeService {
         console.log('record', record)
         return record
       })
-      await ns.upsert(batch)
+      await withRetry(() => ns.upsert(batch))
     }
   }
 
@@ -590,12 +591,12 @@ class PineconeService {
       if (embedding.sparseValues) {
         record.sparseValues = embedding.sparseValues
       }
-      await ns.upsert([record])
+      await withRetry(() => ns.upsert([record]))
     } else if (Object.keys(metadata).length > 0) {
-      await ns.update({
+      await withRetry(() => ns.update({
         id: params.id,
         metadata: metadata as RecordMetadata,
-      })
+      }))
     }
   }
 
@@ -606,11 +607,11 @@ class PineconeService {
     const ns = this.getNamespace(params.indexName, params.namespace)
 
     if (params.deleteAll) {
-      await ns.deleteAll()
+      await withRetry(() => ns.deleteAll())
     } else if (params.ids && params.ids.length > 0) {
-      await ns.deleteMany(params.ids)
+      await withRetry(() => ns.deleteMany(params.ids!))
     } else if (params.filter) {
-      await ns.deleteMany({ filter: params.filter })
+      await withRetry(() => ns.deleteMany({ filter: params.filter! }))
     }
   }
 
@@ -711,18 +712,25 @@ class PineconeService {
         throw new Error('Integrated inference indexes require serverless spec')
       }
 
-      await this.client.createIndexForModel({
+      // Extract values before arrow function to preserve type narrowing
+      const cloud = spec.serverless.cloud as 'aws' | 'gcp' | 'azure'
+      const region = spec.serverless.region
+      const embedModel = params.embed.model
+      const embedFieldMap = params.embed.fieldMap
+      const embedMetric = params.embed.metric || params.metric
+
+      await withRetry(() => this.client!.createIndexForModel({
         name: params.name,
-        cloud: spec.serverless.cloud as 'aws' | 'gcp' | 'azure',
-        region: spec.serverless.region,
+        cloud,
+        region,
         embed: {
-          model: params.embed.model,
-          fieldMap: params.embed.fieldMap,
-          metric: params.embed.metric || params.metric,
+          model: embedModel,
+          fieldMap: embedFieldMap,
+          metric: embedMetric,
         },
         deletionProtection: params.deletionProtection,
         waitUntilReady: true,
-      })
+      }))
 
       // Clear cache to pick up new index
       this.indexCache.delete(params.name)
@@ -754,7 +762,8 @@ class PineconeService {
       createParams.vectorType = 'sparse'
     }
 
-    await this.client.createIndex(createParams as unknown as Parameters<typeof this.client.createIndex>[0])
+    const client = this.client!
+    await withRetry(() => client.createIndex(createParams as unknown as Parameters<typeof client.createIndex>[0]))
 
     // Clear cache to pick up new index
     this.indexCache.delete(params.name)
@@ -768,7 +777,7 @@ class PineconeService {
       throw new Error('Pinecone client not connected. Please connect first.')
     }
 
-    await this.client.deleteIndex(indexName)
+    await withRetry(() => this.client!.deleteIndex(indexName))
     this.indexCache.delete(indexName)
   }
 
@@ -913,14 +922,14 @@ class PineconeService {
         }
 
         // List next batch of vector IDs
-        const listResult = await sourceNs.listPaginated({ limit: PineconeService.BATCH_SIZE, paginationToken })
+        const listResult = await withRetry(() => sourceNs.listPaginated({ limit: PineconeService.BATCH_SIZE, paginationToken }))
         const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
         paginationToken = listResult.pagination?.next
 
         if (ids.length === 0) break
 
         // Fetch vector data
-        const fetchResult = await sourceNs.fetch(ids)
+        const fetchResult = await withRetry(() => sourceNs.fetch(ids))
         const records = Object.values(fetchResult.records || {})
         if (records.length === 0) continue
 
@@ -952,7 +961,7 @@ class PineconeService {
 
         // Queue the upsert operation (don't await)
         const upsertCount = vectorsToUpsert.length
-        const upsertPromise = targetNs.upsert(vectorsToUpsert as PineconeRecord[])
+        const upsertPromise = withRetry(() => targetNs.upsert(vectorsToUpsert as PineconeRecord[]))
           .then(() => ({ count: upsertCount }))
 
         pendingUpserts.push(upsertPromise)
@@ -1063,7 +1072,7 @@ class PineconeService {
     const firstWithValues = vectors.find(v => v.values && v.values.length > 0)
     if (!firstWithValues?.values) return
 
-    const targetInfo = await this.client!.describeIndex(targetIndexName)
+    const targetInfo = await withRetry(() => this.client!.describeIndex(targetIndexName))
     if (targetInfo.dimension && firstWithValues.values.length !== targetInfo.dimension) {
       throw new Error(
         `Dimension mismatch: Generated embeddings have ${firstWithValues.values.length} dimensions ` +
@@ -1085,17 +1094,17 @@ class PineconeService {
     let paginationToken: string | undefined
 
     do {
-      const listResult = await ns.listPaginated({
+      const listResult = await withRetry(() => ns.listPaginated({
         limit: Math.min(PineconeService.BATCH_SIZE, limit - allVectors.length),
         paginationToken,
-      })
+      }))
 
       const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
       paginationToken = listResult.pagination?.next
 
       if (ids.length === 0) break
 
-      const fetchResult = await ns.fetch(ids)
+      const fetchResult = await withRetry(() => ns.fetch(ids))
       const records = Object.values(fetchResult.records || {})
 
       allVectors.push(...records.map(record => ({
@@ -1125,10 +1134,10 @@ class PineconeService {
   ): Promise<PaginatedVectorsResult> {
     const ns = this.getNamespace(indexName, namespace)
 
-    const listResult = await ns.listPaginated({
+    const listResult = await withRetry(() => ns.listPaginated({
       limit: Math.min(pageSize, PineconeService.BATCH_SIZE),
       paginationToken: cursor,
-    })
+    }))
 
     const ids = listResult.vectors?.map(v => v.id || '').filter(Boolean) || []
 
@@ -1136,7 +1145,7 @@ class PineconeService {
       return { vectors: [], nextCursor: undefined, hasMore: false }
     }
 
-    const fetchResult = await ns.fetch(ids)
+    const fetchResult = await withRetry(() => ns.fetch(ids))
     const vectors = Object.values(fetchResult.records || {}).map(record => ({
       id: record.id,
       values: record.values || [],
