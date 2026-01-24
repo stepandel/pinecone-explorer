@@ -415,9 +415,10 @@ class PineconeService {
 
     // Query by vector or text
     let queryVector = params.vector
+    let querySparseVector: SparseVector | undefined
 
     // If queryText is provided, generate embedding
-    if (params.queryText && !queryVector) {
+    if (params.queryText && !queryVector && !querySparseVector) {
       let embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
       if (!embeddingConfig) {
         throw new Error(
@@ -436,23 +437,28 @@ class PineconeService {
       if (embeddingResult.type === 'dense') {
         queryVector = embeddingResult.values[0]
       } else {
-        // Sparse-only queries require hybrid search with a dense vector
-        // For now, throw an error - user should provide vector directly for sparse indexes
-        throw new Error('Text-based queries are not yet supported for sparse indexes. Please provide a vector directly.')
+        querySparseVector = embeddingResult.sparseValues[0]
       }
     }
 
-    if (!queryVector) {
+    if (!queryVector && !querySparseVector) {
       throw new Error('Either vector, queryText, or id must be provided for querying.')
     }
 
-    const response = await target.query({
-      vector: queryVector,
+    // Build query params
+    // Note: The Pinecone REST API supports sparse-only queries, but the SDK types
+    // incorrectly require a dense vector. We use type assertion to work around this.
+    const queryParams = {
       topK: params.topK || 10,
       filter: params.filter,
       includeValues: params.includeValues ?? false,
       includeMetadata: params.includeMetadata ?? true,
-    })
+      ...(queryVector && { vector: queryVector }),
+      ...(querySparseVector && { sparseVector: querySparseVector }),
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await target.query(queryParams as any)
 
     return {
       matches: response.matches.map((match) => ({
