@@ -331,3 +331,22 @@ export interface CloneNamespaceParams {
   targetNamespace: string
 }
 
+/**
+ * Result from paginated vectors fetch
+ */
+export interface PaginatedVectorsResult {
+  vectors: VectorRecord[]
+  nextCursor: string | undefined
+  hasMore: boolean
+}
+
+/**
+ * Parameters for fetching vectors with pagination
+ */
+export interface GetVectorsPaginatedParams {
+  indexName: string
+  namespace?: string
+  pageSize?: number
+  cursor?: string
+}
+

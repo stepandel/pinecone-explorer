@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import {
   ConnectionProfile,
   IndexInfo,
@@ -18,6 +18,8 @@ export const pineconeQueryKeys = {
     [...pineconeQueryKeys.all, 'indexStats', profileId, indexName] as const,
   vectors: (profileId: string, indexName: string, namespace?: string) =>
     [...pineconeQueryKeys.all, 'vectors', profileId, indexName, namespace] as const,
+  vectorsPaginated: (profileId: string, indexName: string, namespace?: string) =>
+    [...pineconeQueryKeys.all, 'vectorsPaginated', profileId, indexName, namespace] as const,
 }
 
 // Profile Query
@@ -101,6 +103,49 @@ export function useVectorsQuery(
   })
 }
 
+// Paginated Vectors Page Result
+interface PaginatedVectorsPage {
+  vectors: Awaited<ReturnType<typeof window.electronAPI.pinecone.getVectorsPaginated>>['vectors']
+  nextCursor: string | undefined
+  hasMore: boolean
+  fetchTimeMs: number
+}
+
+// Infinite Vectors Query (for pagination with Load More)
+export function useInfiniteVectorsQuery(
+  profileId: string | null,
+  indexName: string | null,
+  namespace?: string,
+  enabled: boolean = true
+) {
+  return useInfiniteQuery({
+    queryKey: pineconeQueryKeys.vectorsPaginated(profileId || '', indexName || '', namespace),
+    queryFn: async ({ pageParam }): Promise<PaginatedVectorsPage> => {
+      if (!profileId || !indexName) {
+        throw new Error('Profile ID and Index name are required')
+      }
+      const startTime = performance.now()
+      const result = await window.electronAPI.pinecone.getVectorsPaginated(profileId, {
+        indexName,
+        namespace,
+        pageSize: 100,
+        cursor: pageParam,
+      })
+      const fetchTimeMs = Math.round(performance.now() - startTime)
+      return {
+        vectors: result.vectors,
+        nextCursor: result.nextCursor,
+        hasMore: result.hasMore,
+        fetchTimeMs,
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: enabled && !!profileId && !!indexName,
+    staleTime: 1000 * 15, // 15 seconds
+  })
+}
+
 // Connect Mutation
 export function useConnectMutation() {
   const queryClient = useQueryClient()
@@ -161,6 +206,9 @@ export function useUpdateVectorMutation(profileId: string, indexName: string, na
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.vectors(profileId, indexName, namespace),
       })
+      queryClient.invalidateQueries({
+        queryKey: pineconeQueryKeys.vectorsPaginated(profileId, indexName, namespace),
+      })
     },
   })
 }
@@ -181,6 +229,9 @@ export function useCreateVectorMutation(profileId: string, indexName: string, na
       // Invalidate vectors for this index/namespace to refetch with new vector
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.vectors(profileId, indexName, namespace),
+      })
+      queryClient.invalidateQueries({
+        queryKey: pineconeQueryKeys.vectorsPaginated(profileId, indexName, namespace),
       })
       // Also invalidate index stats to update vector count
       queryClient.invalidateQueries({
@@ -207,6 +258,9 @@ export function useDeleteVectorsMutation(profileId: string, indexName: string, n
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.vectors(profileId, indexName, namespace),
       })
+      queryClient.invalidateQueries({
+        queryKey: pineconeQueryKeys.vectorsPaginated(profileId, indexName, namespace),
+      })
       // Also invalidate index stats to update vector count
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.indexStats(profileId, indexName),
@@ -231,6 +285,9 @@ export function useBatchImportMutation(profileId: string, indexName: string, nam
       // Invalidate vectors for this index/namespace to refetch with new vectors
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.vectors(profileId, indexName, namespace),
+      })
+      queryClient.invalidateQueries({
+        queryKey: pineconeQueryKeys.vectorsPaginated(profileId, indexName, namespace),
       })
       // Also invalidate index stats to update vector count
       queryClient.invalidateQueries({
@@ -305,6 +362,9 @@ export function useDeleteIndexMutation(profileId: string) {
       queryClient.removeQueries({
         queryKey: pineconeQueryKeys.vectors(data.profileId, data.indexName),
       })
+      queryClient.removeQueries({
+        queryKey: pineconeQueryKeys.vectorsPaginated(data.profileId, data.indexName),
+      })
     },
   })
 }
@@ -329,6 +389,9 @@ export function useDeleteNamespaceMutation() {
       // Invalidate vectors for this namespace
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.vectors(params.profileId, params.indexName, params.namespace),
+      })
+      queryClient.invalidateQueries({
+        queryKey: pineconeQueryKeys.vectorsPaginated(params.profileId, params.indexName, params.namespace),
       })
     },
   })

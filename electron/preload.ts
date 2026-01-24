@@ -20,6 +20,8 @@ import {
   ListVectorsResult,
   FetchVectorsParams,
   EmbeddingConfig,
+  GetVectorsPaginatedParams,
+  PaginatedVectorsResult,
 } from './types'
 
 console.log('Preload script is running!')
@@ -68,6 +70,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getAllVectors: async (profileId: string, indexName: string, namespace?: string, limit?: number): Promise<VectorRecord[]> => {
       const result = await ipcRenderer.invoke('pinecone:getAllVectors', profileId, indexName, namespace, limit)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    getVectorsPaginated: async (profileId: string, params: GetVectorsPaginatedParams): Promise<PaginatedVectorsResult> => {
+      const result = await ipcRenderer.invoke('pinecone:getVectorsPaginated', profileId, params)
       if (!result.success) {
         throw new Error(result.error)
       }
