@@ -65,7 +65,13 @@ export default function VectorDetailPanel({
     const hasDense = vector.embedding && vector.embedding.length > 0
     const hasSparse = vector.sparseEmbedding && vector.sparseEmbedding.indices.length > 0
 
-    if (hasDense) {
+    if (hasDense && hasSparse) {
+      // Hybrid: show both embeddings in a structured format
+      return JSON.stringify({
+        dense: vector.embedding,
+        sparse: vector.sparseEmbedding,
+      }, null, 2)
+    } else if (hasDense) {
       return JSON.stringify(vector.embedding)
     } else if (hasSparse) {
       return JSON.stringify({ sparse: vector.sparseEmbedding }, null, 2)
@@ -76,6 +82,12 @@ export default function VectorDetailPanel({
   // Check if this is a sparse-only vector (no editable dense values)
   const isSparseOnly = Boolean(
     (!vector.embedding || vector.embedding.length === 0) &&
+    vector.sparseEmbedding && vector.sparseEmbedding.indices.length > 0
+  )
+
+  // Check if this is a hybrid vector (has both dense and sparse)
+  const isHybrid = Boolean(
+    vector.embedding && vector.embedding.length > 0 &&
     vector.sparseEmbedding && vector.sparseEmbedding.indices.length > 0
   )
 
@@ -124,7 +136,12 @@ export default function VectorDetailPanel({
 
   const handleSave = useCallback(async () => {
     try {
-      const updates: { id: string; metadata?: Record<string, unknown>; values?: number[] } = {
+      const updates: {
+        id: string
+        metadata?: Record<string, unknown>
+        values?: number[]
+        sparseValues?: { indices: number[]; values: number[] }
+      } = {
         id: vector.id
       }
 
@@ -134,11 +151,35 @@ export default function VectorDetailPanel({
 
       if (hasEmbeddingChanges && draftEmbedding) {
         const parsed = JSON.parse(draftEmbedding)
-        if (!Array.isArray(parsed) || !parsed.every(n => typeof n === 'number')) {
-          setEmbeddingError('Embedding must be an array of numbers')
+
+        // Handle hybrid format: { dense: [...], sparse: { indices: [...], values: [...] } }
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          if (parsed.dense) {
+            if (!Array.isArray(parsed.dense) || !parsed.dense.every((n: unknown) => typeof n === 'number')) {
+              setEmbeddingError('Dense embedding must be an array of numbers')
+              return
+            }
+            updates.values = parsed.dense
+          }
+          if (parsed.sparse) {
+            if (!parsed.sparse.indices || !parsed.sparse.values ||
+                !Array.isArray(parsed.sparse.indices) || !Array.isArray(parsed.sparse.values)) {
+              setEmbeddingError('Sparse embedding must have indices and values arrays')
+              return
+            }
+            updates.sparseValues = parsed.sparse
+          }
+        } else if (Array.isArray(parsed)) {
+          // Simple array format (dense only)
+          if (!parsed.every(n => typeof n === 'number')) {
+            setEmbeddingError('Embedding must be an array of numbers')
+            return
+          }
+          updates.values = parsed
+        } else {
+          setEmbeddingError('Invalid embedding format')
           return
         }
-        updates.values = parsed
       }
 
       if (hasMetadataChanges || hasEmbeddingChanges) {
@@ -279,6 +320,7 @@ export default function VectorDetailPanel({
           <section>
             <h3 className="text-xs font-semibold text-muted-foreground mb-1">
               embedding
+              {isHybrid && <span className="ml-1 text-[10px] opacity-70">(hybrid)</span>}
               {isSparseOnly && <span className="ml-1 text-[10px] opacity-70">(sparse)</span>}
             </h3>
             {isEditingEmbedding ? (
@@ -301,6 +343,11 @@ export default function VectorDetailPanel({
                 />
                 {isSparseOnly && (
                   <p className="text-xs text-muted-foreground mt-1">Sparse embeddings are read-only</p>
+                )}
+                {isHybrid && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Edit both dense and sparse values. Format: {'{ "dense": [...], "sparse": { "indices": [...], "values": [...] } }'}
+                  </p>
                 )}
                 {embeddingError && <p className="text-xs text-destructive mt-1">{embeddingError}</p>}
               </div>

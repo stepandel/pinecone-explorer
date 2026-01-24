@@ -649,7 +649,10 @@ class PineconeService {
     const textField = params.textField || this.getTextFieldForIndex(params.indexName)
     if (params.text) metadata[textField] = params.text
 
-    let embedding: { values?: number[]; sparseValues?: SparseVector } = { values: params.values }
+    let embedding: { values?: number[]; sparseValues?: SparseVector } = {
+      values: params.values,
+      sparseValues: params.sparseValues,
+    }
 
     if (params.regenerateEmbedding) {
       // Get text to embed: explicit params.text, or from metadata field

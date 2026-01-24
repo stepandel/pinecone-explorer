@@ -1,6 +1,9 @@
 import OpenAI from 'openai'
 import { Pinecone } from '@pinecone-database/pinecone'
-import { EmbeddingConfig } from './types'
+import { EmbeddingConfig, SparseVector } from './types'
+
+// Re-export SparseVector for backwards compatibility
+export type { SparseVector }
 
 /**
  * Custom error for missing API credentials
@@ -14,14 +17,6 @@ export class EmbeddingCredentialsError extends Error {
     super(message || `${provider} API key not configured. Set the ${envVar} in Settings.`)
     this.name = 'EmbeddingCredentialsError'
   }
-}
-
-/**
- * Sparse vector representation
- */
-export interface SparseVector {
-  indices: number[]
-  values: number[]
 }
 
 /**

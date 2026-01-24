@@ -8,6 +8,14 @@ export type EmbeddingProviderType =
   | 'openai'
 
 /**
+ * Sparse vector representation (indices and values)
+ */
+export interface SparseVector {
+  indices: number[]
+  values: number[]
+}
+
+/**
  * Index-level embedding configuration from Pinecone API (for integrated inference indexes)
  */
 export interface IndexEmbedConfig {
@@ -198,7 +206,8 @@ export interface UpdateVectorParams {
   indexName: string
   namespace?: string
   id: string
-  values?: number[] // New embedding values
+  values?: number[] // New dense embedding values
+  sparseValues?: SparseVector // New sparse embedding values (for hybrid indexes)
   metadata?: Record<string, unknown> // New metadata (merged with existing)
   text?: string // New text to store in metadata
   regenerateEmbedding?: boolean // If true, regenerate embedding from text

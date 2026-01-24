@@ -140,6 +140,7 @@ declare global {
     namespace?: string
     id: string
     values?: number[]
+    sparseValues?: { indices: number[]; values: number[] } // For hybrid indexes
     metadata?: Record<string, unknown>
     text?: string
     regenerateEmbedding?: boolean
