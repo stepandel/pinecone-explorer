@@ -163,10 +163,17 @@ export class EmbeddingService {
       this.openaiClient = new OpenAI({ apiKey })
     }
 
-    const response = await this.openaiClient.embeddings.create({
+    const params: OpenAI.EmbeddingCreateParams = {
       model: config.modelName,
       input: texts,
-    })
+    }
+
+    // Pass dimensions if specified (for models that support variable dimensions)
+    if (config.dimensions) {
+      params.dimensions = config.dimensions
+    }
+
+    const response = await this.openaiClient.embeddings.create(params)
 
     return { type: 'dense', values: response.data.map(d => d.embedding) }
   }

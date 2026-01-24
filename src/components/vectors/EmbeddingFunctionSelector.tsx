@@ -1,9 +1,17 @@
-import { useState, useEffect } from 'react'
-import { ChevronDown, Lock, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { ChevronDown, Lock, AlertTriangle, Check, X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
-import { EMBEDDING_FUNCTIONS, EMBEDDING_FUNCTION_GROUPS, DEFAULT_EMBEDDING_FUNCTION_ID, getEmbeddingFunctionById } from '../../constants/embedding-functions'
+import {
+  EMBEDDING_FUNCTIONS,
+  EMBEDDING_FUNCTION_GROUPS,
+  DEFAULT_EMBEDDING_FUNCTION_ID,
+  getEmbeddingFunctionById,
+  resolveDimensionForIndex,
+  isCompatibleWithIndex,
+  EmbeddingFunctionConfig,
+} from '../../constants/embedding-functions'
 
 interface EmbeddingFunctionSelectorProps {
   indexName: string
@@ -80,18 +88,62 @@ export function EmbeddingFunctionSelector({
 
   const serverFunction = EMBEDDING_FUNCTIONS.find(ef => ef.modelName === serverConfig?.config?.model_name)
 
+  // Compute compatibility info for each embedding function
+  const compatibilityInfo = useMemo(() => {
+    const info: Record<string, { compatible: boolean; resolvedDimension: number | null; reason?: string }> = {}
+    for (const ef of EMBEDDING_FUNCTIONS) {
+      const compatible = isCompatibleWithIndex(ef, embeddingDimension ?? undefined)
+      const resolvedDimension = resolveDimensionForIndex(ef, embeddingDimension ?? undefined)
+
+      let reason: string | undefined
+      if (!compatible && embeddingDimension) {
+        if (ef.availableDimensions) {
+          reason = `supports ${ef.availableDimensions.join(', ')}d`
+        } else if (ef.defaultDimension) {
+          reason = `requires ${ef.defaultDimension}d`
+        }
+      }
+
+      info[ef.id] = { compatible, resolvedDimension, reason }
+    }
+    return info
+  }, [embeddingDimension])
+
+  // Get display label for an embedding function
+  const getEFDisplayLabel = (ef: EmbeddingFunctionConfig): string => {
+    const info = compatibilityInfo[ef.id]
+    if (ef.vectorType === 'sparse') {
+      return `${ef.label} (sparse)`
+    }
+    if (!embeddingDimension) {
+      // No index dimension to check against
+      return `${ef.label} (${ef.defaultDimension}d)`
+    }
+    if (info.compatible && info.resolvedDimension) {
+      return `${ef.label} → ${info.resolvedDimension}d`
+    }
+    if (!info.compatible && info.reason) {
+      return `${ef.label} ✗ (${info.reason})`
+    }
+    return ef.label
+  }
+
+  // Check if selected embedding function is compatible
+  const isSelectedCompatible = selectedEF ? compatibilityInfo[selectedEF.id]?.compatible ?? true : true
+  const selectedResolvedDimension = selectedEF ? compatibilityInfo[selectedEF.id]?.resolvedDimension : null
+
   const handleSave = async () => {
     if (!canOverride) return
 
     setSaving(true)
     try {
       // Save embedding config if selected
+      // Note: dimension is auto-resolved by EmbeddingContext based on index dimension
       if (selectedEF) {
         await onSave({
           provider: selectedEF.type as EmbeddingProviderType,
           modelName: selectedEF.modelName,
           vectorType: selectedEF.vectorType,
-          ...(selectedEF.defaultDimension && { dimensions: selectedEF.defaultDimension }),
         })
       }
       // Save text field if changed
@@ -124,7 +176,7 @@ export function EmbeddingFunctionSelector({
   }
 
   // Check if there are any changes to save
-  const hasEmbeddingChange = selectedEF !== undefined && selectedEF !== null
+  const hasEmbeddingChange = selectedEF !== undefined && selectedEF !== null && isSelectedCompatible
   const selectedField = textFieldInput.trim()
   const hasTextFieldChange = selectedField !== (clientTextFieldOverride || '') && selectedField !== ''
   const canSave = hasEmbeddingChange || hasTextFieldChange
@@ -258,8 +310,12 @@ export function EmbeddingFunctionSelector({
                 {EMBEDDING_FUNCTION_GROUPS.map(group => (
                   <optgroup key={group} label={group}>
                     {EMBEDDING_FUNCTIONS.filter(ef => ef.group === group).map(ef => (
-                      <option key={ef.id} value={ef.id}>
-                        {ef.label} {ef.defaultDimension ? `(${ef.defaultDimension}d)` : '(sparse)'}
+                      <option
+                        key={ef.id}
+                        value={ef.id}
+                        disabled={!compatibilityInfo[ef.id]?.compatible}
+                      >
+                        {getEFDisplayLabel(ef)}
                       </option>
                     ))}
                   </optgroup>
@@ -302,20 +358,15 @@ export function EmbeddingFunctionSelector({
           {(() => {
             const defaultEF = getEmbeddingFunctionById(DEFAULT_EMBEDDING_FUNCTION_ID)!
             const displayEF = selectedEF || serverFunction || defaultEF
-            // Dimension mismatch only applies to dense models with fixed dimensions
-            const hasDimensionMismatch = selectedEF &&
-              selectedEF.vectorType === 'dense' &&
-              embeddingDimension &&
-              selectedEF.defaultDimension &&
-              selectedEF.defaultDimension !== embeddingDimension
+            const isIncompatible = selectedEF && !isSelectedCompatible
 
             // Determine container styling based on state
             let containerClass = 'bg-black/[0.03] dark:bg-white/[0.04] ring-1 ring-black/[0.04] dark:ring-white/[0.06] shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]'
             let accentColor = ''
 
             if (selectedEF) {
-              if (hasDimensionMismatch) {
-                // Red for dimension mismatch
+              if (isIncompatible) {
+                // Red for incompatible
                 containerClass = 'bg-[#FF3B30]/8 dark:bg-[#FF453A]/10 ring-1 ring-[#FF3B30]/20 dark:ring-[#FF453A]/25 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.1)]'
                 accentColor = 'text-[#FF3B30] dark:text-[#FF453A]'
               } else {
@@ -329,19 +380,38 @@ export function EmbeddingFunctionSelector({
               <div className={`mx-1 text-[11px] px-2.5 py-2 rounded-[5px] space-y-0.5 ${containerClass}`}>
                 {selectedEF && (
                   <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full ${hasDimensionMismatch ? 'bg-[#FF3B30] dark:bg-[#FF453A]' : 'bg-[#007AFF] dark:bg-[#0A84FF]'}`} />
+                    {isIncompatible ? (
+                      <X className="h-2.5 w-2.5 text-[#FF3B30] dark:text-[#FF453A]" />
+                    ) : (
+                      <Check className="h-2.5 w-2.5 text-[#007AFF] dark:text-[#0A84FF]" />
+                    )}
                     <span className={`font-medium text-[10px] ${accentColor}`}>
-                      {hasDimensionMismatch ? 'Dimension Mismatch' : 'Selected'}
+                      {isIncompatible ? 'Incompatible' : 'Compatible'}
                     </span>
                   </div>
                 )}
                 <p className="text-muted-foreground"><span className="text-foreground/60">Provider:</span> {displayEF.type}</p>
                 <p className="text-muted-foreground"><span className="text-foreground/60">Model:</span> {displayEF.modelName}</p>
                 <p className="text-muted-foreground"><span className="text-foreground/60">Type:</span> {displayEF.vectorType}</p>
-                {displayEF.vectorType === 'dense' && (
-                  <p className="text-muted-foreground"><span className="text-foreground/60">Dimensions:</span> {displayEF.availableDimensions ? displayEF.availableDimensions.join(', ') : displayEF.defaultDimension}</p>
+                {displayEF.vectorType === 'dense' && selectedEF && selectedResolvedDimension && (
+                  <p className="text-muted-foreground">
+                    <span className="text-foreground/60">Dimension:</span> {selectedResolvedDimension}d
+                    {embeddingDimension && selectedResolvedDimension === embeddingDimension && (
+                      <span className="text-emerald-600 dark:text-emerald-400 ml-1">(auto-matched)</span>
+                    )}
+                  </p>
                 )}
-                {embeddingDimension && (
+                {displayEF.vectorType === 'dense' && !selectedEF && (
+                  <p className="text-muted-foreground">
+                    <span className="text-foreground/60">Dimensions:</span> {displayEF.availableDimensions ? displayEF.availableDimensions.join(', ') : displayEF.defaultDimension}
+                  </p>
+                )}
+                {isIncompatible && embeddingDimension && (
+                  <p className="text-[#FF3B30] dark:text-[#FF453A] pt-1 border-t border-[#FF3B30]/10 dark:border-[#FF453A]/15 mt-1">
+                    Index requires {embeddingDimension}d
+                  </p>
+                )}
+                {embeddingDimension && !isIncompatible && (
                   <p className="text-muted-foreground pt-1 border-t border-black/5 dark:border-white/5 mt-1">
                     <span className="text-foreground/60">Index:</span> {embeddingDimension}d
                   </p>
