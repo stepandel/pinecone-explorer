@@ -337,12 +337,46 @@ class PineconeService {
 
   /**
    * Query vectors by similarity
+   * Supports three modes:
+   * 1. Query by vector/text within a namespace (namespace specified)
+   * 2. Query by vector/text across all namespaces (namespace omitted)
+   * 3. Query by existing vector ID (id specified) - finds similar vectors using that vector's embedding
    */
   async queryVectors(
     params: QueryVectorsParams,
     embeddingConfigOverride?: EmbeddingConfig
   ): Promise<QueryResult> {
-    const ns = this.getNamespace(params.indexName, params.namespace)
+    const index = this.getIndex(params.indexName)
+
+    // Only scope to namespace if explicitly provided
+    const target = params.namespace !== undefined
+      ? index.namespace(params.namespace)
+      : index
+
+    // Query by ID mode - use existing vector's embedding as query vector
+    if (params.id) {
+      const response = await target.query({
+        id: params.id,
+        topK: params.topK || 10,
+        filter: params.filter,
+        includeValues: params.includeValues ?? false,
+        includeMetadata: params.includeMetadata ?? true,
+      })
+
+      return {
+        matches: response.matches.map((match) => ({
+          id: match.id,
+          score: match.score || 0,
+          values: match.values,
+          metadata: match.metadata,
+          sparseValues: match.sparseValues,
+        })),
+        namespace: params.namespace ?? '',
+        usage: response.usage ? { readUnits: response.usage.readUnits || 0 } : undefined,
+      }
+    }
+
+    // Query by vector or text
     let queryVector = params.vector
 
     // If queryText is provided, generate embedding
@@ -369,10 +403,10 @@ class PineconeService {
     }
 
     if (!queryVector) {
-      throw new Error('Either vector or queryText must be provided for querying.')
+      throw new Error('Either vector, queryText, or id must be provided for querying.')
     }
 
-    const response = await ns.query({
+    const response = await target.query({
       vector: queryVector,
       topK: params.topK || 10,
       filter: params.filter,
@@ -388,7 +422,7 @@ class PineconeService {
         metadata: match.metadata,
         sparseValues: match.sparseValues,
       })),
-      namespace: params.namespace || '',
+      namespace: params.namespace ?? '',
       usage: response.usage ? { readUnits: response.usage.readUnits || 0 } : undefined,
     }
   }
