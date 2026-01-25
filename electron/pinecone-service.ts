@@ -670,6 +670,7 @@ class PineconeService {
           hits?: Array<{
             _id: string
             _score?: number
+            fields?: Record<string, unknown>  // Metadata fields nested under 'fields'
             [key: string]: unknown
           }>
         }
@@ -687,13 +688,20 @@ class PineconeService {
       }))
 
       // Transform searchRecords response to QueryResult format
-      // searchRecords returns records with _id, _score, and fields
+      // searchRecords returns records with _id, _score, and fields object containing metadata
       const matches = (response.result?.hits || []).map((hit) => {
-        const { _id, _score, ...fields } = hit
+        const { _id, _score, fields, ...rest } = hit as {
+          _id: string
+          _score?: number
+          fields?: Record<string, unknown>
+          [key: string]: unknown
+        }
+        // Use fields object if present, otherwise use remaining properties
+        const metadata = fields || (Object.keys(rest).length > 0 ? rest : undefined)
         return {
           id: _id,
           score: _score || 0,
-          metadata: fields as Record<string, unknown>,
+          metadata: metadata as Record<string, unknown> | undefined,
           // searchRecords doesn't return vector values by default
           values: params.includeValues ? undefined : undefined,
         }
