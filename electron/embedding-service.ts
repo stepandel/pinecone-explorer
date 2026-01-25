@@ -31,13 +31,53 @@ export type EmbeddingResult =
  */
 export class EmbeddingService {
   private openaiClient: OpenAI | null = null
-  private pineconeClient: Pinecone | null = null
+  private pineconeClient: Pinecone | null = null  // Data client (from connection profile)
+  private inferenceClient: Pinecone | null = null // Inference client (for local mode, uses Settings API key)
+  private isLocalMode: boolean = false
 
   /**
    * Set the Pinecone client instance (passed from PineconeService)
+   * This is the data client used for cloud connections
    */
   setPineconeClient(client: Pinecone): void {
     this.pineconeClient = client
+  }
+
+  /**
+   * Set local mode and configure inference client if API key available
+   * In local mode, Pinecone Inference requires a separate API key from Settings
+   */
+  setLocalMode(isLocal: boolean, inferenceApiKey?: string): void {
+    this.isLocalMode = isLocal
+    if (isLocal && inferenceApiKey) {
+      this.inferenceClient = new Pinecone({ apiKey: inferenceApiKey })
+    } else {
+      this.inferenceClient = null
+    }
+  }
+
+  /**
+   * Get the appropriate client for Pinecone Inference API calls
+   * - Cloud mode: use the profile's data client (same API key for data + inference)
+   * - Local mode: use separate inference client with Settings API key
+   */
+  private getPineconeInferenceClient(): Pinecone {
+    if (this.isLocalMode) {
+      if (!this.inferenceClient) {
+        throw new EmbeddingCredentialsError(
+          'Pinecone',
+          'PINECONE_API_KEY',
+          'Pinecone API key required for embeddings in local mode. Configure it in Settings → API Keys.'
+        )
+      }
+      return this.inferenceClient
+    }
+
+    // Cloud mode: use the profile's client
+    if (!this.pineconeClient) {
+      throw new Error('Pinecone client not initialized. Please connect first.')
+    }
+    return this.pineconeClient
   }
 
   /**
@@ -109,9 +149,7 @@ export class EmbeddingService {
     texts: string[],
     config: EmbeddingConfig
   ): Promise<EmbeddingResult> {
-    if (!this.pineconeClient) {
-      throw new Error('Pinecone client not initialized. Please connect first.')
-    }
+    const client = this.getPineconeInferenceClient()
 
     const inputType = config.inputType || 'passage'
 
@@ -125,7 +163,7 @@ export class EmbeddingService {
       params.dimension = config.dimensions
     }
 
-    const response = await this.pineconeClient.inference.embed(
+    const response = await client.inference.embed(
       config.modelName,
       texts,
       params as Record<string, string>
@@ -150,13 +188,11 @@ export class EmbeddingService {
     texts: string[],
     config: EmbeddingConfig
   ): Promise<EmbeddingResult> {
-    if (!this.pineconeClient) {
-      throw new Error('Pinecone client not initialized. Please connect first.')
-    }
+    const client = this.getPineconeInferenceClient()
 
     const inputType = config.inputType || 'passage'
 
-    const response = await this.pineconeClient.inference.embed(
+    const response = await client.inference.embed(
       config.modelName,
       texts,
       { inputType, truncate: 'END' } as Record<string, string>

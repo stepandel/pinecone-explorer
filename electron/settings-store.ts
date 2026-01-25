@@ -6,6 +6,7 @@ import { getEncryptionKey } from './secure-key-manager'
 
 export interface ApiKeys {
   OPENAI_API_KEY?: string
+  PINECONE_API_KEY?: string  // For Pinecone Inference (embeddings/reranking) - required for local mode
 }
 
 export type Theme = 'light' | 'dark' | 'system'
