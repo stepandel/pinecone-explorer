@@ -121,18 +121,12 @@ body {
   --sidebar-accent-foreground: oklch(0.10 0 0);
   --sidebar-border: oklch(0 0 0 / 10%);
   --sidebar-ring: oklch(0.40 0.18 255 / 30%);
-  --sidebar-shadow:
-    inset -1px 0 0 oklch(0 0 0 / 6%),
-    inset 1px 0 0 oklch(1 0 0 / 30%),
-    1px 0 0 oklch(0 0 0 / 4%);
+  --sidebar-shadow: 1px 0 3px oklch(0 0 0 / 8%);
 
   /* Glass system */
   --glass-border: oklch(0 0 0 / 8%);
   --panel-detail: oklch(0.96 0 0 / 70%);
-  --panel-detail-shadow:
-    inset 1px 0 0 oklch(0 0 0 / 4%),
-    inset -1px 0 0 oklch(1 0 0 / 30%),
-    -1px 0 0 oklch(0 0 0 / 4%);
+  --panel-detail-shadow: -1px 0 3px oklch(0 0 0 / 8%);
   --content-background: oklch(0.92 0 0 / 75%);
   --shadow-panel: 0 0 1px oklch(0 0 0 / 8%);
 
