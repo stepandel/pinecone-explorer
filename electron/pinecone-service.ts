@@ -569,8 +569,6 @@ class PineconeService {
           record.sparseValues = v.sparseValues
         }
 
-
-        console.log('record', record)
         return record
       })
       await withRetry(() => ns.upsert(batch))
