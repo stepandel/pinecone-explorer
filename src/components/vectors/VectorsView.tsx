@@ -305,6 +305,7 @@ export default function VectorsView({
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
+    refetch: refetchVectors,
   } = useInfiniteVectorsQuery(currentProfile?.id || null, indexName, namespace)
 
   // Fetch index stats for total vector count
@@ -519,11 +520,13 @@ export default function VectorsView({
       setDraftError(null)
       onClearSelection() // Deselect after saving
       onIsFirstVectorChange?.(false) // Reset first vector flag
+      // Explicitly refetch vectors to ensure new vectors appear in table
+      refetchVectors()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create vector(s)'
       setDraftError(message)
     }
-  }, [draftVectors, createMutation, createBatchMutation, onClearSelection, onIsFirstVectorChange, effectiveTextField])
+  }, [draftVectors, createMutation, createBatchMutation, onClearSelection, onIsFirstVectorChange, effectiveTextField, refetchVectors])
 
   // Toggle deletion mark for all selected vectors
   const handleToggleDeletion = useCallback(() => {
