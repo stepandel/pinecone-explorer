@@ -298,7 +298,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
                       }}
                       className="w-3.5 h-3.5 rounded border-foreground/20 bg-black/[0.06] dark:bg-white/[0.08] checked:bg-primary"
                     />
-                    <span className="text-[12px] text-foreground/60">Pinecone Local</span>
+                    <span className="text-[12px] text-foreground/60">Local Server</span>
                   </label>
                 </div>
 
