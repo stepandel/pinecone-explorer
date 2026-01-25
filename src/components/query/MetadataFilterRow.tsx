@@ -6,6 +6,8 @@ interface MetadataFilterRowProps {
   fieldTypes: Record<string, 'string' | 'number' | 'boolean'>
   onChange: (id: string, updates: Partial<MetadataFilter>) => void
   onRemove: (id: string) => void
+  onAdd?: () => void
+  isLast?: boolean
 }
 
 const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
@@ -19,6 +21,8 @@ export function MetadataFilterRow({
   fieldTypes,
   onChange,
   onRemove,
+  onAdd,
+  isLast = false,
 }: MetadataFilterRowProps) {
   // Get the type of the currently selected field
   const fieldType = fieldTypes[filter.field] || 'string'
@@ -110,6 +114,17 @@ export function MetadataFilterRow({
       >
         -
       </button>
+
+      {/* Add button - only on last row */}
+      {isLast && onAdd && (
+        <button
+          onClick={onAdd}
+          className={`${buttonClassName} text-muted-foreground`}
+          title="Add filter"
+        >
+          +
+        </button>
+      )}
     </div>
   )
 }

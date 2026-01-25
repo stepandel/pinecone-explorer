@@ -187,13 +187,15 @@ export function QueryToolbar({
           </label>
         )}
 
-        {/* Add filter button - inline on main row */}
-        <button
-          onClick={handleAddFilter}
-          className={`${buttonClassName} text-muted-foreground`}
-        >
-          + Filter
-        </button>
+        {/* Add filter button - inline on main row, hidden when filters exist */}
+        {filters.length === 0 && (
+          <button
+            onClick={handleAddFilter}
+            className={`${buttonClassName} text-muted-foreground`}
+          >
+            + Filter
+          </button>
+        )}
       </div>
 
       {/* Hybrid search alpha slider */}
@@ -265,7 +267,7 @@ export function QueryToolbar({
       {/* Metadata filter rows */}
       {filters.length > 0 && (
         <div className="space-y-2">
-          {filters.map((filter) => (
+          {filters.map((filter, index) => (
             <MetadataFilterRow
               key={filter.id}
               filter={filter}
@@ -273,6 +275,8 @@ export function QueryToolbar({
               fieldTypes={fieldTypes}
               onChange={handleFilterChange}
               onRemove={handleRemoveFilter}
+              onAdd={handleAddFilter}
+              isLast={index === filters.length - 1}
             />
           ))}
         </div>
