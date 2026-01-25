@@ -9,6 +9,7 @@ import { NewButton } from '../ui/new-button'
 import { DeleteNamespaceDialog } from './DeleteNamespaceDialog'
 import { DuplicateNamespaceDialog } from './DuplicateNamespaceDialog'
 import { DuplicateNamespaceProgressDialog } from './DuplicateNamespaceProgressDialog'
+import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 
 const inputClassName = "w-full h-6 text-[11px] py-0 px-1.5 pr-5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] placeholder:text-sidebar-foreground/50 text-sidebar-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-ring/50 transition-colors"
 const inputStyle = { boxShadow: 'inset 0 0.5px 1px 0 rgb(0 0 0 / 0.04)' }
@@ -105,6 +106,19 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
     })
     return unsubscribe
   }, [])
+
+  // Keyboard shortcut: New Namespace (⌘⌥N)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (matchesShortcut(e, SHORTCUTS.NEW_NAMESPACE) && activeIndex) {
+        e.preventDefault()
+        startNamespaceCreation(activeIndex)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeIndex, startNamespaceCreation])
 
   // Handle context menu on namespace
   const handleContextMenu = useCallback((e: React.MouseEvent, namespace: string) => {
@@ -257,7 +271,7 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
       {/* Header */}
       <div className="px-3 py-2">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {showIndexesToggle && onToggleIndexesPanel && (
               <button
                 onClick={onToggleIndexesPanel}
@@ -270,6 +284,12 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
             <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
               Namespaces
             </h2>
+            <NewButton
+              onClick={() => startNamespaceCreation(activeIndex)}
+              label="Namespace"
+              title="Create new namespace"
+              iconOnly
+            />
           </div>
           <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
             Index: <span className="text-sidebar-foreground">{activeIndex}</span>
@@ -360,15 +380,6 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
             })}
           </div>
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="px-2 py-2">
-        <NewButton
-          onClick={() => startNamespaceCreation(activeIndex)}
-          label="Namespace"
-          title="Create new namespace"
-        />
       </div>
 
       {/* Delete Namespace Dialog */}

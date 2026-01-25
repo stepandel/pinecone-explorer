@@ -4,6 +4,7 @@ import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useDeleteIndexMutation } from '../../hooks/usePineconeQueries'
+import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import {
   Dialog,
   DialogContent,
@@ -121,6 +122,19 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
     return () => window.removeEventListener('menu:delete-index', handleMenuDelete)
   }, [activeIndex, openDeleteDialog])
 
+  // Keyboard shortcut: New Index (⌘⇧N)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (matchesShortcut(e, SHORTCUTS.NEW_INDEX) && draftIndex === null) {
+        e.preventDefault()
+        startCreation()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [draftIndex, startCreation])
+
   return (
     <aside
       className="h-full w-full flex flex-col flex-shrink-0"
@@ -133,9 +147,18 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
     >
       {/* Header */}
       <div className="px-2 py-2 flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Indexes
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            Indexes
+          </h2>
+          <NewButton
+            onClick={startCreation}
+            disabled={draftIndex !== null}
+            label="Index"
+            title="Create new index"
+            iconOnly
+          />
+        </div>
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
@@ -210,16 +233,6 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
             })}
           </div>
         )}
-      </div>
-
-      {/* Footer with Create button */}
-      <div className="px-2 py-2">
-        <NewButton
-          onClick={startCreation}
-          disabled={draftIndex !== null}
-          label="Index"
-          title="Create new index"
-        />
       </div>
 
       {/* Delete Confirmation Dialog */}
