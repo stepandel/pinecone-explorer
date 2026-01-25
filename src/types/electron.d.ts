@@ -357,6 +357,8 @@ declare global {
       onToggleRightPanel: (callback: () => void) => () => void
       onFocusSearch: (callback: () => void) => () => void
       onClearFilters: (callback: () => void) => () => void
+      onAddFilter: (callback: () => void) => () => void
+      onRemoveFilter: (callback: () => void) => () => void
       // Window menu events
       onDisconnect: (callback: () => void) => () => void
       // Help menu events

@@ -63,6 +63,14 @@ export function useMenuHandlers() {
       window.dispatchEvent(new CustomEvent('menu:clear-filters'))
     }
 
+    const handleAddFilter = () => {
+      window.dispatchEvent(new CustomEvent('menu:add-filter'))
+    }
+
+    const handleRemoveFilter = () => {
+      window.dispatchEvent(new CustomEvent('menu:remove-filter'))
+    }
+
     // Index menu handlers
     const handleNewIndex = () => {
       stateRef.current.startIndexCreation()
@@ -155,6 +163,8 @@ export function useMenuHandlers() {
     const unsubToggleRight = window.electronAPI.menu.onToggleRightPanel(handleToggleRightPanel)
     const unsubFocusSearch = window.electronAPI.menu.onFocusSearch(handleFocusSearch)
     const unsubClearFilters = window.electronAPI.menu.onClearFilters(handleClearFilters)
+    const unsubAddFilter = window.electronAPI.menu.onAddFilter(handleAddFilter)
+    const unsubRemoveFilter = window.electronAPI.menu.onRemoveFilter(handleRemoveFilter)
 
     // Index menu
     const unsubNewIndex = window.electronAPI.menu.onNewIndex(handleNewIndex)
@@ -187,6 +197,8 @@ export function useMenuHandlers() {
       unsubToggleRight()
       unsubFocusSearch()
       unsubClearFilters()
+      unsubAddFilter()
+      unsubRemoveFilter()
       unsubNewIndex()
       unsubDuplicateIndex()
       unsubRenameIndex()

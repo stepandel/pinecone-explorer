@@ -234,6 +234,20 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
             sendToFocusedWindow('menu:clear-filters')
           },
         },
+        {
+          label: 'Add Filter',
+          accelerator: 'CmdOrCtrl+=',
+          click: () => {
+            sendToFocusedWindow('menu:add-filter')
+          },
+        },
+        {
+          label: 'Remove Filter',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => {
+            sendToFocusedWindow('menu:remove-filter')
+          },
+        },
         { type: 'separator' },
         {
           label: 'Reload Window',
