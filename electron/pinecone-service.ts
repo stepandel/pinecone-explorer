@@ -724,6 +724,16 @@ class PineconeService {
           `Please select a metadata field that contains text.`
         )
       }
+      if (message.includes('token') && message.includes('exceeds')) {
+        // Extract token counts from error if present
+        const tokenMatch = message.match(/(\d+)\s*tokens.*maximum.*?(\d+)/i)
+        const docTokens = tokenMatch?.[1] || 'unknown'
+        const maxTokens = tokenMatch?.[2] || '1024'
+        throw new Error(
+          `Reranking failed: Document exceeds token limit (${docTokens}/${maxTokens} tokens). ` +
+          `Try using shorter text content or a model with higher limits (e.g., Cohere Rerank 3.5).`
+        )
+      }
       throw error
     }
   }
