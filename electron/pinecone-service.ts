@@ -51,6 +51,7 @@ class PineconeService {
     try {
       this.client = new Pinecone({
         apiKey: profile.apiKey,
+        ...(profile.controllerHostUrl && { controllerHostUrl: profile.controllerHostUrl }),
       })
 
       // Test connection by listing indexes
