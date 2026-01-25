@@ -7,6 +7,7 @@ interface NewButtonProps {
   disabled?: boolean
   title?: string
   className?: string
+  iconOnly?: boolean
 }
 
 export function NewButton({
@@ -15,7 +16,24 @@ export function NewButton({
   title,
   label,
   className,
+  iconOnly = false,
 }: NewButtonProps) {
+  if (iconOnly) {
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          "h-5 w-5 flex items-center justify-center rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-muted-foreground hover:text-foreground",
+          className
+        )}
+        title={title || `Add ${label}`}
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    )
+  }
+
   return (
     <button
       onClick={onClick}

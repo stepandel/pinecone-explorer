@@ -133,9 +133,18 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
     >
       {/* Header */}
       <div className="px-2 py-2 flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Indexes
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            Indexes
+          </h2>
+          <NewButton
+            onClick={startCreation}
+            disabled={draftIndex !== null}
+            label="Index"
+            title="Create new index"
+            iconOnly
+          />
+        </div>
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
@@ -210,16 +219,6 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
             })}
           </div>
         )}
-      </div>
-
-      {/* Footer with Create button */}
-      <div className="px-2 py-2">
-        <NewButton
-          onClick={startCreation}
-          disabled={draftIndex !== null}
-          label="Index"
-          title="Create new index"
-        />
       </div>
 
       {/* Delete Confirmation Dialog */}

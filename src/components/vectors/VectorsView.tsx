@@ -1004,6 +1004,13 @@ export default function VectorsView({
                 availableTextFields={availableTextFields}
               />
             </div>
+            <NewButton
+              onClick={handleStartCreate}
+              disabled={hasDrafts || markedForDeletion.size > 0}
+              title="Add vector"
+              label="Vector"
+              className="w-auto px-2 flex-shrink-0"
+            />
           </div>
           <span className="text-xs text-muted-foreground flex-shrink-0">
             {!loading && !error && (
@@ -1084,74 +1091,64 @@ export default function VectorsView({
         />
       </div>
 
-      {/* Bottom Toolbar */}
-      <div className="px-4 py-1.5 flex items-center justify-between bg-white/60 dark:bg-white/[0.06] border-t border-transparent dark:border-white/[0.06]">
-        <NewButton
-          onClick={handleStartCreate}
-          disabled={hasDrafts || markedForDeletion.size > 0}
-          title="Add vector"
-          label="Vector"
-          className="w-auto px-2"
-        />
-        {hasDrafts && (
-          <div className="flex items-center gap-3">
-            {draftError && (
-              <span className="text-[11px] text-destructive">{draftError}</span>
-            )}
-            <span className="text-[11px] text-muted-foreground">
-              {draftVectors.length} vector{draftVectors.length !== 1 ? 's' : ''} to add
-            </span>
-            <div className="flex gap-2">
+      {/* Bottom Action Bar - only shows during drafts or deletions */}
+      {(hasDrafts || markedForDeletion.size > 0) && (
+        <div className="px-4 py-1.5 flex items-center justify-end bg-white/60 dark:bg-white/[0.06] border-t border-transparent dark:border-white/[0.06]">
+          {hasDrafts && (
+            <div className="flex items-center gap-3">
+              {draftError && (
+                <span className="text-[11px] text-destructive">{draftError}</span>
+              )}
+              <span className="text-[11px] text-muted-foreground">
+                {draftVectors.length} vector{draftVectors.length !== 1 ? 's' : ''} to add
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCancelDraft}
+                  disabled={createMutation.isPending || createBatchMutation.isPending}
+                  className="h-6 px-2 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={createMutation.isPending || createBatchMutation.isPending || draftVectors.some(d => !d.id.trim())}
+                  className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {(createMutation.isPending || createBatchMutation.isPending) ? 'Saving...' : (draftVectors.length === 1 ? 'Save' : 'Save All')}
+                </button>
+              </div>
+            </div>
+          )}
+          {!hasDrafts && markedForDeletion.size > 0 && (
+            <div className="flex gap-2 items-center">
+              {deleteError && (
+                <span className="text-[11px] text-destructive">{deleteError}</span>
+              )}
+              <span className="text-[11px] text-muted-foreground">
+                {markedForDeletion.size} marked for deletion
+              </span>
               <button
-                onClick={handleCancelDraft}
-                disabled={createMutation.isPending || createBatchMutation.isPending}
+                onClick={() => {
+                  setMarkedForDeletion(new Set())
+                  setDeleteError(null)
+                }}
+                disabled={deleteMutation.isPending}
                 className="h-6 px-2 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveDraft}
-                disabled={createMutation.isPending || createBatchMutation.isPending || draftVectors.some(d => !d.id.trim())}
-                className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleCommitDeletions}
+                disabled={deleteMutation.isPending}
+                className="h-6 px-2 text-[11px] rounded-md bg-red-500 hover:bg-red-600 active:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(createMutation.isPending || createBatchMutation.isPending) ? 'Saving...' : (draftVectors.length === 1 ? 'Save' : 'Save All')}
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
               </button>
             </div>
-          </div>
-        )}
-        {!hasDrafts && markedForDeletion.size > 0 && (
-          <div className="flex gap-2 items-center">
-            {deleteError && (
-              <span className="text-[11px] text-destructive">{deleteError}</span>
-            )}
-            <span className="text-[11px] text-muted-foreground">
-              {markedForDeletion.size} marked for deletion
-            </span>
-            <button
-              onClick={() => {
-                setMarkedForDeletion(new Set())
-                setDeleteError(null)
-              }}
-              disabled={deleteMutation.isPending}
-              className="h-6 px-2 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCommitDeletions}
-              disabled={deleteMutation.isPending}
-              className="h-6 px-2 text-[11px] rounded-md bg-red-500 hover:bg-red-600 active:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-            </button>
-          </div>
-        )}
-        {!hasDrafts && markedForDeletion.size === 0 && fetchTimeMs !== null && !loading && (
-          <span className="text-[10px] text-muted-foreground">
-            {isFetching ? 'fetching...' : `${fetchTimeMs}ms`}
-          </span>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

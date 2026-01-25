@@ -257,7 +257,7 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
       {/* Header */}
       <div className="px-3 py-2">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {showIndexesToggle && onToggleIndexesPanel && (
               <button
                 onClick={onToggleIndexesPanel}
@@ -270,6 +270,12 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
             <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
               Namespaces
             </h2>
+            <NewButton
+              onClick={() => startNamespaceCreation(activeIndex)}
+              label="Namespace"
+              title="Create new namespace"
+              iconOnly
+            />
           </div>
           <div className="text-[10px] text-muted-foreground truncate" title={activeIndex}>
             Index: <span className="text-sidebar-foreground">{activeIndex}</span>
@@ -360,15 +366,6 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
             })}
           </div>
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="px-2 py-2">
-        <NewButton
-          onClick={() => startNamespaceCreation(activeIndex)}
-          label="Namespace"
-          title="Create new namespace"
-        />
       </div>
 
       {/* Delete Namespace Dialog */}
