@@ -249,10 +249,8 @@ export default function VectorsView({
     // Build metadata filter from filter rows
     const filter = buildPineconeFilter(metadataFilters)
 
-    // Determine namespace parameter based on scope
-    // 'namespace' scope: use current namespace
-    // 'index' or 'id' scope: query across all namespaces (omit namespace param)
-    const namespaceParam = queryScope === 'namespace' ? namespace : undefined
+    // Always query within the current namespace
+    const namespaceParam = namespace
 
     setIsSearching(true)
     setSearchError(null)
