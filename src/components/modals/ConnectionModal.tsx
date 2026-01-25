@@ -85,6 +85,8 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
       setProfiles(savedProfiles)
     } catch (err) {
       console.error('Failed to load profiles:', err)
+      // Show error to user so they know profiles couldn't be loaded
+      setError('Failed to load saved connections')
     }
   }
 

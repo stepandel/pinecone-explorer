@@ -1,7 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { ConnectionProfile, VectorRecord, QueryVectorsParams, QueryResult } from '../../electron/types'
+import { ConnectionProfile, VectorRecord, QueryVectorsParams, QueryResult, IndexInfo } from '../../electron/types'
 import { useIndexesQuery, useConnectMutation, useRefreshIndexesMutation } from '../hooks/usePineconeQueries'
 import { useQueryClient } from '@tanstack/react-query'
+
+/** Safely extract error message from unknown error */
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return 'An error occurred'
+}
 
 interface PineconeContextValue {
   // Connection state
@@ -11,7 +19,7 @@ interface PineconeContextValue {
   disconnect: () => void
 
   // Indexes
-  indexes: any[]
+  indexes: IndexInfo[]
   indexesLoading: boolean
   indexesError: string | null
   refreshIndexes: () => Promise<void>
@@ -120,7 +128,7 @@ export function PineconeProvider({ profile, windowId, children }: PineconeProvid
     disconnect,
     indexes,
     indexesLoading,
-    indexesError: indexesError ? (indexesError as Error).message : null,
+    indexesError: getErrorMessage(indexesError),
     refreshIndexes,
     queryVectors,
     invalidateCache,

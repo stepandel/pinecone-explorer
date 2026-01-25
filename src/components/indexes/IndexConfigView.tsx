@@ -80,7 +80,7 @@ export function IndexConfigView() {
       setIsHybridEnabled(false)
     }
     // If hybrid is enabled, keep dotproduct; otherwise use model's first supported metric
-    const targetMetric = (isHybridEnabled && !isSparse) ? 'dotproduct' : selectedEmbedding.supportedMetrics[0]
+    const targetMetric = (isHybridEnabled && !isSparse) ? 'dotproduct' : selectedEmbedding.supportedMetrics[0] ?? 'cosine'
     updateDraft({
       embeddingFunctionId: selectedEmbeddingId,
       dimensionOverride: selectedEmbedding.defaultDimension ? String(selectedEmbedding.defaultDimension) : '',

@@ -34,7 +34,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const resolved = savedTheme === 'system' ? getSystemTheme() : savedTheme
       setResolvedTheme(resolved)
       applyTheme(resolved)
-    }).catch(console.error)
+    }).catch((err) => {
+      // Log and fall back to system theme
+      console.warn('Failed to load saved theme, using system preference:', err)
+      const resolved = getSystemTheme()
+      setResolvedTheme(resolved)
+      applyTheme(resolved)
+    })
   }, [])
 
   // Listen for system preference changes
@@ -69,7 +75,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setResolvedTheme(resolved)
     applyTheme(resolved)
     // Persist to electron-store (also broadcasts to other windows)
-    window.electronAPI.settings.setTheme(newTheme).catch(console.error)
+    window.electronAPI.settings.setTheme(newTheme).catch((err) => {
+      // Theme is already applied locally - log failure to persist
+      console.warn('Failed to persist theme preference:', err)
+    })
   }, [])
 
   return (

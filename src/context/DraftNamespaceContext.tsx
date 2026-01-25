@@ -155,8 +155,9 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
           currentProfile.id,
           indexName
         )
-      } catch {
-        // No text field configured, that's fine
+      } catch (error) {
+        // No text field configured - this is expected, log for debugging only
+        console.debug('No text field override configured for index:', error)
       }
     }
 
@@ -335,8 +336,9 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
           draftNamespace.indexName
         )
         textField = textFieldOverride || undefined
-      } catch {
-        // No text field configured
+      } catch (error) {
+        // No text field configured - embeddings won't be generated unless metadata includes text
+        console.debug('No text field override for embedding generation:', error)
       }
 
       // Upsert each vector
