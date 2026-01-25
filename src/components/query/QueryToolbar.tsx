@@ -126,7 +126,7 @@ export function QueryToolbar({
         <select
           value={scope}
           onChange={(e) => onScopeChange(e.target.value as QueryScope)}
-          className={`w-36 ${selectClassName}`}
+          className={`w-28 ${selectClassName}`}
           style={inputStyle}
         >
           <option value="namespace">{getScopeLabel('namespace')}</option>
@@ -174,6 +174,27 @@ export function QueryToolbar({
           </select>
         </div>
 
+        {/* Rerank toggle - inline on main row for namespace scope */}
+        {scope === 'namespace' && (
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rerankEnabled}
+              onChange={(e) => onRerankEnabledChange?.(e.target.checked)}
+              className="w-3 h-3 rounded border-black/20 dark:border-white/20 text-[#007AFF] focus:ring-[#007AFF]/50"
+            />
+            <span className="text-[11px] text-muted-foreground">Rerank</span>
+          </label>
+        )}
+
+        {/* Add filter button - inline on main row */}
+        <button
+          onClick={handleAddFilter}
+          className={`${buttonClassName} text-muted-foreground`}
+        >
+          + Filter
+        </button>
+
         {/* Search button */}
         <button
           onClick={onSearch}
@@ -204,59 +225,43 @@ export function QueryToolbar({
         </div>
       )}
 
-      {/* Reranking controls - only shown for namespace scope (not id or index) */}
-      {scope === 'namespace' && (
+      {/* Reranking options row - shown when rerank is enabled */}
+      {scope === 'namespace' && rerankEnabled && (
         <div className="flex items-center gap-3 px-1">
-          {/* Enable toggle */}
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={rerankEnabled}
-              onChange={(e) => onRerankEnabledChange?.(e.target.checked)}
-              className="w-3 h-3 rounded border-black/20 dark:border-white/20 text-[#007AFF] focus:ring-[#007AFF]/50"
-            />
-            <span className="text-[11px] text-muted-foreground">Rerank</span>
-          </label>
+          {/* Model selector */}
+          <select
+            value={rerankModel}
+            onChange={(e) => onRerankModelChange?.(e.target.value as RerankModel)}
+            className={selectClassName}
+            style={inputStyle}
+            title="Reranking model"
+          >
+            <option value="bge-reranker-v2-m3">BGE Reranker v2 (Free)</option>
+            <option value="pinecone-rerank-v0">Pinecone Rerank</option>
+            <option value="cohere-rerank-3.5">Cohere Rerank 3.5</option>
+          </select>
 
-          {/* Rerank options - shown when enabled */}
-          {rerankEnabled && (
-            <>
-              {/* Model selector */}
-              <select
-                value={rerankModel}
-                onChange={(e) => onRerankModelChange?.(e.target.value as RerankModel)}
-                className={selectClassName}
-                style={inputStyle}
-                title="Reranking model"
-              >
-                <option value="bge-reranker-v2-m3">BGE Reranker v2 (Free)</option>
-                <option value="pinecone-rerank-v0">Pinecone Rerank</option>
-                <option value="cohere-rerank-3.5">Cohere Rerank 3.5</option>
-              </select>
-
-              {/* Rank field selector */}
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] text-muted-foreground">Field:</span>
-                <select
-                  value={rerankField}
-                  onChange={(e) => onRerankFieldChange?.(e.target.value)}
-                  className={selectClassName}
-                  style={inputStyle}
-                  title="Metadata field containing text to rerank on"
-                >
-                  {textFields.length === 0 ? (
-                    <option value="">No text fields</option>
-                  ) : (
-                    textFields.map((field) => (
-                      <option key={field} value={field}>
-                        {field}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-            </>
-          )}
+          {/* Rank field selector */}
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">Field:</span>
+            <select
+              value={rerankField}
+              onChange={(e) => onRerankFieldChange?.(e.target.value)}
+              className={selectClassName}
+              style={inputStyle}
+              title="Metadata field containing text to rerank on"
+            >
+              {textFields.length === 0 ? (
+                <option value="">No text fields</option>
+              ) : (
+                textFields.map((field) => (
+                  <option key={field} value={field}>
+                    {field}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
         </div>
       )}
 
@@ -267,28 +272,21 @@ export function QueryToolbar({
         </div>
       )}
 
-      {/* Metadata filters section */}
-      <div className="space-y-2">
-        {/* Filter rows */}
-        {filters.map((filter) => (
-          <MetadataFilterRow
-            key={filter.id}
-            filter={filter}
-            availableFields={availableFields}
-            fieldTypes={fieldTypes}
-            onChange={handleFilterChange}
-            onRemove={handleRemoveFilter}
-          />
-        ))}
-
-        {/* Add filter button */}
-        <button
-          onClick={handleAddFilter}
-          className={`${buttonClassName} text-muted-foreground`}
-        >
-          + Add Filter
-        </button>
-      </div>
+      {/* Metadata filter rows */}
+      {filters.length > 0 && (
+        <div className="space-y-2">
+          {filters.map((filter) => (
+            <MetadataFilterRow
+              key={filter.id}
+              filter={filter}
+              availableFields={availableFields}
+              fieldTypes={fieldTypes}
+              onChange={handleFilterChange}
+              onRemove={handleRemoveFilter}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
