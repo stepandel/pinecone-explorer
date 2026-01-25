@@ -12,6 +12,17 @@ import { useTableSelection } from '../../hooks/useTableSelection'
 import { useInlineEditing } from '../../hooks/useInlineEditing'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
 
+// Format score/distance for display - handles very small reranking scores
+function formatScore(score: number): string {
+  if (score === 0) return '0'
+  // For very small numbers (< 0.001), use scientific notation
+  if (Math.abs(score) < 0.001) {
+    return score.toExponential(1)
+  }
+  // For normal numbers, use 3 decimal places
+  return score.toFixed(3)
+}
+
 interface VectorsTableProps {
   vectors: LocalVectorRecord[]
   loading: boolean
@@ -160,7 +171,7 @@ export default function VectorsTable({
         size: 60,
         cell: info => (
           <div className="text-xs font-mono text-muted-foreground text-center">
-            {(info.getValue() as number | null) !== null ? (info.getValue() as number).toFixed(3) : '-'}
+            {(info.getValue() as number | null) !== null ? formatScore(info.getValue() as number) : '-'}
           </div>
         ),
       })
@@ -594,7 +605,7 @@ function DataRow({
         {hasDistances && (
           <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[0]?.getSize() }}>
             <div className="text-xs font-mono text-muted-foreground text-center">
-              {vec.distance !== null && vec.distance !== undefined ? vec.distance.toFixed(3) : '-'}
+              {vec.distance !== null && vec.distance !== undefined ? formatScore(vec.distance) : '-'}
             </div>
           </div>
         )}
