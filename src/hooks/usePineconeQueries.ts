@@ -8,6 +8,7 @@ import {
   BatchImportParams,
   CreateIndexParams,
 } from '../../electron/types'
+import { PAGINATION, QUERY } from '../constants/ui'
 
 // Query Keys
 export const pineconeQueryKeys = {
@@ -46,7 +47,7 @@ export function useIndexesQuery(profileId: string | null, enabled: boolean = tru
       return indexes
     },
     enabled: enabled && !!profileId,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: QUERY.STALE_TIME_INDEXES,
   })
 }
 
@@ -65,7 +66,7 @@ export function useIndexStatsQuery(
       return await window.electronAPI.pinecone.getIndexStats(profileId, indexName)
     },
     enabled: enabled && !!profileId && !!indexName,
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: QUERY.STALE_TIME_STATS,
   })
 }
 
@@ -93,7 +94,7 @@ export function useVectorsQuery(
         profileId,
         indexName,
         namespace,
-        1000 // Limit to 1000 vectors for UI display
+        PAGINATION.INITIAL_LOAD_LIMIT
       )
       const fetchTimeMs = Math.round(performance.now() - startTime)
       return { vectors, fetchTimeMs }
@@ -130,7 +131,7 @@ export function useInfiniteVectorsQuery(
       const result = await window.electronAPI.pinecone.getVectorsPaginated(profileId, {
         indexName,
         namespace,
-        pageSize: 100,
+        pageSize: PAGINATION.VECTORS_PER_PAGE,
         cursor: pageParam,
       })
       const fetchTimeMs = Math.round(performance.now() - startTime)
@@ -144,8 +145,8 @@ export function useInfiniteVectorsQuery(
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: enabled && !!profileId && !!indexName,
-    staleTime: 1000 * 60 * 5,   // 5 minutes - large datasets don't change often during browsing
-    gcTime: 1000 * 60 * 10,     // 10 minutes - clean up old pages to limit memory growth
+    staleTime: QUERY.STALE_TIME_VECTORS,
+    gcTime: QUERY.GC_TIME_VECTORS,
   })
 }
 

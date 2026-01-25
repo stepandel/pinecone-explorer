@@ -1,4 +1,5 @@
 import { FilterRow as FilterRowType } from '../../types/filters'
+import { formStyles } from '../../styles/form-controls'
 
 interface FilterRowProps {
   row: FilterRowType
@@ -13,10 +14,10 @@ interface FilterRowProps {
   onNResultsChange?: (n: number) => void
 }
 
-const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
-const selectClassName = "h-6 text-[11px] px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] focus:outline-none focus:ring-1 focus:ring-ring/50"
-const buttonClassName = "h-6 w-6 p-0 text-[11px] rounded-md bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
-const inputStyle = { boxShadow: 'inset 0 0.5px 1px 0 rgb(0 0 0 / 0.03)' }
+const inputClassName = formStyles.input
+const selectClassName = formStyles.select
+const buttonClassName = formStyles.iconButton
+const inputStyle = formStyles.inputShadow
 
 export function FilterRow({
   row,

@@ -341,26 +341,28 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
         console.debug('No text field override for embedding generation:', error)
       }
 
-      // Upsert each vector
-      for (const vector of draftNamespace.vectors) {
-        const metadata = fieldsToMetadata(vector.metadataFields)
+      // Upsert all vectors in parallel for better performance
+      await Promise.all(
+        draftNamespace.vectors.map(async (vector) => {
+          const metadata = fieldsToMetadata(vector.metadataFields)
 
-        // Get text from configured text field for embedding generation
-        let text: string | undefined
-        if (textField && metadata[textField] && typeof metadata[textField] === 'string') {
-          text = metadata[textField] as string
-        }
+          // Get text from configured text field for embedding generation
+          let text: string | undefined
+          if (textField && metadata[textField] && typeof metadata[textField] === 'string') {
+            text = metadata[textField] as string
+          }
 
-        await window.electronAPI.pinecone.createVector(currentProfile.id, {
-          indexName: draftNamespace.indexName,
-          namespace,
-          id: vector.id.trim(),
-          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
-          text,
-          textField,
-          generateEmbedding: !!text,
+          return window.electronAPI.pinecone.createVector(currentProfile.id, {
+            indexName: draftNamespace.indexName,
+            namespace,
+            id: vector.id.trim(),
+            metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+            text,
+            textField,
+            generateEmbedding: !!text,
+          })
         })
-      }
+      )
 
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({

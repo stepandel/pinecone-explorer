@@ -1,11 +1,7 @@
 import { createContext, useContext, useCallback, useRef, ReactNode } from 'react'
 import { QueryScope, MetadataFilter } from '../types/filters'
 import { LocalVectorRecord } from '../types/vectors'
-
-// Constants
-const MAX_CACHED_NAMESPACES = 5
-const RESULTS_TTL_MS = 2 * 60 * 1000 // 2 minutes
-const MAX_RESULTS_PER_NAMESPACE = 500
+import { QUERY_CACHE } from '../constants/ui'
 
 // Query parameters for a namespace
 export interface NamespaceQueryParams {
@@ -86,7 +82,7 @@ export function QueryStateProvider({ children }: QueryStateProviderProps) {
     const order = accessOrderRef.current
     const stateMap = stateMapRef.current
 
-    while (order.length > MAX_CACHED_NAMESPACES) {
+    while (order.length > QUERY_CACHE.MAX_CACHED_NAMESPACES) {
       const oldestKey = order.shift()
       if (oldestKey) {
         stateMap.delete(oldestKey)
@@ -143,7 +139,7 @@ export function QueryStateProvider({ children }: QueryStateProviderProps) {
 
     // Check TTL
     const age = Date.now() - state.searchResults.timestamp
-    if (age > RESULTS_TTL_MS) {
+    if (age > QUERY_CACHE.RESULTS_TTL_MS) {
       // Expired - clear results
       state.searchResults = null
       return null
@@ -164,7 +160,7 @@ export function QueryStateProvider({ children }: QueryStateProviderProps) {
     const existing = stateMap.get(key)
 
     // Truncate results if over limit to prevent memory bloat
-    const truncatedResults = results.slice(0, MAX_RESULTS_PER_NAMESPACE)
+    const truncatedResults = results.slice(0, QUERY_CACHE.MAX_RESULTS_PER_NAMESPACE)
 
     if (existing) {
       existing.searchResults = {
