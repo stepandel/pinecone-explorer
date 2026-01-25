@@ -4,6 +4,7 @@ import { usePinecone } from '../../providers/PineconeProvider'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useDeleteIndexMutation } from '../../hooks/usePineconeQueries'
+import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import {
   Dialog,
   DialogContent,
@@ -120,6 +121,19 @@ export function IndexesPanel({ onToggleCollapse }: IndexesPanelProps) {
     window.addEventListener('menu:delete-index', handleMenuDelete)
     return () => window.removeEventListener('menu:delete-index', handleMenuDelete)
   }, [activeIndex, openDeleteDialog])
+
+  // Keyboard shortcut: New Index (⌘⇧N)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (matchesShortcut(e, SHORTCUTS.NEW_INDEX) && draftIndex === null) {
+        e.preventDefault()
+        startCreation()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [draftIndex, startCreation])
 
   return (
     <aside

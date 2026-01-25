@@ -37,11 +37,20 @@ export function matchesShortcut(e: KeyboardEvent, shortcut: KeyboardShortcut): b
   if (wantsKey === '/') wantsKey = '/'
   if (wantsKey === ',') wantsKey = ','
 
-  // Get actual key pressed (normalized)
-  let actualKey = e.key.toLowerCase()
-  if (actualKey === 'backspace') actualKey = 'backspace'
-  if (actualKey === 'delete') actualKey = 'delete'
-  if (actualKey === 'enter') actualKey = 'enter'
+  // Get actual key pressed
+  // For letter keys with Alt/Option on macOS, e.key produces special characters (e.g., Option+N = ˜)
+  // So we use e.code for single letter keys when Alt is pressed
+  let actualKey: string
+  if (wantsAlt && wantsKey.length === 1 && wantsKey >= 'a' && wantsKey <= 'z') {
+    // Use e.code (e.g., 'KeyN') and extract the letter
+    actualKey = e.code.replace('Key', '').toLowerCase()
+  } else {
+    // Use e.key for other keys
+    actualKey = e.key.toLowerCase()
+    if (actualKey === 'backspace') actualKey = 'backspace'
+    if (actualKey === 'delete') actualKey = 'delete'
+    if (actualKey === 'enter') actualKey = 'enter'
+  }
 
   // Check modifiers
   const hasMeta = e.metaKey || e.ctrlKey
@@ -94,6 +103,13 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
     keys: '⌘⇧N',
     accelerator: 'CmdOrCtrl+Shift+N',
     action: 'New Index',
+    category: 'indexes',
+  },
+  NEW_NAMESPACE: {
+    id: 'new-namespace',
+    keys: '⌘⌥N',
+    accelerator: 'CmdOrCtrl+Alt+N',
+    action: 'New Namespace',
     category: 'indexes',
   },
   PASTE_INDEX: {
