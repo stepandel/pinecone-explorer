@@ -54,16 +54,16 @@ class PineconeService {
         ...(profile.controllerHostUrl && { controllerHostUrl: profile.controllerHostUrl }),
       })
 
-      // Test connection by listing indexes
-      await this.client.listIndexes()
+      // Store profile first (needed by listIndexes for local instance handling)
+      this.profile = profile
+      this.indexCache.clear()
 
       // Initialize embedding service and pass Pinecone client
       this.embeddingService = new EmbeddingService()
       this.embeddingService.setPineconeClient(this.client)
 
-      // Store profile on successful connection
-      this.profile = profile
-      this.indexCache.clear()
+      // Test connection and populate index cache
+      await this.listIndexes()
     } catch (error) {
       this.client = null
       this.embeddingService = null
@@ -92,6 +92,7 @@ class PineconeService {
 
   /**
    * Get or create an index reference
+   * For Pinecone Local, explicitly passes the host URL with http:// prefix
    */
   private getIndex(indexName: string): Index<RecordMetadata> {
     if (!this.client) {
@@ -100,7 +101,22 @@ class PineconeService {
 
     let index = this.indexCache.get(indexName)
     if (!index) {
-      index = this.client.index(indexName)
+      // For Pinecone Local, we need to explicitly provide the host URL
+      if (this.profile?.controllerHostUrl) {
+        const indexInfo = this.indexInfoCache.get(indexName)
+        if (indexInfo?.host) {
+          // Pinecone Local returns hosts without protocol, need to add http://
+          const hostUrl = indexInfo.host.startsWith('http')
+            ? indexInfo.host
+            : `http://${indexInfo.host}`
+          index = this.client.index(indexName, hostUrl)
+        } else {
+          // Fallback if index info not cached yet
+          index = this.client.index(indexName)
+        }
+      } else {
+        index = this.client.index(indexName)
+      }
       this.indexCache.set(indexName, index)
     }
     return index
