@@ -238,75 +238,6 @@ export default function VectorsView({
     setTextFieldOverride(null)
   }, [currentProfile?.id, indexName])
 
-  // Handle search execution based on query scope
-  const handleSearch = useCallback(async () => {
-    // Determine the query parameters based on scope
-    const isIdQuery = queryScope === 'id'
-    const queryText = isIdQuery ? undefined : searchText.trim()
-    const queryId = isIdQuery ? idSearch.trim() : undefined
-
-    // Validate that we have query input
-    if (!queryText && !queryId) {
-      setSearchResults(null)
-      setSearchError(null)
-      return
-    }
-
-    // Build metadata filter from filter rows
-    const filter = buildPineconeFilter(metadataFilters)
-
-    // Always query within the current namespace
-    const namespaceParam = namespace
-
-    setIsSearching(true)
-    setSearchError(null)
-    try {
-      // Build rerank config if enabled and we have a valid field
-      const rerankConfig = rerankEnabled && rerankField && queryScope === 'namespace'
-        ? {
-            enabled: true,
-            model: rerankModel,
-            rankField: rerankField,
-            topN: topK || 10,
-          }
-        : undefined
-
-      const result = await queryMutation.mutateAsync({
-        indexName: indexName,
-        namespace: namespaceParam,
-        queryText,
-        id: queryId,
-        topK: topK || 10,
-        filter,
-        includeValues: true,
-        includeMetadata: true,
-        // Pass alpha for hybrid search (only used when hybrid is enabled on the index)
-        alpha: isHybridEnabled ? alpha : undefined,
-        // Pass rerank config
-        rerank: rerankConfig,
-      })
-
-      // Convert query results to LocalVectorRecord format
-      const results: LocalVectorRecord[] = result.matches.map(match => ({
-        id: match.id,
-        metadata: match.metadata || null,
-        embedding: match.values || null,
-        sparseEmbedding: match.sparseValues || null,
-        score: match.score,
-      }))
-      setSearchResults(results)
-      // Cache results in context for restoration when switching back to this namespace
-      saveSearchResults(indexName, namespace, results)
-    } catch (error) {
-      console.error('Search failed:', error)
-      const message = error instanceof Error ? error.message : 'Search failed'
-      setSearchError(message)
-      setSearchResults(null)
-    } finally {
-      setIsSearching(false)
-    }
-  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha, saveSearchResults, rerankEnabled, rerankModel, rerankField])
-
   // Use React Query for vectors with infinite pagination
   const {
     data: infiniteData,
@@ -409,6 +340,75 @@ export default function VectorsView({
     })
     return types
   }, [vectors])
+
+  // Handle search execution based on query scope
+  const handleSearch = useCallback(async () => {
+    // Determine the query parameters based on scope
+    const isIdQuery = queryScope === 'id'
+    const queryText = isIdQuery ? undefined : searchText.trim()
+    const queryId = isIdQuery ? idSearch.trim() : undefined
+
+    // Validate that we have query input
+    if (!queryText && !queryId) {
+      setSearchResults(null)
+      setSearchError(null)
+      return
+    }
+
+    // Build metadata filter from filter rows (pass field types for correct type coercion)
+    const filter = buildPineconeFilter(metadataFilters, metadataFieldTypes)
+
+    // Always query within the current namespace
+    const namespaceParam = namespace
+
+    setIsSearching(true)
+    setSearchError(null)
+    try {
+      // Build rerank config if enabled and we have a valid field
+      const rerankConfig = rerankEnabled && rerankField && queryScope === 'namespace'
+        ? {
+            enabled: true,
+            model: rerankModel,
+            rankField: rerankField,
+            topN: topK || 10,
+          }
+        : undefined
+
+      const result = await queryMutation.mutateAsync({
+        indexName: indexName,
+        namespace: namespaceParam,
+        queryText,
+        id: queryId,
+        topK: topK || 10,
+        filter,
+        includeValues: true,
+        includeMetadata: true,
+        // Pass alpha for hybrid search (only used when hybrid is enabled on the index)
+        alpha: isHybridEnabled ? alpha : undefined,
+        // Pass rerank config
+        rerank: rerankConfig,
+      })
+
+      // Convert query results to LocalVectorRecord format
+      const results: LocalVectorRecord[] = result.matches.map(match => ({
+        id: match.id,
+        metadata: match.metadata || null,
+        embedding: match.values || null,
+        sparseEmbedding: match.sparseValues || null,
+        score: match.score,
+      }))
+      setSearchResults(results)
+      // Cache results in context for restoration when switching back to this namespace
+      saveSearchResults(indexName, namespace, results)
+    } catch (error) {
+      console.error('Search failed:', error)
+      const message = error instanceof Error ? error.message : 'Search failed'
+      setSearchError(message)
+      setSearchResults(null)
+    } finally {
+      setIsSearching(false)
+    }
+  }, [queryScope, searchText, idSearch, metadataFilters, metadataFieldTypes, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha, saveSearchResults, rerankEnabled, rerankModel, rerankField])
 
   // Draft vector handlers
   const handleStartCreate = useCallback(() => {

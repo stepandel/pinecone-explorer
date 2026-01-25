@@ -70,14 +70,16 @@ export function getOperatorsForType(
 
 // Build Pinecone filter object from MetadataFilter array
 export function buildPineconeFilter(
-  filters: MetadataFilter[]
+  filters: MetadataFilter[],
+  fieldTypes?: Record<string, 'string' | 'number' | 'boolean'>
 ): Record<string, unknown> | undefined {
   if (filters.length === 0) return undefined
 
   const filterClauses = filters
     .filter(f => f.field.trim() && f.value.trim())
     .map(f => {
-      const value = parseFilterValue(f.value, f.operator)
+      const fieldType = fieldTypes?.[f.field]
+      const value = parseFilterValue(f.value, f.operator, fieldType)
       return { [f.field]: { [f.operator]: value } }
     })
 
@@ -86,22 +88,39 @@ export function buildPineconeFilter(
   return { $and: filterClauses }
 }
 
-// Parse filter value based on operator
+// Parse filter value based on operator and known field type
 function parseFilterValue(
   value: string,
-  operator: MetadataOperator
+  operator: MetadataOperator,
+  fieldType?: 'string' | 'number' | 'boolean'
 ): unknown {
   if (operator === '$exists') {
     return value.toLowerCase() === 'true'
   }
   if (operator === '$in' || operator === '$nin') {
-    return value.split(',').map(v => inferType(v.trim()))
+    return value.split(',').map(v => inferType(v.trim(), fieldType))
   }
-  return inferType(value)
+  return inferType(value, fieldType)
 }
 
 // Infer primitive type from string value
-function inferType(value: string): string | number | boolean {
+// If fieldType is known, use it to guide parsing (prevents incorrect type coercion)
+function inferType(value: string, fieldType?: 'string' | 'number' | 'boolean'): string | number | boolean {
+  // If we know the field type, respect it
+  if (fieldType === 'string') {
+    return value
+  }
+  if (fieldType === 'number') {
+    const num = Number(value)
+    return !isNaN(num) ? num : value
+  }
+  if (fieldType === 'boolean') {
+    if (value.toLowerCase() === 'true') return true
+    if (value.toLowerCase() === 'false') return false
+    return value
+  }
+
+  // Unknown field type - auto-infer (original behavior)
   if (value.toLowerCase() === 'true') return true
   if (value.toLowerCase() === 'false') return false
   const num = Number(value)
