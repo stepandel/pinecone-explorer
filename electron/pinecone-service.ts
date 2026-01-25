@@ -37,7 +37,6 @@ class PineconeService {
 
   private client: Pinecone | null = null
   private embeddingService: EmbeddingService | null = null
-  private inferenceClient: Pinecone | null = null  // Separate client for inference (local mode)
   private profile: ConnectionProfile | null = null
   private indexCache: Map<string, Index<RecordMetadata>> = new Map()
   private indexInfoCache: Map<string, IndexInfo> = new Map()
@@ -51,27 +50,6 @@ class PineconeService {
    */
   isLocalMode(): boolean {
     return !!this.profile?.controllerHostUrl
-  }
-
-  /**
-   * Get the Pinecone client for inference operations (embeddings, reranking)
-   * - Cloud mode: uses the profile's data client
-   * - Local mode: uses separate inference client with Settings API key
-   */
-  private getInferenceClient(): Pinecone {
-    if (this.isLocalMode()) {
-      if (!this.inferenceClient) {
-        throw new Error(
-          'Pinecone API key required for reranking in local mode. Configure it in Settings → API Keys.'
-        )
-      }
-      return this.inferenceClient
-    }
-
-    if (!this.client) {
-      throw new Error('Pinecone client not connected. Please connect first.')
-    }
-    return this.client
   }
 
   /**
@@ -92,21 +70,14 @@ class PineconeService {
       this.embeddingService = new EmbeddingService()
       this.embeddingService.setPineconeClient(this.client)
 
-      // Configure local mode for embedding service and inference client
+      // Configure local mode for embedding service
       // In local mode, Pinecone Inference needs a separate API key from Settings
       const isLocalMode = !!profile.controllerHostUrl
       if (isLocalMode) {
         const apiKeys = settingsStore.getApiKeys()
         this.embeddingService.setLocalMode(true, apiKeys.PINECONE_API_KEY)
-        // Create inference client for reranking in local mode
-        if (apiKeys.PINECONE_API_KEY) {
-          this.inferenceClient = new Pinecone({ apiKey: apiKeys.PINECONE_API_KEY })
-        } else {
-          this.inferenceClient = null
-        }
       } else {
         this.embeddingService.setLocalMode(false)
-        this.inferenceClient = null  // Not needed in cloud mode
       }
 
       // Test connection and populate index cache
@@ -114,7 +85,6 @@ class PineconeService {
     } catch (error) {
       this.client = null
       this.embeddingService = null
-      this.inferenceClient = null
       this.profile = null
       throw error
     }
@@ -126,7 +96,6 @@ class PineconeService {
   disconnect(): void {
     this.client = null
     this.embeddingService = null
-    this.inferenceClient = null
     this.profile = null
     this.indexCache.clear()
     this.indexInfoCache.clear()
@@ -728,17 +697,12 @@ class PineconeService {
       fields.push('*') // Request all fields
     }
 
-    try {
-      // Local mode: query locally first, then use inference API for reranking
-      if (this.isLocalMode()) {
-        return await this.searchWithRerankLocal(
-          params,
-          queryVector,
-          querySparseVector,
-          namespace
-        )
-      }
+    // Reranking is not supported in local mode
+    if (this.isLocalMode()) {
+      throw new Error('Reranking is not available for Pinecone Local. Disable reranking to search.')
+    }
 
+    try {
       // Cloud mode: use searchRecords API (server-side reranking)
       // Type for searchRecords response
       interface SearchRecordsResponse {
@@ -813,106 +777,6 @@ class PineconeService {
         )
       }
       throw error
-    }
-  }
-
-  /**
-   * Local mode reranking: query locally, then use Pinecone Inference API for reranking
-   * This is needed because Pinecone Local doesn't support server-side reranking
-   */
-  private async searchWithRerankLocal(
-    params: QueryVectorsParams & { rerank: RerankConfig },
-    queryVector: number[] | undefined,
-    querySparseVector: SparseVector | undefined,
-    namespace: ReturnType<Index<RecordMetadata>['namespace']>
-  ): Promise<QueryResult> {
-    // Get the inference client (will throw if not configured)
-    const inferenceClient = this.getInferenceClient()
-
-    // Step 1: Do a regular vector query on the local index
-    // Request more results than topN to give reranker good candidates
-    const queryTopK = Math.max((params.rerank.topN || params.topK || 10) * 2, 20)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const queryParams: any = {
-      topK: queryTopK,
-      includeMetadata: true,
-    }
-
-    if (queryVector) {
-      queryParams.vector = queryVector
-    }
-    if (querySparseVector) {
-      queryParams.sparseVector = querySparseVector
-    }
-    if (params.filter) {
-      queryParams.filter = params.filter
-    }
-
-    const queryResponse = await withRetry(() => namespace.query(queryParams))
-
-    if (!queryResponse.matches || queryResponse.matches.length === 0) {
-      return {
-        matches: [],
-        namespace: params.namespace || '',
-        usage: undefined,
-      }
-    }
-
-    // Step 2: Extract documents for reranking
-    const rankField = params.rerank.rankField
-    const documents = queryResponse.matches
-      .map((match, index) => {
-        const text = match.metadata?.[rankField]
-        if (typeof text === 'string' && text.trim()) {
-          return { id: match.id, text, originalIndex: index }
-        }
-        return null
-      })
-      .filter((doc): doc is { id: string; text: string; originalIndex: number } => doc !== null)
-
-    if (documents.length === 0) {
-      throw new Error(
-        `Reranking failed: No documents have text content in field "${rankField}". ` +
-        `Please select a metadata field that contains text.`
-      )
-    }
-
-    // Step 3: Call Pinecone Inference rerank API
-    const queryText = params.queryText || ''
-    if (!queryText) {
-      throw new Error('Reranking requires query text to compare against documents.')
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rerankResponse = await withRetry(() => (inferenceClient.inference as any).rerank(
-      params.rerank.model,
-      queryText,
-      documents.map(d => d.text),
-      {
-        topN: params.rerank.topN || params.topK || 10,
-        returnDocuments: false,
-      }
-    ))
-
-    // Step 4: Map reranked results back to original matches
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rerankedData = (rerankResponse as any).data || []
-    const matches = rerankedData.map((item: { index: number; score: number }) => {
-      const doc = documents[item.index]
-      const originalMatch = queryResponse.matches![doc.originalIndex]
-      return {
-        id: originalMatch.id,
-        score: item.score,
-        metadata: originalMatch.metadata as Record<string, unknown> | undefined,
-        values: params.includeValues ? originalMatch.values : undefined,
-      }
-    })
-
-    return {
-      matches,
-      namespace: params.namespace || '',
-      usage: undefined, // Local mode doesn't track usage the same way
     }
   }
 

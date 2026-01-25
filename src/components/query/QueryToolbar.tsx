@@ -42,6 +42,8 @@ interface QueryToolbarProps {
   onRerankTopNChange?: (topN: number | undefined) => void
   // Text fields for reranking (string-type metadata fields)
   textFields?: string[]
+  // Local mode - reranking not available
+  isLocalMode?: boolean
 }
 
 const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
@@ -78,6 +80,7 @@ export function QueryToolbar({
   onRerankFieldChange,
   onRerankTopNChange,
   textFields = [],
+  isLocalMode = false,
 }: QueryToolbarProps) {
   // Handle filter changes
   const handleFilterChange = useCallback((id: string, updates: Partial<MetadataFilter>) => {
@@ -174,8 +177,8 @@ export function QueryToolbar({
           </select>
         </div>
 
-        {/* Rerank toggle - inline on main row for namespace scope */}
-        {scope === 'namespace' && (
+        {/* Rerank toggle - inline on main row for namespace scope (hidden in local mode) */}
+        {scope === 'namespace' && !isLocalMode && (
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -217,8 +220,8 @@ export function QueryToolbar({
         </div>
       )}
 
-      {/* Reranking options row - shown when rerank is enabled */}
-      {scope === 'namespace' && rerankEnabled && (
+      {/* Reranking options row - shown when rerank is enabled (hidden in local mode) */}
+      {scope === 'namespace' && rerankEnabled && !isLocalMode && (
         <div className="flex items-center gap-3 px-1">
           {/* Model selector */}
           <select

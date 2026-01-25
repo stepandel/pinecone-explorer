@@ -51,7 +51,7 @@ export default function VectorsView({
   onExposeDraftHandler,
   onIsFirstVectorChange,
 }: VectorsViewProps) {
-  const { currentProfile } = usePinecone()
+  const { currentProfile, isLocalMode } = usePinecone()
   const { setEmbeddingTextField } = usePanel()
   const { isHybridEnabled, hybridConfig } = useEmbedding()
   const { getParams, saveParams, getSearchResults, saveSearchResults } = useQueryState()
@@ -1080,7 +1080,7 @@ export default function VectorsView({
             isHybridEnabled={isHybridEnabled}
             alpha={alpha}
             onAlphaChange={setAlpha}
-            // Reranking props
+            // Reranking props (hidden in local mode)
             rerankEnabled={rerankEnabled}
             rerankModel={rerankModel}
             rerankField={rerankField}
@@ -1088,6 +1088,7 @@ export default function VectorsView({
             onRerankModelChange={setRerankModel}
             onRerankFieldChange={setRerankField}
             textFields={availableTextFields}
+            isLocalMode={isLocalMode}
           />
         </div>
 
