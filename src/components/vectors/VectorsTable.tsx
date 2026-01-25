@@ -11,6 +11,7 @@ import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { useTableSelection } from '../../hooks/useTableSelection'
 import { useInlineEditing } from '../../hooks/useInlineEditing'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
+import { VIRTUALIZATION } from '../../constants/ui'
 
 // Format score/distance for display - handles very small reranking scores
 function formatScore(score: number): string {
@@ -233,15 +234,12 @@ export default function VectorsTable({
   // Total rows including drafts
   const totalRows = draftVectors.length + vectors.length
 
-  // Virtual row height estimation
-  const ROW_HEIGHT = 32
-
   // Virtualizer for efficient rendering
   const rowVirtualizer = useVirtualizer({
     count: totalRows,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 10,
+    estimateSize: () => VIRTUALIZATION.ROW_HEIGHT,
+    overscan: VIRTUALIZATION.OVERSCAN,
   })
 
   // Loading state

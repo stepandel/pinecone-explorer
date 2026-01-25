@@ -101,6 +101,8 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
 
   // Fetch client overrides when index changes
   useEffect(() => {
+    const abortController = new AbortController()
+
     const fetchOverrides = async () => {
       if (!currentProfile?.id || !activeIndex) {
         setClientOverride(null)
@@ -116,10 +118,15 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
           window.electronAPI.profiles.getTextFieldOverride(currentProfile.id, activeIndex),
           window.electronAPI.profiles.getHybridEmbeddingOverride(currentProfile.id, activeIndex),
         ])
+
+        // Check if aborted before updating state
+        if (abortController.signal.aborted) return
+
         setClientOverride(embeddingOverride)
         setClientTextFieldOverrideState(textFieldOverride)
         setHybridConfig(hybridOverride)
       } catch (err) {
+        if (abortController.signal.aborted) return
         // Log error with context - this typically means no overrides are configured
         console.warn('Failed to fetch embedding overrides for index:', activeIndex, err)
         // Reset to defaults (explicit null vs undefined indicates "failed to load")
@@ -127,11 +134,17 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
         setClientTextFieldOverrideState(null)
         setHybridConfig(null)
       } finally {
-        setIsLoading(false)
+        if (!abortController.signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchOverrides()
+
+    return () => {
+      abortController.abort()
+    }
   }, [currentProfile?.id, activeIndex])
 
   const setOverride = useCallback(async (override: EmbeddingConfig) => {

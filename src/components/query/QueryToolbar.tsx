@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { QueryScope, MetadataFilter, MetadataOperator } from '../../types/filters'
 import { MetadataFilterRow } from './MetadataFilterRow'
+import { QUERY } from '../../constants/ui'
+import { formStyles } from '../../styles/form-controls'
 
 // Simple debounce function
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T & { cancel: () => void } {
@@ -63,10 +65,10 @@ interface QueryToolbarProps {
   textFields?: string[]
 }
 
-const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
-const selectClassName = "h-6 text-[11px] px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] focus:outline-none focus:ring-1 focus:ring-ring/50"
-const buttonClassName = "h-6 px-2 text-[11px] rounded-md bg-black/[0.03] dark:bg-white/[0.05] hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
-const inputStyle = { boxShadow: 'inset 0 0.5px 1px 0 rgb(0 0 0 / 0.03)' }
+const inputClassName = formStyles.input
+const selectClassName = formStyles.select
+const buttonClassName = formStyles.button
+const inputStyle = formStyles.inputShadow
 
 export function QueryToolbar({
   scope,
@@ -103,7 +105,7 @@ export function QueryToolbar({
 
   // Initialize debounced search
   useEffect(() => {
-    debouncedSearchRef.current = debounce(() => onSearch(), 300)
+    debouncedSearchRef.current = debounce(() => onSearch(), QUERY.DEBOUNCE_SEARCH)
     return () => {
       debouncedSearchRef.current?.cancel()
     }
