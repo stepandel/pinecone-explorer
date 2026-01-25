@@ -276,7 +276,7 @@ export default function VectorsView({
         metadata: match.metadata || null,
         embedding: match.values || null,
         sparseEmbedding: match.sparseValues || null,
-        distance: match.score,
+        score: match.score,
       }))
       setSearchResults(results)
       // Cache results in context for restoration when switching back to this namespace

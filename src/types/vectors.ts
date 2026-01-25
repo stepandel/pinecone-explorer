@@ -10,8 +10,8 @@ export interface LocalVectorRecord {
   embedding: number[] | null
   /** Sparse embedding values (for sparse or hybrid indexes) */
   sparseEmbedding?: { indices: number[]; values: number[] } | null
-  /** Distance/score from semantic search results */
-  distance?: number | null
+  /** Similarity score from query results (interpretation depends on index metric) */
+  score?: number | null
 }
 
 /**
