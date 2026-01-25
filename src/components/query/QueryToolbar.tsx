@@ -194,16 +194,6 @@ export function QueryToolbar({
         >
           + Filter
         </button>
-
-        {/* Search button */}
-        <button
-          onClick={onSearch}
-          disabled={isSearching || (scope === 'id' ? !idSearch.trim() : !searchText.trim())}
-          className={`${buttonClassName} bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/20 disabled:opacity-50 disabled:cursor-not-allowed`}
-          style={inputStyle}
-        >
-          {isSearching ? 'Searching...' : 'Search'}
-        </button>
       </div>
 
       {/* Hybrid search alpha slider */}
