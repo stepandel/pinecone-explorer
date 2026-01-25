@@ -5,6 +5,7 @@ import { EmbeddingProvider } from '../context/EmbeddingContext'
 import { DraftIndexProvider } from '../context/DraftIndexContext'
 import { DraftNamespaceProvider } from '../context/DraftNamespaceContext'
 import { ClipboardProvider } from '../context/ClipboardContext'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 import { AppLayout } from '../components/layout/AppLayout'
 import { useProfileQuery } from '../hooks/usePineconeQueries'
 
@@ -42,7 +43,9 @@ export function ConnectionWindow({ windowId, profileId }: ConnectionWindowProps)
             <EmbeddingProvider>
               <DraftIndexProvider>
                 <DraftNamespaceProvider>
-                  <AppLayout />
+                  <ErrorBoundary>
+                    <AppLayout />
+                  </ErrorBoundary>
                 </DraftNamespaceProvider>
               </DraftIndexProvider>
             </EmbeddingProvider>

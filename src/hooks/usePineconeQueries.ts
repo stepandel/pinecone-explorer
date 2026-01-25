@@ -164,6 +164,9 @@ export function useConnectMutation() {
         queryKey: pineconeQueryKeys.indexes(profile.id)
       })
     },
+    onError: (error) => {
+      console.error('Connection failed:', error)
+    },
   })
 }
 
@@ -180,6 +183,9 @@ export function useRefreshIndexesMutation(profileId: string) {
       // Update the cache directly
       queryClient.setQueryData(pineconeQueryKeys.indexes(profileId), indexes)
     },
+    onError: (error) => {
+      console.error('Failed to refresh indexes:', error)
+    },
   })
 }
 
@@ -188,6 +194,9 @@ export function useQueryVectorsMutation(profileId: string) {
   return useMutation({
     mutationFn: async (params: QueryVectorsParams) => {
       return await window.electronAPI.pinecone.queryVectors(profileId, params)
+    },
+    onError: (error) => {
+      console.error('Query vectors failed:', error)
     },
   })
 }
@@ -212,6 +221,9 @@ export function useUpdateVectorMutation(profileId: string, indexName: string, na
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.vectorsPaginated(profileId, indexName, namespace),
       })
+    },
+    onError: (error) => {
+      console.error('Failed to update vector:', error)
     },
   })
 }
@@ -241,6 +253,9 @@ export function useCreateVectorMutation(profileId: string, indexName: string, na
         queryKey: pineconeQueryKeys.indexStats(profileId, indexName),
       })
     },
+    onError: (error) => {
+      console.error('Failed to create vector:', error)
+    },
   })
 }
 
@@ -268,6 +283,9 @@ export function useDeleteVectorsMutation(profileId: string, indexName: string, n
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.indexStats(profileId, indexName),
       })
+    },
+    onError: (error) => {
+      console.error('Failed to delete vectors:', error)
     },
   })
 }
@@ -297,6 +315,9 @@ export function useBatchImportMutation(profileId: string, indexName: string, nam
         queryKey: pineconeQueryKeys.indexStats(profileId, indexName),
       })
     },
+    onError: (error) => {
+      console.error('Batch import failed:', error)
+    },
   })
 }
 
@@ -313,6 +334,9 @@ export function useCreateIndexMutation(profileId: string) {
       queryClient.invalidateQueries({
         queryKey: pineconeQueryKeys.indexes(profileId),
       })
+    },
+    onError: (error) => {
+      console.error('Failed to create index:', error)
     },
   })
 }

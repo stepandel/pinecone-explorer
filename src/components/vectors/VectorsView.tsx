@@ -4,6 +4,7 @@ import { usePanel } from '../../context/PanelContext'
 import { useEmbedding } from '../../context/EmbeddingContext'
 import { useQueryState } from '../../context/QueryStateContext'
 import { useInfiniteVectorsQuery, useIndexStatsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
+import { useMetadataAnalysis } from '../../hooks/useMetadataAnalysis'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
 import VectorsTable from './VectorsTable'
@@ -285,28 +286,8 @@ export default function VectorsView({
     )
   }, [rawVectors, searchResults, idFilterValue])
 
-  // Extract unique metadata fields from vectors (needed for draft creation)
-  const metadataFields = useMemo(() =>
-    Array.from(new Set(vectors.flatMap((vec: LocalVectorRecord) =>
-      vec.metadata ? Object.keys(vec.metadata) : []
-    ))).sort(),
-    [vectors]
-  )
-
-  // Extract text fields (string-type metadata fields) for embedding text field dropdown
-  const availableTextFields = useMemo(() => {
-    const textFields = new Set<string>()
-    vectors.forEach((vec: LocalVectorRecord) => {
-      if (vec.metadata) {
-        Object.entries(vec.metadata).forEach(([key, value]) => {
-          if (typeof value === 'string') {
-            textFields.add(key)
-          }
-        })
-      }
-    })
-    return Array.from(textFields).sort()
-  }, [vectors])
+  // Extract metadata fields, text fields, and types in a single pass
+  const { metadataFields, availableTextFields, metadataFieldTypes } = useMetadataAnalysis(vectors)
 
   // Auto-select default rank field when text fields become available
   useEffect(() => {
@@ -323,23 +304,6 @@ export default function VectorsView({
 
   // Check if there are active filters or search results
   const hasActiveFilters = searchText.trim() !== '' || idSearch.trim() !== '' || metadataFilters.some(f => f.field.trim() && f.value.trim())
-
-  // Extract metadata field types from vectors (for filter dropdowns)
-  const metadataFieldTypes = useMemo(() => {
-    const types: Record<string, 'string' | 'number' | 'boolean'> = {}
-    vectors.forEach((vec: LocalVectorRecord) => {
-      if (vec.metadata) {
-        Object.entries(vec.metadata).forEach(([key, value]) => {
-          if (!(key in types)) {
-            if (typeof value === 'number') types[key] = 'number'
-            else if (typeof value === 'boolean') types[key] = 'boolean'
-            else types[key] = 'string'
-          }
-        })
-      }
-    })
-    return types
-  }, [vectors])
 
   // Handle search execution based on query scope
   const handleSearch = useCallback(async () => {
