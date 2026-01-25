@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { usePanel } from '../../context/PanelContext'
 import { useEmbedding } from '../../context/EmbeddingContext'
+import { useQueryState } from '../../context/QueryStateContext'
 import { useInfiniteVectorsQuery, useIndexStatsQuery, useIndexesQuery, useCreateVectorMutation, useDeleteVectorsMutation, useBatchImportMutation, useUpdateVectorMutation, useQueryVectorsMutation } from '../../hooks/usePineconeQueries'
 import { useClipboard } from '../../context/ClipboardContext'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
@@ -34,23 +35,6 @@ interface VectorsViewProps {
   onIsFirstVectorChange?: (isFirst: boolean) => void
 }
 
-// Initial query state
-function createInitialQueryState(): {
-  scope: QueryScope
-  searchText: string
-  idSearch: string
-  topK: number
-  filters: MetadataFilter[]
-} {
-  return {
-    scope: 'namespace',
-    searchText: '',
-    idSearch: '',
-    topK: 10,
-    filters: [],
-  }
-}
-
 export default function VectorsView({
   indexName,
   namespace,
@@ -70,14 +54,20 @@ export default function VectorsView({
   const { currentProfile } = usePinecone()
   const { setEmbeddingTextField } = usePanel()
   const { isHybridEnabled, hybridConfig } = useEmbedding()
+  const { getParams, saveParams, getSearchResults, saveSearchResults } = useQueryState()
 
-  // Query state
-  const [queryScope, setQueryScope] = useState<QueryScope>('namespace')
-  const [searchText, setSearchText] = useState('')
-  const [idSearch, setIdSearch] = useState('')
-  const [topK, setTopK] = useState(10)
-  const [metadataFilters, setMetadataFilters] = useState<MetadataFilter[]>([])
-  const [alpha, setAlpha] = useState(hybridConfig?.defaultAlpha ?? 0.5)
+  // Get initial params and results from context (runs once on mount due to key-based remounting)
+  const defaultAlpha = hybridConfig?.defaultAlpha ?? 0.5
+  const initialParams = getParams(indexName, namespace, defaultAlpha)
+  const initialResults = getSearchResults(indexName, namespace)
+
+  // Query state - initialized from context
+  const [queryScope, setQueryScope] = useState<QueryScope>(() => initialParams.scope)
+  const [searchText, setSearchText] = useState(() => initialParams.searchText)
+  const [idSearch, setIdSearch] = useState(() => initialParams.idSearch)
+  const [topK, setTopK] = useState(() => initialParams.topK)
+  const [metadataFilters, setMetadataFilters] = useState<MetadataFilter[]>(() => initialParams.filters)
+  const [alpha, setAlpha] = useState(() => initialParams.alpha)
 
   // Draft vectors state - supports single new vector or multiple pasted vectors
   const [draftVectors, setDraftVectors] = useState<DraftVector[]>([])
@@ -144,10 +134,28 @@ export default function VectorsView({
   // Query vectors mutation (for semantic search)
   const queryMutation = useQueryVectorsMutation(currentProfile?.id || '')
 
-  // Search results state
-  const [searchResults, setSearchResults] = useState<LocalVectorRecord[] | null>(null)
+  // Search results state - initialized from context cache
+  const [searchResults, setSearchResults] = useState<LocalVectorRecord[] | null>(() => initialResults)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+
+  // Ref to track current query state for save on unmount
+  const queryStateRef = useRef({ queryScope, searchText, idSearch, topK, metadataFilters, alpha })
+  queryStateRef.current = { queryScope, searchText, idSearch, topK, metadataFilters, alpha }
+
+  // Save query state to context when component unmounts (namespace change triggers remount)
+  useEffect(() => {
+    return () => {
+      saveParams(indexName, namespace, {
+        scope: queryStateRef.current.queryScope,
+        searchText: queryStateRef.current.searchText,
+        idSearch: queryStateRef.current.idSearch,
+        topK: queryStateRef.current.topK,
+        filters: queryStateRef.current.metadataFilters,
+        alpha: queryStateRef.current.alpha,
+      })
+    }
+  }, [indexName, namespace, saveParams])
 
   // Clipboard context
   const { clipboard, copyVectors, hasCopiedVectors } = useClipboard()
@@ -224,21 +232,6 @@ export default function VectorsView({
     setTextFieldOverride(null)
   }, [currentProfile?.id, indexName])
 
-  // Reset query state and deletion marks when index changes
-  useEffect(() => {
-    setQueryScope('namespace')
-    setSearchText('')
-    setIdSearch('')
-    setTopK(10)
-    setMetadataFilters([])
-    setMarkedForDeletion(new Set())
-    setDraftVectors([])
-    setDraftError(null)
-    setSearchResults(null)
-    setSearchError(null)
-    setIsSearching(false)
-  }, [indexName])
-
   // Handle search execution based on query scope
   const handleSearch = useCallback(async () => {
     // Determine the query parameters based on scope
@@ -286,6 +279,8 @@ export default function VectorsView({
         distance: match.score,
       }))
       setSearchResults(results)
+      // Cache results in context for restoration when switching back to this namespace
+      saveSearchResults(indexName, namespace, results)
     } catch (error) {
       console.error('Search failed:', error)
       const message = error instanceof Error ? error.message : 'Search failed'
@@ -294,7 +289,7 @@ export default function VectorsView({
     } finally {
       setIsSearching(false)
     }
-  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha])
+  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha, saveSearchResults])
 
   // Use React Query for vectors with infinite pagination
   const {

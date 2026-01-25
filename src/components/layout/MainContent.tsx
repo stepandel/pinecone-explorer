@@ -147,6 +147,7 @@ export function MainContent() {
           <NamespaceConfigView />
         ) : showVectors ? (
           <VectorsView
+            key={`${activeIndex}::${activeNamespace ?? ''}`}
             indexName={activeIndex}
             namespace={activeNamespace}
             selectedVectorIds={selectedVectorIds}
