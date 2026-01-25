@@ -688,19 +688,21 @@ class PineconeService {
       }))
 
       // Transform searchRecords response to QueryResult format
-      // searchRecords returns records with _id, _score, and fields object containing metadata
+      // searchRecords returns records - field names may vary by SDK version
       const matches = (response.result?.hits || []).map((hit) => {
-        const { _id, _score, fields, ...rest } = hit as {
-          _id: string
-          _score?: number
-          fields?: Record<string, unknown>
-          [key: string]: unknown
-        }
-        // Use fields object if present, otherwise use remaining properties
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const h = hit as any
+        // Extract ID - try multiple possible field names
+        const id = h._id || h.id || ''
+        // Extract score - try multiple possible field names
+        const score = h._score ?? h.score ?? h.rerank_score ?? 0
+        // Extract metadata - may be in 'fields' object or spread at top level
+        const { _id, id: _, _score, score: __, rerank_score, fields, ...rest } = h
         const metadata = fields || (Object.keys(rest).length > 0 ? rest : undefined)
+
         return {
-          id: _id,
-          score: _score || 0,
+          id,
+          score: typeof score === 'number' ? score : 0,
           metadata: metadata as Record<string, unknown> | undefined,
           // searchRecords doesn't return vector values by default
           values: params.includeValues ? undefined : undefined,
