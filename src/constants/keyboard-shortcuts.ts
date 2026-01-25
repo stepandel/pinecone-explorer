@@ -14,7 +14,7 @@ export interface KeyboardShortcut {
   keys: string
   accelerator: string
   action: string
-  category: 'general' | 'indexes' | 'vectors' | 'view' | 'editing'
+  category: 'general' | 'indexes' | 'namespaces' | 'vectors' | 'view' | 'editing'
 }
 
 // Helper to check if a keyboard event matches a shortcut
@@ -105,19 +105,13 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
     action: 'New Index',
     category: 'indexes',
   },
+  // Namespaces
   NEW_NAMESPACE: {
     id: 'new-namespace',
     keys: '⌘⌥N',
     accelerator: 'CmdOrCtrl+Alt+N',
     action: 'New Namespace',
-    category: 'indexes',
-  },
-  PASTE_INDEX: {
-    id: 'paste-index',
-    keys: '⌘V',
-    accelerator: 'CmdOrCtrl+V',
-    action: 'Paste Index',
-    category: 'indexes',
+    category: 'namespaces',
   },
 
   // Vectors
@@ -234,12 +228,13 @@ export function getShortcutsByCategory(): Array<{
   const categoryLabels: Record<string, string> = {
     general: 'General',
     indexes: 'Indexes',
+    namespaces: 'Namespaces',
     vectors: 'Vectors',
     view: 'View',
     editing: 'Editing',
   }
 
-  const categoryOrder = ['general', 'indexes', 'vectors', 'view', 'editing']
+  const categoryOrder = ['general', 'indexes', 'namespaces', 'vectors', 'view', 'editing']
   const grouped: Record<string, KeyboardShortcut[]> = {}
 
   // Group shortcuts by category
