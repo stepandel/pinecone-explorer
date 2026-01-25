@@ -7,6 +7,7 @@ interface MetadataFilterRowProps {
   onChange: (id: string, updates: Partial<MetadataFilter>) => void
   onRemove: (id: string) => void
   onAdd?: () => void
+  onSearch?: () => void
   isLast?: boolean
 }
 
@@ -22,8 +23,16 @@ export function MetadataFilterRow({
   onChange,
   onRemove,
   onAdd,
+  onSearch,
   isLast = false,
 }: MetadataFilterRowProps) {
+  // Handle Enter key to trigger search
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && onSearch) {
+      e.preventDefault()
+      onSearch()
+    }
+  }
   // Get the type of the currently selected field
   const fieldType = fieldTypes[filter.field] || 'string'
 
@@ -76,6 +85,7 @@ export function MetadataFilterRow({
           type="text"
           value={filter.field}
           onChange={(e) => onChange(filter.id, { field: e.target.value })}
+          onKeyDown={handleKeyDown}
           placeholder="field name"
           className={`w-28 ${inputClassName}`}
           style={inputStyle}
@@ -101,6 +111,7 @@ export function MetadataFilterRow({
         type="text"
         value={filter.value}
         onChange={(e) => onChange(filter.id, { value: e.target.value })}
+        onKeyDown={handleKeyDown}
         placeholder={getPlaceholder()}
         className={`flex-1 min-w-[100px] ${inputClassName}`}
         style={inputStyle}

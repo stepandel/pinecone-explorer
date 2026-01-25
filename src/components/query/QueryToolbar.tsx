@@ -276,6 +276,7 @@ export function QueryToolbar({
               onChange={handleFilterChange}
               onRemove={handleRemoveFilter}
               onAdd={handleAddFilter}
+              onSearch={onSearch}
               isLast={index === filters.length - 1}
             />
           ))}
