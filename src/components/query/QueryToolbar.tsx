@@ -90,8 +90,8 @@ export function QueryToolbar({
   // Get scope label for dropdown
   const getScopeLabel = (s: QueryScope): string => {
     switch (s) {
-      case 'namespace': return currentNamespace ? `In "${currentNamespace}"` : 'This Namespace'
-      case 'id': return 'By Vector ID'
+      case 'namespace': return 'Text Query'
+      case 'id': return 'Find Similar'
     }
   }
 
