@@ -192,8 +192,9 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
     if (currentProfile) {
       try {
         await window.electronAPI.pinecone.cancelClone(currentProfile.id)
-      } catch {
-        // Ignore cancel errors
+      } catch (error) {
+        // Log cancel errors but don't block UI - cancellation may fail if already completed
+        console.warn('Clone cancellation failed:', error)
       }
     }
   }, [currentProfile])
@@ -224,15 +225,17 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
             embeddingFunctionId = matchingFunction.id
           }
         }
-      } catch {
-        // Use default
+      } catch (error) {
+        // Use default embedding config, log for debugging
+        console.debug('No embedding override found for source index, using default:', error)
       }
 
       // Discover available text fields
       try {
         availableTextFields = await discoverTextFields(currentProfile.id, index.name)
-      } catch {
-        // Use default
+      } catch (error) {
+        // Use default text fields, log for debugging
+        console.debug('Failed to discover text fields, using defaults:', error)
       }
     }
 

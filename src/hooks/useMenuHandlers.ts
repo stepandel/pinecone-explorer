@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePanel } from '../context/PanelContext'
 import { useSelection } from '../context/SelectionContext'
 import { useDraftIndex } from '../context/DraftIndexContext'
@@ -7,6 +7,10 @@ import { useDraftNamespace } from '../context/DraftNamespaceContext'
 /**
  * Hook to handle native menu events in the connection window.
  * Dispatches custom window events that components can listen to.
+ *
+ * Uses refs for all handlers to avoid re-subscribing to Electron IPC
+ * events on every state change. This prevents constant event listener
+ * registration/deregistration which causes performance issues.
  */
 export function useMenuHandlers() {
   const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } = usePanel()
@@ -14,123 +18,138 @@ export function useMenuHandlers() {
   const { startCreation: startIndexCreation } = useDraftIndex()
   const { startCreation: startNamespaceCreation } = useDraftNamespace()
 
-  // View menu handlers
-  const handleToggleLeftPanel = useCallback(() => {
-    setLeftPanelOpen(!leftPanelOpen)
-  }, [leftPanelOpen, setLeftPanelOpen])
+  // Store current values in refs for stable access in event handlers
+  const stateRef = useRef({
+    leftPanelOpen,
+    rightPanelOpen,
+    activeIndex,
+    activeNamespace,
+    setLeftPanelOpen,
+    setRightPanelOpen,
+    startIndexCreation,
+    startNamespaceCreation,
+  })
 
-  const handleToggleRightPanel = useCallback(() => {
-    setRightPanelOpen(!rightPanelOpen)
-  }, [rightPanelOpen, setRightPanelOpen])
-
-  const handleFocusSearch = useCallback(() => {
-    // Dispatch event for VectorsView to focus the search input
-    window.dispatchEvent(new CustomEvent('menu:focus-search'))
-  }, [])
-
-  const handleClearFilters = useCallback(() => {
-    // Dispatch event for VectorsView to clear filters
-    window.dispatchEvent(new CustomEvent('menu:clear-filters'))
-  }, [])
-
-  // Index menu handlers
-  const handleNewIndex = useCallback(() => {
-    startIndexCreation()
-  }, [startIndexCreation])
-
-  const handleDuplicateIndex = useCallback(() => {
-    // Dispatch event to duplicate the active index
-    if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:duplicate-index'))
-    }
-  }, [activeIndex])
-
-  const handleRenameIndex = useCallback(() => {
-    // Dispatch event to start renaming
-    if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:rename-index'))
-    }
-  }, [activeIndex])
-
-  const handleDeleteIndex = useCallback(() => {
-    // Dispatch event to delete the active index
-    if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:delete-index'))
-    }
-  }, [activeIndex])
-
-  // Namespace menu handlers
-  const handleNewNamespace = useCallback(() => {
-    if (activeIndex) {
-      startNamespaceCreation(activeIndex)
-    }
-  }, [activeIndex, startNamespaceCreation])
-
-  const handleDuplicateNamespace = useCallback(() => {
-    // Dispatch event to duplicate the active namespace
-    if (activeIndex && activeNamespace !== null) {
-      window.dispatchEvent(new CustomEvent('menu:duplicate-namespace'))
-    }
-  }, [activeIndex, activeNamespace])
-
-  const handleDeleteNamespace = useCallback(() => {
-    // Dispatch event to delete the active namespace
-    if (activeIndex && activeNamespace !== null) {
-      window.dispatchEvent(new CustomEvent('menu:delete-namespace'))
-    }
-  }, [activeIndex, activeNamespace])
-
-  // Vector menu handlers
-  const handleNewVector = useCallback(() => {
-    // Dispatch event for VectorsView to create a new vector
-    if (activeIndex) {
-      window.dispatchEvent(new CustomEvent('menu:new-vector'))
-    }
-  }, [activeIndex])
-
-  const handleEditVector = useCallback(() => {
-    // Dispatch event for VectorsView to edit the selected vector
-    window.dispatchEvent(new CustomEvent('menu:edit-vector'))
-  }, [])
-
-  const handleDeleteSelected = useCallback(() => {
-    // Dispatch event for VectorsView to delete selected vectors
-    window.dispatchEvent(new CustomEvent('menu:delete-selected'))
-  }, [])
-
-  const handleCopyVectors = useCallback(() => {
-    // Dispatch event for VectorsView to copy selected vectors
-    window.dispatchEvent(new CustomEvent('menu:copy-vectors'))
-  }, [])
-
-  const handlePasteVectors = useCallback(() => {
-    // Dispatch event for VectorsView to paste vectors
-    window.dispatchEvent(new CustomEvent('menu:paste-vectors'))
-  }, [])
-
-  const handleSelectAllVectors = useCallback(() => {
-    // Dispatch event for VectorsView to select all vectors
-    window.dispatchEvent(new CustomEvent('menu:select-all-vectors'))
-  }, [])
-
-  const handleConfigureEmbedding = useCallback(() => {
-    // Dispatch event to open embedding configuration
-    window.dispatchEvent(new CustomEvent('menu:configure-embedding'))
-  }, [])
-
-  // Window menu handlers
-  const handleDisconnect = useCallback(() => {
-    window.electronAPI.window.closeCurrent()
-  }, [])
-
-  // Help menu handlers
-  const handleShowShortcuts = useCallback(() => {
-    // Open settings window which contains the keyboard shortcuts section
-    window.electronAPI.settings.openWindow()
-  }, [])
-
-  // Subscribe to menu events from main process
+  // Update ref when dependencies change (doesn't trigger re-subscription)
   useEffect(() => {
+    stateRef.current = {
+      leftPanelOpen,
+      rightPanelOpen,
+      activeIndex,
+      activeNamespace,
+      setLeftPanelOpen,
+      setRightPanelOpen,
+      startIndexCreation,
+      startNamespaceCreation,
+    }
+  })
+
+  // Subscribe once on mount with stable handlers that read from refs
+  useEffect(() => {
+    // View menu handlers
+    const handleToggleLeftPanel = () => {
+      stateRef.current.setLeftPanelOpen(!stateRef.current.leftPanelOpen)
+    }
+
+    const handleToggleRightPanel = () => {
+      stateRef.current.setRightPanelOpen(!stateRef.current.rightPanelOpen)
+    }
+
+    const handleFocusSearch = () => {
+      window.dispatchEvent(new CustomEvent('menu:focus-search'))
+    }
+
+    const handleClearFilters = () => {
+      window.dispatchEvent(new CustomEvent('menu:clear-filters'))
+    }
+
+    // Index menu handlers
+    const handleNewIndex = () => {
+      stateRef.current.startIndexCreation()
+    }
+
+    const handleDuplicateIndex = () => {
+      if (stateRef.current.activeIndex) {
+        window.dispatchEvent(new CustomEvent('menu:duplicate-index'))
+      }
+    }
+
+    const handleRenameIndex = () => {
+      if (stateRef.current.activeIndex) {
+        window.dispatchEvent(new CustomEvent('menu:rename-index'))
+      }
+    }
+
+    const handleDeleteIndex = () => {
+      if (stateRef.current.activeIndex) {
+        window.dispatchEvent(new CustomEvent('menu:delete-index'))
+      }
+    }
+
+    // Namespace menu handlers
+    const handleNewNamespace = () => {
+      const { activeIndex } = stateRef.current
+      if (activeIndex) {
+        stateRef.current.startNamespaceCreation(activeIndex)
+      }
+    }
+
+    const handleDuplicateNamespace = () => {
+      const { activeIndex, activeNamespace } = stateRef.current
+      if (activeIndex && activeNamespace !== null) {
+        window.dispatchEvent(new CustomEvent('menu:duplicate-namespace'))
+      }
+    }
+
+    const handleDeleteNamespace = () => {
+      const { activeIndex, activeNamespace } = stateRef.current
+      if (activeIndex && activeNamespace !== null) {
+        window.dispatchEvent(new CustomEvent('menu:delete-namespace'))
+      }
+    }
+
+    // Vector menu handlers
+    const handleNewVector = () => {
+      if (stateRef.current.activeIndex) {
+        window.dispatchEvent(new CustomEvent('menu:new-vector'))
+      }
+    }
+
+    const handleEditVector = () => {
+      window.dispatchEvent(new CustomEvent('menu:edit-vector'))
+    }
+
+    const handleDeleteSelected = () => {
+      window.dispatchEvent(new CustomEvent('menu:delete-selected'))
+    }
+
+    const handleCopyVectors = () => {
+      window.dispatchEvent(new CustomEvent('menu:copy-vectors'))
+    }
+
+    const handlePasteVectors = () => {
+      window.dispatchEvent(new CustomEvent('menu:paste-vectors'))
+    }
+
+    const handleSelectAllVectors = () => {
+      window.dispatchEvent(new CustomEvent('menu:select-all-vectors'))
+    }
+
+    const handleConfigureEmbedding = () => {
+      window.dispatchEvent(new CustomEvent('menu:configure-embedding'))
+    }
+
+    // Window menu handlers
+    const handleDisconnect = () => {
+      window.electronAPI.window.closeCurrent()
+    }
+
+    // Help menu handlers
+    const handleShowShortcuts = () => {
+      window.electronAPI.settings.openWindow()
+    }
+
+    // Subscribe to menu events from main process
     // View menu
     const unsubToggleLeft = window.electronAPI.menu.onToggleLeftPanel(handleToggleLeftPanel)
     const unsubToggleRight = window.electronAPI.menu.onToggleRightPanel(handleToggleRightPanel)
@@ -185,26 +204,5 @@ export function useMenuHandlers() {
       unsubDisconnect()
       unsubShowShortcuts()
     }
-  }, [
-    handleToggleLeftPanel,
-    handleToggleRightPanel,
-    handleFocusSearch,
-    handleClearFilters,
-    handleNewIndex,
-    handleDuplicateIndex,
-    handleRenameIndex,
-    handleDeleteIndex,
-    handleNewNamespace,
-    handleDuplicateNamespace,
-    handleDeleteNamespace,
-    handleNewVector,
-    handleEditVector,
-    handleDeleteSelected,
-    handleCopyVectors,
-    handlePasteVectors,
-    handleSelectAllVectors,
-    handleConfigureEmbedding,
-    handleDisconnect,
-    handleShowShortcuts,
-  ])
+  }, []) // Empty deps - subscribe once on mount
 }

@@ -44,6 +44,10 @@ interface UseInlineEditingReturn {
 /**
  * Custom hook for inline editing of vector metadata in a table.
  * Handles editing state, type preservation, keyboard shortcuts, and auto-focus.
+ *
+ * Uses refs for vectors lookup to avoid including the entire vectors array
+ * in useCallback dependencies, which would cause callback recreation on every
+ * vectors change (e.g., during scrolling or refetching).
  */
 export function useInlineEditing({
   vectors,
@@ -53,6 +57,12 @@ export function useInlineEditing({
   const [editingState, setEditingState] = useState<EditingState | null>(null)
   const [pendingEmbeddingSave, setPendingEmbeddingSave] = useState<PendingEmbeddingSave | null>(null)
   const editingInputRef = useRef<HTMLInputElement>(null)
+
+  // Store vectors in ref for stable lookup in callbacks
+  const vectorsRef = useRef(vectors)
+  useEffect(() => {
+    vectorsRef.current = vectors
+  }, [vectors])
 
   // Start editing a vector
   const startEditing = useCallback((vec: LocalVectorRecord) => {
@@ -72,7 +82,8 @@ export function useInlineEditing({
   const saveEditing = useCallback(async () => {
     if (!editingState || !onSave) return
 
-    const originalVec = vectors.find(v => v.id === editingState.vectorId)
+    // Use ref to avoid vectors dependency
+    const originalVec = vectorsRef.current.find(v => v.id === editingState.vectorId)
     if (!originalVec) return
 
     // Check if there are actual changes
@@ -101,7 +112,7 @@ export function useInlineEditing({
       }
     }
     setEditingState(null)
-  }, [editingState, vectors, onSave, embeddingTextField])
+  }, [editingState, onSave, embeddingTextField])
 
   // Confirm the pending save with regeneration choice
   const confirmPendingSave = useCallback(async (regenerate: boolean) => {
@@ -127,8 +138,8 @@ export function useInlineEditing({
   const handleEditChange = useCallback((field: string, value: string) => {
     if (!editingState) return
 
-    // Find original value to preserve type
-    const originalVec = vectors.find(v => v.id === editingState.vectorId)
+    // Use ref to avoid vectors dependency
+    const originalVec = vectorsRef.current.find(v => v.id === editingState.vectorId)
     const originalValue = originalVec?.metadata?.[field]
     let parsedValue: unknown = value
 
@@ -145,7 +156,7 @@ export function useInlineEditing({
       ...editingState,
       metadata: { ...editingState.metadata, [field]: parsedValue },
     })
-  }, [editingState, vectors])
+  }, [editingState])
 
   // Handle keyboard events
   const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {

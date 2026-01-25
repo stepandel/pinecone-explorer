@@ -120,7 +120,9 @@ export function EmbeddingProvider({ children }: { children: ReactNode }) {
         setClientTextFieldOverrideState(textFieldOverride)
         setHybridConfig(hybridOverride)
       } catch (err) {
-        console.error('Failed to fetch overrides:', err)
+        // Log error with context - this typically means no overrides are configured
+        console.warn('Failed to fetch embedding overrides for index:', activeIndex, err)
+        // Reset to defaults (explicit null vs undefined indicates "failed to load")
         setClientOverride(null)
         setClientTextFieldOverrideState(null)
         setHybridConfig(null)

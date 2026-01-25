@@ -149,7 +149,8 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
       // Refetch stats to show new namespace
       refetch()
     } catch (error) {
-      // Error is handled via progress events
+      // Error is shown via progress events, but log for debugging
+      console.error('Namespace clone failed:', error)
     }
   }, [currentProfile?.id, activeIndex, selectedNamespace, refetch])
 
@@ -159,7 +160,8 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
     try {
       await window.electronAPI.pinecone.cancelCloneNamespace(currentProfile.id)
     } catch (error) {
-      // Ignore errors
+      // Log cancel errors but don't block UI - cancellation may fail if already completed
+      console.warn('Namespace clone cancellation failed:', error)
     }
   }, [currentProfile?.id])
 
@@ -188,7 +190,8 @@ export function NamespacesPanel({ showIndexesToggle, onToggleIndexesPanel }: Nam
         setActiveNamespace('')
       }
     } catch (error) {
-      // Error is handled by mutation
+      // Mutation handles UI error state, log for debugging
+      console.error('Namespace deletion failed:', error)
     }
   }, [currentProfile?.id, activeIndex, selectedNamespace, deleteNamespaceMutation, activeNamespace, setActiveNamespace])
 
