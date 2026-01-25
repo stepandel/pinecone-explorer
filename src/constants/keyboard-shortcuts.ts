@@ -180,6 +180,20 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
     action: 'Clear Filters',
     category: 'view',
   },
+  ADD_FILTER: {
+    id: 'add-filter',
+    keys: '⌘=',
+    accelerator: 'CmdOrCtrl+=',
+    action: 'Add Filter',
+    category: 'view',
+  },
+  REMOVE_FILTER: {
+    id: 'remove-filter',
+    keys: '⌘-',
+    accelerator: 'CmdOrCtrl+-',
+    action: 'Remove Filter',
+    category: 'view',
+  },
 
   // Editing
   SAVE: {

@@ -780,6 +780,25 @@ export default function VectorsView({
     setSearchResults(null)
   }, [])
 
+  // Add filter handler
+  const handleAddFilter = useCallback(() => {
+    const newFilter: MetadataFilter = {
+      id: crypto.randomUUID(),
+      field: metadataFields[0] || '',
+      operator: '$eq',
+      value: '',
+    }
+    setMetadataFilters(prev => [...prev, newFilter])
+  }, [metadataFields])
+
+  // Remove last filter handler
+  const handleRemoveLastFilter = useCallback(() => {
+    setMetadataFilters(prev => {
+      if (prev.length === 0) return prev
+      return prev.slice(0, -1)
+    })
+  }, [])
+
   // Menu event listeners (from native app menu)
   useEffect(() => {
     // New vector
@@ -824,6 +843,16 @@ export default function VectorsView({
       handleClearAllFilters()
     }
 
+    // Add filter
+    const handleMenuAddFilter = () => {
+      handleAddFilter()
+    }
+
+    // Remove filter
+    const handleMenuRemoveFilter = () => {
+      handleRemoveLastFilter()
+    }
+
     // Configure embedding
     const handleMenuConfigureEmbedding = () => {
       // Click the embedding function selector button
@@ -850,6 +879,8 @@ export default function VectorsView({
     window.addEventListener('menu:select-all-vectors', handleMenuSelectAll)
     window.addEventListener('menu:focus-search', handleMenuFocusSearch)
     window.addEventListener('menu:clear-filters', handleMenuClearFilters)
+    window.addEventListener('menu:add-filter', handleMenuAddFilter)
+    window.addEventListener('menu:remove-filter', handleMenuRemoveFilter)
     window.addEventListener('menu:configure-embedding', handleMenuConfigureEmbedding)
     window.addEventListener('menu:edit-vector', handleMenuEditVector)
 
@@ -861,6 +892,8 @@ export default function VectorsView({
       window.removeEventListener('menu:select-all-vectors', handleMenuSelectAll)
       window.removeEventListener('menu:focus-search', handleMenuFocusSearch)
       window.removeEventListener('menu:clear-filters', handleMenuClearFilters)
+      window.removeEventListener('menu:add-filter', handleMenuAddFilter)
+      window.removeEventListener('menu:remove-filter', handleMenuRemoveFilter)
       window.removeEventListener('menu:configure-embedding', handleMenuConfigureEmbedding)
       window.removeEventListener('menu:edit-vector', handleMenuEditVector)
     }
@@ -873,6 +906,8 @@ export default function VectorsView({
     handlePasteVectors,
     handleSelectAllVectors,
     handleClearAllFilters,
+    handleAddFilter,
+    handleRemoveLastFilter,
     primarySelectedVectorId,
   ])
 

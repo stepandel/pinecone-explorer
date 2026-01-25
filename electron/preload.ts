@@ -497,6 +497,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:clear-filters', handler)
       return () => ipcRenderer.removeListener('menu:clear-filters', handler)
     },
+    onAddFilter: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:add-filter', handler)
+      return () => ipcRenderer.removeListener('menu:add-filter', handler)
+    },
+    onRemoveFilter: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:remove-filter', handler)
+      return () => ipcRenderer.removeListener('menu:remove-filter', handler)
+    },
     // Window menu events
     onDisconnect: (callback: () => void): (() => void) => {
       const handler = () => callback()
