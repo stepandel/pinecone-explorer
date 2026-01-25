@@ -79,6 +79,12 @@ export default function VectorsView({
   const [metadataFilters, setMetadataFilters] = useState<MetadataFilter[]>([])
   const [alpha, setAlpha] = useState(hybridConfig?.defaultAlpha ?? 0.5)
 
+  // Reranking state
+  type RerankModel = 'bge-reranker-v2-m3' | 'pinecone-rerank-v0' | 'cohere-rerank-3.5'
+  const [rerankEnabled, setRerankEnabled] = useState(false)
+  const [rerankModel, setRerankModel] = useState<RerankModel>('bge-reranker-v2-m3')
+  const [rerankField, setRerankField] = useState<string>('')
+
   // Draft vectors state - supports single new vector or multiple pasted vectors
   const [draftVectors, setDraftVectors] = useState<DraftVector[]>([])
 
@@ -237,6 +243,10 @@ export default function VectorsView({
     setSearchResults(null)
     setSearchError(null)
     setIsSearching(false)
+    // Reset reranking state
+    setRerankEnabled(false)
+    setRerankModel('bge-reranker-v2-m3')
+    setRerankField('')
   }, [indexName])
 
   // Handle search execution based on query scope
@@ -264,6 +274,16 @@ export default function VectorsView({
     setIsSearching(true)
     setSearchError(null)
     try {
+      // Build rerank config if enabled and we have a valid field
+      const rerankConfig = rerankEnabled && rerankField && queryScope === 'namespace'
+        ? {
+            enabled: true,
+            model: rerankModel,
+            rankField: rerankField,
+            topN: topK || 10,
+          }
+        : undefined
+
       const result = await queryMutation.mutateAsync({
         indexName: indexName,
         namespace: namespaceParam,
@@ -275,6 +295,8 @@ export default function VectorsView({
         includeMetadata: true,
         // Pass alpha for hybrid search (only used when hybrid is enabled on the index)
         alpha: isHybridEnabled ? alpha : undefined,
+        // Pass rerank config
+        rerank: rerankConfig,
       })
 
       // Convert query results to LocalVectorRecord format
@@ -294,7 +316,7 @@ export default function VectorsView({
     } finally {
       setIsSearching(false)
     }
-  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha])
+  }, [queryScope, searchText, idSearch, metadataFilters, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha, rerankEnabled, rerankModel, rerankField])
 
   // Use React Query for vectors with infinite pagination
   const {
@@ -365,6 +387,19 @@ export default function VectorsView({
     })
     return Array.from(textFields).sort()
   }, [vectors])
+
+  // Auto-select default rank field when text fields become available
+  useEffect(() => {
+    if (!rerankField && availableTextFields.length > 0) {
+      // Prefer '_text' or the effective text field, then fall back to first available
+      const defaultField = availableTextFields.includes(effectiveTextField)
+        ? effectiveTextField
+        : availableTextFields.includes('_text')
+          ? '_text'
+          : availableTextFields[0]
+      setRerankField(defaultField)
+    }
+  }, [availableTextFields, rerankField, effectiveTextField])
 
   // Check if there are active filters or search results
   const hasActiveFilters = searchText.trim() !== '' || idSearch.trim() !== '' || metadataFilters.some(f => f.field.trim() && f.value.trim())
@@ -1014,6 +1049,14 @@ export default function VectorsView({
             isHybridEnabled={isHybridEnabled}
             alpha={alpha}
             onAlphaChange={setAlpha}
+            // Reranking props
+            rerankEnabled={rerankEnabled}
+            rerankModel={rerankModel}
+            rerankField={rerankField}
+            onRerankEnabledChange={setRerankEnabled}
+            onRerankModelChange={setRerankModel}
+            onRerankFieldChange={setRerankField}
+            textFields={availableTextFields}
           />
         </div>
 
