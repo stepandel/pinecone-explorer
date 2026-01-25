@@ -2,6 +2,9 @@ import { useCallback } from 'react'
 import { QueryScope, MetadataFilter, MetadataOperator } from '../../types/filters'
 import { MetadataFilterRow } from './MetadataFilterRow'
 
+// Reranking model types
+type RerankModel = 'bge-reranker-v2-m3' | 'pinecone-rerank-v0' | 'cohere-rerank-3.5'
+
 interface QueryToolbarProps {
   // Query state
   scope: QueryScope
@@ -28,6 +31,17 @@ interface QueryToolbarProps {
   isHybridEnabled?: boolean
   alpha?: number
   onAlphaChange?: (alpha: number) => void
+  // Reranking support
+  rerankEnabled?: boolean
+  rerankModel?: RerankModel
+  rerankField?: string
+  rerankTopN?: number
+  onRerankEnabledChange?: (enabled: boolean) => void
+  onRerankModelChange?: (model: RerankModel) => void
+  onRerankFieldChange?: (field: string) => void
+  onRerankTopNChange?: (topN: number | undefined) => void
+  // Text fields for reranking (string-type metadata fields)
+  textFields?: string[]
 }
 
 const inputClassName = "h-6 text-[11px] py-0 px-1.5 rounded-md bg-black/[0.03] dark:bg-white/[0.05] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring/50"
@@ -55,6 +69,15 @@ export function QueryToolbar({
   isHybridEnabled,
   alpha = 0.5,
   onAlphaChange,
+  rerankEnabled = false,
+  rerankModel = 'bge-reranker-v2-m3',
+  rerankField = '',
+  rerankTopN,
+  onRerankEnabledChange,
+  onRerankModelChange,
+  onRerankFieldChange,
+  onRerankTopNChange,
+  textFields = [],
 }: QueryToolbarProps) {
   // Handle filter changes
   const handleFilterChange = useCallback((id: string, updates: Partial<MetadataFilter>) => {
@@ -178,6 +201,62 @@ export function QueryToolbar({
           />
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">Semantic</span>
           <span className="text-[11px] text-muted-foreground/70 ml-1 tabular-nums">{alpha.toFixed(1)}</span>
+        </div>
+      )}
+
+      {/* Reranking controls - only shown for namespace scope (not id or index) */}
+      {scope === 'namespace' && (
+        <div className="flex items-center gap-3 px-1">
+          {/* Enable toggle */}
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rerankEnabled}
+              onChange={(e) => onRerankEnabledChange?.(e.target.checked)}
+              className="w-3 h-3 rounded border-black/20 dark:border-white/20 text-[#007AFF] focus:ring-[#007AFF]/50"
+            />
+            <span className="text-[11px] text-muted-foreground">Rerank</span>
+          </label>
+
+          {/* Rerank options - shown when enabled */}
+          {rerankEnabled && (
+            <>
+              {/* Model selector */}
+              <select
+                value={rerankModel}
+                onChange={(e) => onRerankModelChange?.(e.target.value as RerankModel)}
+                className={selectClassName}
+                style={inputStyle}
+                title="Reranking model"
+              >
+                <option value="bge-reranker-v2-m3">BGE Reranker v2 (Free)</option>
+                <option value="pinecone-rerank-v0">Pinecone Rerank</option>
+                <option value="cohere-rerank-3.5">Cohere Rerank 3.5</option>
+              </select>
+
+              {/* Rank field selector */}
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-muted-foreground">Field:</span>
+                <select
+                  value={rerankField}
+                  onChange={(e) => onRerankFieldChange?.(e.target.value)}
+                  className={selectClassName}
+                  style={inputStyle}
+                  title="Metadata field containing text to rerank on"
+                >
+                  {textFields.length === 0 ? (
+                    <option value="">No text fields</option>
+                  ) : (
+                    textFields.map((field) => (
+                      <option key={field} value={field}>
+                        {field}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </>
+          )}
         </div>
       )}
 

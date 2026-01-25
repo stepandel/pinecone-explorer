@@ -23,6 +23,7 @@ import {
   EmbeddingConfig,
   HybridEmbeddingConfig,
   PaginatedVectorsResult,
+  RerankConfig,
 } from './types'
 import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-service'
 import { withRetry } from './retry-utils'
@@ -427,6 +428,15 @@ class PineconeService {
     embeddingConfigOverride?: EmbeddingConfig,
     hybridConfigOverride?: HybridEmbeddingConfig
   ): Promise<QueryResult> {
+    // If reranking is enabled, delegate to searchWithRerank
+    if (params.rerank?.enabled) {
+      return this.searchWithRerank(
+        params as QueryVectorsParams & { rerank: RerankConfig },
+        embeddingConfigOverride,
+        hybridConfigOverride
+      )
+    }
+
     const index = this.getIndex(params.indexName)
 
     // Only scope to namespace if explicitly provided
@@ -540,6 +550,193 @@ class PineconeService {
       })),
       namespace: params.namespace ?? '',
       usage: response.usage ? { readUnits: response.usage.readUnits || 0 } : undefined,
+    }
+  }
+
+  /**
+   * Query vectors with reranking using searchRecords API
+   * Reranking applies a second-stage scoring model to improve result relevance
+   * Note: searchRecords requires a specific namespace - cross-namespace queries not supported
+   */
+  async searchWithRerank(
+    params: QueryVectorsParams & { rerank: RerankConfig },
+    embeddingConfigOverride?: EmbeddingConfig,
+    hybridConfigOverride?: HybridEmbeddingConfig
+  ): Promise<QueryResult> {
+    if (!params.namespace && params.namespace !== '') {
+      throw new Error('Reranking requires a specific namespace. Cross-namespace queries are not supported with reranking.')
+    }
+
+    const index = this.getIndex(params.indexName)
+    const namespace = index.namespace(params.namespace || '')
+
+    // Generate query vector if queryText is provided
+    let queryVector = params.vector
+    let querySparseVector: SparseVector | undefined
+
+    if (params.queryText && !queryVector) {
+      // Check for hybrid query
+      const hybridConfig = hybridConfigOverride || this.getHybridEmbeddingConfig(params.indexName)
+      const alpha = params.alpha
+
+      if (this.isHybridCapable(params.indexName) && hybridConfig && alpha !== undefined) {
+        // Hybrid query: generate both dense and sparse embeddings
+        const denseConfig = this.resolveEmbeddingDimension(hybridConfig.denseConfig, params.indexName)
+        const sparseConfig = hybridConfig.sparseConfig
+
+        const hybridResult = await this.embeddingService!.generateHybridEmbeddings(
+          [params.queryText],
+          { ...denseConfig, inputType: 'query' },
+          { ...sparseConfig, inputType: 'query' }
+        )
+
+        // Apply alpha weighting
+        const weighted = this.applyAlphaWeighting(
+          hybridResult.dense.values[0],
+          hybridResult.sparse.sparseValues[0],
+          alpha
+        )
+        queryVector = weighted.vector
+        querySparseVector = weighted.sparseVector
+      } else {
+        // Standard query: single embedding type
+        let embeddingConfig = embeddingConfigOverride || this.getEmbeddingConfig(params.indexName)
+        if (!embeddingConfig) {
+          throw new Error(
+            'No embedding configuration found. Please configure an embedding provider to search by text.'
+          )
+        }
+        embeddingConfig = this.resolveEmbeddingDimension(embeddingConfig, params.indexName)
+
+        const embeddingResult = await this.embeddingService!.generateEmbeddings(
+          [params.queryText],
+          { ...embeddingConfig, inputType: 'query' }
+        )
+        if (embeddingResult.type === 'dense') {
+          queryVector = embeddingResult.values[0]
+        } else {
+          querySparseVector = embeddingResult.sparseValues[0]
+        }
+      }
+    }
+
+    if (!queryVector && !querySparseVector) {
+      throw new Error('Either vector or queryText must be provided for reranked queries.')
+    }
+
+    // Build searchRecords query object
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query: any = {
+      topK: params.topK || 10,
+    }
+
+    if (params.filter) {
+      query.filter = params.filter
+    }
+
+    // Add vector to query
+    if (queryVector) {
+      query.vector = { values: queryVector }
+    }
+    if (querySparseVector) {
+      query.sparseVector = querySparseVector
+    }
+
+    // Build rerank config for searchRecords
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rerank: any = {
+      model: params.rerank.model,
+      topN: params.rerank.topN || params.topK || 10,
+      rankFields: [params.rerank.rankField],
+    }
+
+    // For vector queries, provide the original query text for reranking
+    if (params.queryText) {
+      rerank.query = params.queryText
+    }
+
+    // Fields to return must include the rank field
+    const fields = [params.rerank.rankField]
+    // Also include other common fields if metadata is requested
+    if (params.includeMetadata !== false) {
+      fields.push('*') // Request all fields
+    }
+
+    try {
+      // Call searchRecords API
+      // Type for searchRecords response
+      interface SearchRecordsResponse {
+        result?: {
+          hits?: Array<{
+            _id: string
+            _score?: number
+            fields?: Record<string, unknown>  // Metadata fields nested under 'fields'
+            [key: string]: unknown
+          }>
+        }
+        usage?: {
+          readUnits?: number
+          rerankUnits?: number
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response: SearchRecordsResponse = await withRetry(() => (namespace as any).searchRecords({
+        query,
+        rerank,
+        fields: ['*'], // Get all fields
+      }))
+
+      // Transform searchRecords response to QueryResult format
+      // searchRecords returns records - field names may vary by SDK version
+      const matches = (response.result?.hits || []).map((hit) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const h = hit as any
+        // Extract ID - try multiple possible field names
+        const id = h._id || h.id || ''
+        // Extract score - try multiple possible field names
+        const score = h._score ?? h.score ?? h.rerank_score ?? 0
+        // Extract metadata - may be in 'fields' object or spread at top level
+        const { _id, id: _, _score, score: __, rerank_score, fields, ...rest } = h
+        const metadata = fields || (Object.keys(rest).length > 0 ? rest : undefined)
+
+        return {
+          id,
+          score: typeof score === 'number' ? score : 0,
+          metadata: metadata as Record<string, unknown> | undefined,
+          // searchRecords doesn't return vector values by default
+          values: params.includeValues ? undefined : undefined,
+        }
+      })
+
+      return {
+        matches,
+        namespace: params.namespace || '',
+        usage: response.usage ? {
+          readUnits: response.usage.readUnits || 0,
+          rerankUnits: response.usage.rerankUnits,
+        } : undefined,
+      }
+    } catch (error) {
+      // Provide better error messages for common issues
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('rank_fields')) {
+        throw new Error(
+          `Reranking failed: The field "${params.rerank.rankField}" may not exist or contain text content. ` +
+          `Please select a metadata field that contains text.`
+        )
+      }
+      if (message.includes('token') && message.includes('exceeds')) {
+        // Extract token counts from error if present
+        const tokenMatch = message.match(/(\d+)\s*tokens.*maximum.*?(\d+)/i)
+        const docTokens = tokenMatch?.[1] || 'unknown'
+        const maxTokens = tokenMatch?.[2] || '1024'
+        throw new Error(
+          `Reranking failed: Document exceeds token limit (${docTokens}/${maxTokens} tokens). ` +
+          `Try using shorter text content or a model with higher limits (e.g., Cohere Rerank 3.5).`
+        )
+      }
+      throw error
     }
   }
 

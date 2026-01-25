@@ -132,6 +132,21 @@ export interface VectorRecord {
 }
 
 /**
+ * Reranking model types supported by Pinecone
+ */
+export type RerankModel = 'bge-reranker-v2-m3' | 'pinecone-rerank-v0' | 'cohere-rerank-3.5'
+
+/**
+ * Reranking configuration for searchRecords
+ */
+export interface RerankConfig {
+  enabled: boolean
+  model: RerankModel
+  rankField: string  // Metadata field containing text to rerank on
+  topN?: number      // Results to return after reranking (defaults to topK)
+}
+
+/**
  * Parameters for querying vectors
  */
 export interface QueryVectorsParams {
@@ -145,6 +160,7 @@ export interface QueryVectorsParams {
   includeValues?: boolean // Include vector values in response
   includeMetadata?: boolean // Include metadata in response
   alpha?: number // Hybrid query alpha (0.0-1.0): 1.0 = pure semantic, 0.0 = pure keyword
+  rerank?: RerankConfig // Reranking configuration
 }
 
 /**
@@ -165,6 +181,7 @@ export interface QueryResult {
   namespace: string
   usage?: {
     readUnits: number
+    rerankUnits?: number // Only present when reranking is used
   }
 }
 
