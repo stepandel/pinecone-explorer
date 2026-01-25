@@ -3,8 +3,9 @@ import { QueryScope, MetadataFilter } from '../types/filters'
 import { LocalVectorRecord } from '../types/vectors'
 
 // Constants
-const MAX_CACHED_NAMESPACES = 10
-const RESULTS_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const MAX_CACHED_NAMESPACES = 5
+const RESULTS_TTL_MS = 2 * 60 * 1000 // 2 minutes
+const MAX_RESULTS_PER_NAMESPACE = 500
 
 // Query parameters for a namespace
 export interface NamespaceQueryParams {
@@ -162,9 +163,12 @@ export function QueryStateProvider({ children }: QueryStateProviderProps) {
     const stateMap = stateMapRef.current
     const existing = stateMap.get(key)
 
+    // Truncate results if over limit to prevent memory bloat
+    const truncatedResults = results.slice(0, MAX_RESULTS_PER_NAMESPACE)
+
     if (existing) {
       existing.searchResults = {
-        results,
+        results: truncatedResults,
         timestamp: Date.now(),
       }
       existing.lastAccessed = Date.now()
@@ -173,7 +177,7 @@ export function QueryStateProvider({ children }: QueryStateProviderProps) {
       stateMap.set(key, {
         params: createDefaultParams(),
         searchResults: {
-          results,
+          results: truncatedResults,
           timestamp: Date.now(),
         },
         lastAccessed: Date.now(),

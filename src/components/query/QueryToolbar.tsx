@@ -1,6 +1,25 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { QueryScope, MetadataFilter, MetadataOperator } from '../../types/filters'
 import { MetadataFilterRow } from './MetadataFilterRow'
+
+// Simple debounce function
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T & { cancel: () => void } {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  const debounced = ((...args: unknown[]) => {
+    if (timeoutId) clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn(...args), ms)
+  }) as T & { cancel: () => void }
+
+  debounced.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  }
+
+  return debounced
+}
 
 // Reranking model types
 type RerankModel = 'bge-reranker-v2-m3' | 'pinecone-rerank-v0' | 'cohere-rerank-3.5'
@@ -79,6 +98,22 @@ export function QueryToolbar({
   onRerankTopNChange,
   textFields = [],
 }: QueryToolbarProps) {
+  // Create debounced search function (300ms delay)
+  const debouncedSearchRef = useRef<ReturnType<typeof debounce> | null>(null)
+
+  // Initialize debounced search
+  useEffect(() => {
+    debouncedSearchRef.current = debounce(() => onSearch(), 300)
+    return () => {
+      debouncedSearchRef.current?.cancel()
+    }
+  }, [onSearch])
+
+  // Trigger debounced search on text/id changes (auto-search with debouncing)
+  const triggerDebouncedSearch = useCallback(() => {
+    debouncedSearchRef.current?.()
+  }, [])
+
   // Handle filter changes
   const handleFilterChange = useCallback((id: string, updates: Partial<MetadataFilter>) => {
     onFiltersChange(
@@ -102,13 +137,27 @@ export function QueryToolbar({
     onFiltersChange(filters.filter(f => f.id !== id))
   }, [filters, onFiltersChange])
 
-  // Handle key press in search/id inputs
+  // Handle key press in search/id inputs (immediate search on Enter)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
+      // Cancel any pending debounced search and execute immediately
+      debouncedSearchRef.current?.cancel()
       onSearch()
     }
   }
+
+  // Handle search text change with debounced auto-search
+  const handleSearchTextChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onSearchTextChange(e.target.value)
+    triggerDebouncedSearch()
+  }, [onSearchTextChange, triggerDebouncedSearch])
+
+  // Handle ID search change with debounced auto-search
+  const handleIdSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onIdSearchChange(e.target.value)
+    triggerDebouncedSearch()
+  }, [onIdSearchChange, triggerDebouncedSearch])
 
   // Get scope label for dropdown
   const getScopeLabel = (s: QueryScope): string => {
@@ -138,7 +187,7 @@ export function QueryToolbar({
           <input
             type="text"
             value={idSearch}
-            onChange={(e) => onIdSearchChange(e.target.value)}
+            onChange={handleIdSearchChange}
             onKeyDown={handleKeyDown}
             placeholder="Enter vector ID to find similar..."
             className={`flex-1 ${inputClassName}`}
@@ -148,7 +197,7 @@ export function QueryToolbar({
           <input
             type="text"
             value={searchText}
-            onChange={(e) => onSearchTextChange(e.target.value)}
+            onChange={handleSearchTextChange}
             onKeyDown={handleKeyDown}
             placeholder="Search query..."
             className={`flex-1 ${inputClassName}`}
