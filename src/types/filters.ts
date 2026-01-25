@@ -1,5 +1,5 @@
 // Query scope types
-export type QueryScope = 'namespace' | 'index' | 'id'
+export type QueryScope = 'namespace' | 'id'
 
 // Metadata filter operators (per Pinecone docs)
 export type MetadataOperator =

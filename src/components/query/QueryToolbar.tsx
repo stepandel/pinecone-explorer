@@ -113,9 +113,8 @@ export function QueryToolbar({
   // Get scope label for dropdown
   const getScopeLabel = (s: QueryScope): string => {
     switch (s) {
-      case 'namespace': return currentNamespace ? `In "${currentNamespace}"` : 'This Namespace'
-      case 'index': return 'All Namespaces'
-      case 'id': return 'By Vector ID'
+      case 'namespace': return 'Text Query'
+      case 'id': return 'Find Similar'
     }
   }
 
@@ -131,7 +130,6 @@ export function QueryToolbar({
           style={inputStyle}
         >
           <option value="namespace">{getScopeLabel('namespace')}</option>
-          <option value="index">{getScopeLabel('index')}</option>
           <option value="id">{getScopeLabel('id')}</option>
         </select>
 

@@ -154,9 +154,9 @@ export default function VectorsTable({
     [vectors]
   )
 
-  // Check if any vectors have distance scores
-  const hasDistances = useMemo(() =>
-    vectors.some(v => v.distance !== undefined && v.distance !== null),
+  // Check if any vectors have similarity scores (from query results)
+  const hasScores = useMemo(() =>
+    vectors.some(v => v.score !== undefined && v.score !== null),
     [vectors]
   )
 
@@ -164,10 +164,10 @@ export default function VectorsTable({
   const columns = useMemo<ColumnDef<LocalVectorRecord>[]>(() => {
     const cols: ColumnDef<LocalVectorRecord>[] = []
 
-    if (hasDistances) {
+    if (hasScores) {
       cols.push({
-        accessorKey: 'distance',
-        header: 'dist',
+        accessorKey: 'score',
+        header: 'score',
         size: 60,
         cell: info => (
           <div className="text-xs font-mono text-muted-foreground text-center">
@@ -221,7 +221,7 @@ export default function VectorsTable({
     })
 
     return cols
-  }, [metadataKeys, hasDistances, embeddingTextField])
+  }, [metadataKeys, hasScores, embeddingTextField])
 
   const table = useReactTable({
     data: vectors,
@@ -295,7 +295,7 @@ export default function VectorsTable({
   }
 
   const headerGroup = table.getHeaderGroups()[0]
-  const idColIndex = hasDistances ? 1 : 0
+  const idColIndex = hasScores ? 1 : 0
   const tableRows = table.getRowModel().rows
 
   return (
@@ -362,7 +362,7 @@ export default function VectorsTable({
                 index={virtualRow.index}
                 isSelected={selectedVectorIds.has(draft.id)}
                 metadataKeys={metadataKeys}
-                hasDistances={hasDistances}
+                hasScores={hasScores}
                 headerGroup={headerGroup}
                 idColIndex={idColIndex}
                 inputRef={virtualRow.index === 0 ? draftIdInputRef : undefined}
@@ -394,7 +394,7 @@ export default function VectorsTable({
               editingState={editingState}
               editingInputRef={editingInputRef}
               metadataKeys={metadataKeys}
-              hasDistances={hasDistances}
+              hasScores={hasScores}
               headerGroup={headerGroup}
               idColIndex={idColIndex}
               onRowClick={handleRowClick}
@@ -434,7 +434,7 @@ interface DraftRowProps {
   index: number
   isSelected: boolean
   metadataKeys: string[]
-  hasDistances: boolean
+  hasScores: boolean
   headerGroup: HeaderGroup<LocalVectorRecord>
   idColIndex: number
   inputRef?: React.RefObject<HTMLInputElement | null>
@@ -452,7 +452,7 @@ function DraftRow({
   index,
   isSelected,
   metadataKeys,
-  hasDistances,
+  hasScores,
   headerGroup,
   idColIndex,
   inputRef,
@@ -480,7 +480,7 @@ function DraftRow({
       onMouseDown={e => onMouseDown(e, index)}
       onMouseEnter={() => onMouseEnter(index)}
     >
-      {hasDistances && (
+      {hasScores && (
         <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[0]?.getSize() }}>
           <div className="text-xs font-mono text-muted-foreground text-center">-</div>
         </div>
@@ -529,7 +529,7 @@ interface DataRowProps {
   editingState: import('../../types/vectors').EditingState | null
   editingInputRef: React.RefObject<HTMLInputElement | null>
   metadataKeys: string[]
-  hasDistances: boolean
+  hasScores: boolean
   headerGroup: HeaderGroup<LocalVectorRecord>
   idColIndex: number
   onRowClick: (e: React.MouseEvent, id: string, index: number) => void
@@ -554,7 +554,7 @@ function DataRow({
   editingState,
   editingInputRef,
   metadataKeys,
-  hasDistances,
+  hasScores,
   headerGroup,
   idColIndex,
   onRowClick,
@@ -602,10 +602,10 @@ function DataRow({
         style={rowStyle}
         onContextMenu={e => onContextMenu?.(e, vec.id)}
       >
-        {hasDistances && (
+        {hasScores && (
           <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[0]?.getSize() }}>
             <div className="text-xs font-mono text-muted-foreground text-center">
-              {vec.distance !== null && vec.distance !== undefined ? formatScore(vec.distance) : '-'}
+{vec.score !== null && vec.score !== undefined ? formatScore(vec.score) : '-'}
             </div>
           </div>
         )}
