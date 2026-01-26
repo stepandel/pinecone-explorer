@@ -10,6 +10,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { useTableSelection } from '../../hooks/useTableSelection'
 import { useInlineEditing } from '../../hooks/useInlineEditing'
+import { usePanel } from '../../context/PanelContext'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
 import { EmbeddingFieldRequiredDialog } from './EmbeddingFieldRequiredDialog'
 import { VIRTUALIZATION } from '../../constants/ui'
@@ -77,6 +78,9 @@ export default function VectorsTable({
   onLoadMore,
   totalVectorCount,
 }: VectorsTableProps) {
+  // Panel context for closing detail panel during inline editing
+  const { setRightPanelOpen } = usePanel()
+
   // Refs for auto-focus and virtualization
   const draftIdInputRef = useRef<HTMLInputElement>(null)
   const prevDraftCountRef = useRef<number>(0)
@@ -154,6 +158,8 @@ export default function VectorsTable({
       startEditing(vec)
     }
     onSingleSelect(vecId)
+    // Close the detail panel when inline editing is active
+    setRightPanelOpen(false)
   }
 
   // Extract metadata keys from vectors
