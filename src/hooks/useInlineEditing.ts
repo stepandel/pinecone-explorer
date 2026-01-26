@@ -23,6 +23,8 @@ interface UseInlineEditingReturn {
   editingState: EditingState | null
   /** Ref to attach to the first input for auto-focus */
   editingInputRef: React.RefObject<HTMLInputElement | null>
+  /** Ref to attach to the editing row for click-outside detection */
+  editingRowRef: React.RefObject<HTMLDivElement | null>
   /** Start editing a vector */
   startEditing: (vector: LocalVectorRecord) => void
   /** Cancel editing without saving */
@@ -65,6 +67,7 @@ export function useInlineEditing({
   const [pendingEmbeddingSave, setPendingEmbeddingSave] = useState<PendingEmbeddingSave | null>(null)
   const [showFieldRequiredDialog, setShowFieldRequiredDialog] = useState(false)
   const editingInputRef = useRef<HTMLInputElement>(null)
+  const editingRowRef = useRef<HTMLDivElement>(null)
 
   // Store vectors in ref for stable lookup in callbacks
   const vectorsRef = useRef(vectors)
@@ -201,9 +204,24 @@ export function useInlineEditing({
     }
   }, [editingState?.vectorId])
 
+  // Cancel editing when clicking outside the editing row
+  useEffect(() => {
+    if (!editingState) return
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (editingRowRef.current && !editingRowRef.current.contains(e.target as Node)) {
+        setEditingState(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [editingState])
+
   return {
     editingState,
     editingInputRef,
+    editingRowRef,
     startEditing,
     cancelEditing,
     saveEditing,

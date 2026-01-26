@@ -119,6 +119,7 @@ export default function VectorsTable({
   const {
     editingState,
     editingInputRef,
+    editingRowRef,
     startEditing,
     saveEditing,
     handleEditChange,
@@ -412,6 +413,7 @@ export default function VectorsTable({
               isEditing={isEditing(row.original.id)}
               editingState={editingState}
               editingInputRef={editingInputRef}
+              editingRowRef={editingRowRef}
               metadataKeys={metadataKeys}
               hasScores={hasScores}
               headerGroup={headerGroup}
@@ -547,6 +549,7 @@ interface DataRowProps {
   isEditing: boolean
   editingState: import('../../types/vectors').EditingState | null
   editingInputRef: React.RefObject<HTMLInputElement | null>
+  editingRowRef: React.RefObject<HTMLDivElement | null>
   metadataKeys: string[]
   hasScores: boolean
   headerGroup: HeaderGroup<LocalVectorRecord>
@@ -572,6 +575,7 @@ function DataRow({
   isEditing,
   editingState,
   editingInputRef,
+  editingRowRef,
   metadataKeys,
   hasScores,
   headerGroup,
@@ -617,6 +621,7 @@ function DataRow({
   if (isEditing && editingState) {
     return (
       <div
+        ref={editingRowRef}
         className={`flex transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
         style={rowStyle}
         onContextMenu={e => onContextMenu?.(e, vec.id)}
