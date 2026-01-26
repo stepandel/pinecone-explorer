@@ -96,16 +96,32 @@ function createInitialDraft(indexName: string, embeddingTextField?: string | nul
 function validateDraft(draft: DraftNamespace): Record<string, string> {
   const errors: Record<string, string> = {}
 
+  // Embedding text field is required
+  if (!draft.textField.trim()) {
+    errors.textField = 'Embedding text field is required'
+  }
+
   // Namespace name validation - optional, but no leading/trailing spaces
   if (draft.name !== draft.name.trim()) {
     errors.name = 'Namespace name cannot have leading or trailing spaces'
   }
 
   // Validate each vector
+  const trimmedTextField = draft.textField.trim()
   draft.vectors.forEach((vector, vIndex) => {
     // Vector ID is required
     if (!vector.id.trim()) {
       errors[`vector_${vIndex}_id`] = 'Vector ID is required'
+    }
+
+    // Embedding text field must be present in metadata
+    if (trimmedTextField) {
+      const hasTextField = vector.metadataFields.some(
+        (f) => f.key.trim() === trimmedTextField
+      )
+      if (!hasTextField) {
+        errors[`vector_${vIndex}_textField`] = `Missing "${trimmedTextField}" metadata field for embedding generation`
+      }
     }
 
     // Metadata field names must be unique and non-empty if present

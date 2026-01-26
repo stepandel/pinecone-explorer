@@ -132,7 +132,7 @@ export function NamespaceConfigView() {
           {/* Embedding Text Field */}
           <div className="space-y-1 mb-3">
             <label className="text-[10px] font-medium text-muted-foreground">
-              Embedding Text Field
+              Embedding Text Field <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
@@ -142,6 +142,9 @@ export function NamespaceConfigView() {
               className={inputClassName}
               style={inputStyle}
             />
+            {validationErrors.textField && (
+              <p className="text-[10px] text-destructive">{validationErrors.textField}</p>
+            )}
             <p className="text-[10px] text-muted-foreground">
               Metadata field containing text for auto-generating embeddings. Changing this updates the setting for the entire index.
             </p>
@@ -276,6 +279,11 @@ Or an array of vectors:
                           onChange={(fields) => updateVector(vIndex, { metadataFields: fields })}
                           disabled={isSaving}
                         />
+                        {validationErrors[`vector_${vIndex}_textField`] && (
+                          <p className="text-[10px] text-destructive">
+                            {validationErrors[`vector_${vIndex}_textField`]}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -321,7 +329,7 @@ Or an array of vectors:
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || draftNamespace.vectors.length === 0}
+            disabled={isSaving || draftNamespace.vectors.length === 0 || !draftNamespace.textField.trim()}
             className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving
