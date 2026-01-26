@@ -599,6 +599,12 @@ function DataRow({
         className={`flex transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
         style={rowStyle}
         onContextMenu={e => onContextMenu?.(e, vec.id)}
+        onBlur={e => {
+          // Only save when focus leaves the entire editing row
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            onEditBlur()
+          }
+        }}
       >
         {hasScores && (
           <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[0]?.getSize() }}>
@@ -624,7 +630,6 @@ function DataRow({
                 value={value !== undefined && value !== null ? String(value) : ''}
                 onChange={e => onEditChange(key, e.target.value)}
                 onKeyDown={onEditKeyDown}
-                onBlur={onEditBlur}
                 placeholder="-"
                 className="w-full text-xs bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/50 placeholder:italic"
               />
