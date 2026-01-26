@@ -49,7 +49,7 @@ interface QueryToolbarProps {
   isSearching?: boolean
   error?: string | null
   // Hybrid search support
-  isHybridEnabled?: boolean
+  isHybridCapable?: boolean
   alpha?: number
   onAlphaChange?: (alpha: number) => void
   // Reranking support
@@ -87,7 +87,7 @@ export function QueryToolbar({
   onSearch,
   isSearching,
   error,
-  isHybridEnabled,
+  isHybridCapable,
   alpha = 0.5,
   onAlphaChange,
   rerankEnabled = false,
@@ -250,7 +250,7 @@ export function QueryToolbar({
       </div>
 
       {/* Hybrid search alpha slider */}
-      {isHybridEnabled && scope !== 'id' && (
+      {isHybridCapable && scope !== 'id' && (
         <div className="flex items-center gap-2 px-1">
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">Keyword</span>
           <input

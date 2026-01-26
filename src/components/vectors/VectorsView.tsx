@@ -54,7 +54,7 @@ export default function VectorsView({
 }: VectorsViewProps) {
   const { currentProfile } = usePinecone()
   const { setEmbeddingTextField } = usePanel()
-  const { isHybridEnabled, hybridConfig } = useEmbedding()
+  const { isHybridCapable, hybridConfig } = useEmbedding()
   const { getParams, saveParams, getSearchResults, saveSearchResults } = useQueryState()
 
   // Get initial params and results from context (runs once on mount due to key-based remounting)
@@ -351,7 +351,7 @@ export default function VectorsView({
         includeValues: true,
         includeMetadata: true,
         // Pass alpha for hybrid search (only used when hybrid is enabled on the index)
-        alpha: isHybridEnabled ? alpha : undefined,
+        alpha: isHybridCapable ? alpha : undefined,
         // Pass rerank config
         rerank: rerankConfig,
       })
@@ -375,7 +375,7 @@ export default function VectorsView({
     } finally {
       setIsSearching(false)
     }
-  }, [queryScope, searchText, idSearch, metadataFilters, metadataFieldTypes, indexName, namespace, topK, queryMutation, isHybridEnabled, alpha, saveSearchResults, rerankEnabled, rerankModel, rerankField])
+  }, [queryScope, searchText, idSearch, metadataFilters, metadataFieldTypes, indexName, namespace, topK, queryMutation, isHybridCapable, alpha, saveSearchResults, rerankEnabled, rerankModel, rerankField])
 
   // Draft vector handlers
   const handleStartCreate = useCallback(() => {
@@ -1044,7 +1044,7 @@ export default function VectorsView({
             onSearch={handleSearch}
             isSearching={isSearching}
             error={searchError}
-            isHybridEnabled={isHybridEnabled}
+            isHybridCapable={isHybridCapable}
             alpha={alpha}
             onAlphaChange={setAlpha}
             // Reranking props
