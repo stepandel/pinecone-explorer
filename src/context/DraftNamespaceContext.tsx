@@ -25,6 +25,7 @@ export interface DraftVector {
 export interface DraftNamespace {
   indexName: string
   name: string // Namespace name (empty = default namespace)
+  textField: string // Metadata field for embedding text (editable, pre-filled from index config)
   vectors: DraftVector[]
   jsonMode: boolean
   jsonValue: string
@@ -71,13 +72,15 @@ function vectorsToJson(vectors: DraftVector[]): string {
 
 // Create initial draft with one vector, optionally pre-populated with embedding text field
 function createInitialDraft(indexName: string, embeddingTextField?: string | null): DraftNamespace {
-  const initialMetadataFields: MetadataField[] = embeddingTextField
-    ? [{ key: embeddingTextField, type: 'string', value: '' }]
+  const textField = embeddingTextField || ''
+  const initialMetadataFields: MetadataField[] = textField
+    ? [{ key: textField, type: 'string', value: '' }]
     : []
 
   return {
     indexName,
     name: '',
+    textField,
     vectors: [
       {
         id: generateUUID(),
@@ -328,17 +331,16 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
     try {
       const namespace = draftNamespace.name.trim() || undefined
 
-      // Get text field config for embedding generation
-      let textField: string | undefined
-      try {
-        const textFieldOverride = await window.electronAPI.profiles.getTextFieldOverride(
+      // Use text field from draft (user may have changed it during namespace creation)
+      const textField = draftNamespace.textField.trim() || undefined
+
+      // Save updated text field as index-level override if the user set one
+      if (textField) {
+        await window.electronAPI.profiles.setTextFieldOverride(
           currentProfile.id,
-          draftNamespace.indexName
+          draftNamespace.indexName,
+          textField
         )
-        textField = textFieldOverride || undefined
-      } catch (error) {
-        // No text field configured - embeddings won't be generated unless metadata includes text
-        console.debug('No text field override for embedding generation:', error)
       }
 
       // Upsert all vectors in parallel for better performance

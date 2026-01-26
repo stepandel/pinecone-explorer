@@ -88,6 +88,11 @@ function validateDraft(draft: DraftIndex, isSparseModel: boolean): Record<string
     }
   }
 
+  // Embedding text field is required for new indexes (not copy mode)
+  if (!draft.sourceIndex && !draft.textField?.trim()) {
+    errors.textField = 'Embedding text field is required'
+  }
+
   // Validate first vector if namespace setup is enabled
   if (draft.firstNamespace?.firstVector) {
     if (!draft.firstNamespace.firstVector.id.trim()) {
@@ -313,12 +318,12 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
         )
       }
 
-      // Save text field override if specified (for new indexes, not copy mode)
-      if (!draftIndex.sourceIndex && draftIndex.textField?.trim()) {
+      // Save text field override (validation guarantees it's set for new indexes)
+      if (!draftIndex.sourceIndex) {
         await window.electronAPI.profiles.setTextFieldOverride(
           currentProfile.id,
           newIndexName,
-          draftIndex.textField.trim()
+          draftIndex.textField!.trim()
         )
       }
 

@@ -423,7 +423,7 @@ export function IndexConfigView() {
         {!draftIndex.sourceIndex && (
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-muted-foreground">
-              Embedding Text Field
+              Embedding Text Field <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
@@ -433,6 +433,7 @@ export function IndexConfigView() {
               className={inputClassName}
               style={inputStyle}
             />
+            {validationErrors.textField && <p className="text-[10px] text-destructive">{validationErrors.textField}</p>}
             <p className="text-[10px] text-muted-foreground">
               Metadata field name that will contain text for embeddings
             </p>
@@ -615,7 +616,7 @@ export function IndexConfigView() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isCreating || !draftIndex.name.trim()}
+            disabled={isCreating || !draftIndex.name.trim() || (!draftIndex.sourceIndex && !draftIndex.textField?.trim())}
             className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isCreating ? 'Creating...' : 'Create Index'}
