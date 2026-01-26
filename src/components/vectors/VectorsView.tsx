@@ -178,6 +178,9 @@ export default function VectorsView({
   // Compute effective text field: index embed > client override > default '_text'
   const effectiveTextField = currentIndex?.embed?.fieldMap?.text || textFieldOverride || '_text'
 
+  // Whether the embedding text field is explicitly configured (not just the default fallback)
+  const isEmbeddingFieldConfigured = !!currentIndex?.embed?.fieldMap?.text || !!textFieldOverride
+
   // Sync effective text field to context for VectorDetailPanel
   useEffect(() => {
     setEmbeddingTextField(effectiveTextField)
@@ -1083,6 +1086,7 @@ export default function VectorsView({
           onVectorContextMenu={handleVectorContextMenu}
           onTableContextMenu={handleTableContextMenu}
           embeddingTextField={effectiveTextField}
+          isEmbeddingFieldConfigured={isEmbeddingFieldConfigured}
           hasMore={searchResults === null ? hasNextPage : false}
           isFetchingMore={isFetchingNextPage}
           onLoadMore={fetchNextPage}

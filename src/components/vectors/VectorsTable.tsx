@@ -11,6 +11,7 @@ import { LocalVectorRecord, DraftVector } from '../../types/vectors'
 import { useTableSelection } from '../../hooks/useTableSelection'
 import { useInlineEditing } from '../../hooks/useInlineEditing'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
+import { EmbeddingFieldRequiredDialog } from './EmbeddingFieldRequiredDialog'
 import { VIRTUALIZATION } from '../../constants/ui'
 
 // Format score/distance for display - handles very small reranking scores
@@ -43,6 +44,8 @@ interface VectorsTableProps {
   onTableContextMenu?: (e: React.MouseEvent) => void
   // Embedding text field (for highlighting the column used for embeddings)
   embeddingTextField?: string
+  // Whether the embedding text field is explicitly configured
+  isEmbeddingFieldConfigured?: boolean
   // Pagination props
   hasMore?: boolean
   isFetchingMore?: boolean
@@ -68,6 +71,7 @@ export default function VectorsTable({
   onVectorContextMenu,
   onTableContextMenu,
   embeddingTextField,
+  isEmbeddingFieldConfigured,
   hasMore = false,
   isFetchingMore = false,
   onLoadMore,
@@ -119,10 +123,13 @@ export default function VectorsTable({
     pendingEmbeddingSave,
     confirmPendingSave,
     cancelPendingSave,
+    showFieldRequiredDialog,
+    dismissFieldRequiredDialog,
   } = useInlineEditing({
     vectors,
     onSave: onVectorUpdate,
     embeddingTextField,
+    isEmbeddingFieldConfigured,
   })
 
   // Loading state for regenerate dialog
@@ -302,6 +309,14 @@ export default function VectorsTable({
       className="overflow-auto h-full"
       onContextMenu={onTableContextMenu}
     >
+      {/* Embedding field required dialog */}
+      <EmbeddingFieldRequiredDialog
+        open={showFieldRequiredDialog}
+        onOpenChange={(open) => {
+          if (!open) dismissFieldRequiredDialog()
+        }}
+      />
+
       {/* Regenerate embedding dialog */}
       <RegenerateEmbeddingDialog
         open={pendingEmbeddingSave !== null}

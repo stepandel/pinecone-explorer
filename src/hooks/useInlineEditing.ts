@@ -14,6 +14,8 @@ interface UseInlineEditingProps {
   onSave?: (vectorId: string, updates: { metadata?: Record<string, unknown>; regenerateEmbedding?: boolean }) => Promise<void>
   /** The metadata field used for embedding text (to detect when regeneration might be needed) */
   embeddingTextField?: string
+  /** Whether the embedding text field is explicitly configured (index embed config or client override) */
+  isEmbeddingFieldConfigured?: boolean
 }
 
 interface UseInlineEditingReturn {
@@ -39,6 +41,10 @@ interface UseInlineEditingReturn {
   confirmPendingSave: (regenerate: boolean) => Promise<void>
   /** Cancel the pending save */
   cancelPendingSave: () => void
+  /** Whether the embedding field required dialog should be shown */
+  showFieldRequiredDialog: boolean
+  /** Dismiss the embedding field required dialog */
+  dismissFieldRequiredDialog: () => void
 }
 
 /**
@@ -53,9 +59,11 @@ export function useInlineEditing({
   vectors,
   onSave,
   embeddingTextField,
+  isEmbeddingFieldConfigured,
 }: UseInlineEditingProps): UseInlineEditingReturn {
   const [editingState, setEditingState] = useState<EditingState | null>(null)
   const [pendingEmbeddingSave, setPendingEmbeddingSave] = useState<PendingEmbeddingSave | null>(null)
+  const [showFieldRequiredDialog, setShowFieldRequiredDialog] = useState(false)
   const editingInputRef = useRef<HTMLInputElement>(null)
 
   // Store vectors in ref for stable lookup in callbacks
@@ -78,9 +86,20 @@ export function useInlineEditing({
     setEditingState(null)
   }, [])
 
+  // Dismiss the embedding field required dialog
+  const dismissFieldRequiredDialog = useCallback(() => {
+    setShowFieldRequiredDialog(false)
+  }, [])
+
   // Save editing changes
   const saveEditing = useCallback(async () => {
     if (!editingState || !onSave) return
+
+    // Gate: require embedding field to be configured before saving
+    if (!isEmbeddingFieldConfigured) {
+      setShowFieldRequiredDialog(true)
+      return
+    }
 
     // Use ref to avoid vectors dependency
     const originalVec = vectorsRef.current.find(v => v.id === editingState.vectorId)
@@ -112,7 +131,7 @@ export function useInlineEditing({
       }
     }
     setEditingState(null)
-  }, [editingState, onSave, embeddingTextField])
+  }, [editingState, onSave, embeddingTextField, isEmbeddingFieldConfigured])
 
   // Confirm the pending save with regeneration choice
   const confirmPendingSave = useCallback(async (regenerate: boolean) => {
@@ -194,5 +213,7 @@ export function useInlineEditing({
     pendingEmbeddingSave,
     confirmPendingSave,
     cancelPendingSave,
+    showFieldRequiredDialog,
+    dismissFieldRequiredDialog,
   }
 }

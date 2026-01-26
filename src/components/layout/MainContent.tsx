@@ -3,6 +3,7 @@ import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useDraftNamespace } from '../../context/DraftNamespaceContext'
 import { usePanel } from '../../context/PanelContext'
+import { useEmbedding } from '../../context/EmbeddingContext'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { IndexesPanel } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
@@ -22,6 +23,8 @@ export function MainContent() {
   const { draftIndex } = useDraftIndex()
   const { draftNamespace } = useDraftNamespace()
   const { currentProfile } = usePinecone()
+  const { indexEmbedConfig, clientTextFieldOverride } = useEmbedding()
+  const isEmbeddingFieldConfigured = !!indexEmbedConfig || !!clientTextFieldOverride
   const {
     indexesPanelOpen,
     setIndexesPanelOpen,
@@ -228,6 +231,7 @@ export function MainContent() {
             isFirstVector={isFirstVector}
             onDraftChange={isSelectedDraft ? draftUpdateHandler ?? undefined : undefined}
             embeddingTextField={embeddingTextField ?? undefined}
+            isEmbeddingFieldConfigured={isEmbeddingFieldConfigured}
           />
         ) : (
           <div

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, X, ChevronDown } from 'lucide-react'
 import EmbeddingCell from './EmbeddingCell'
 import { RegenerateEmbeddingDialog } from './RegenerateEmbeddingDialog'
+import { EmbeddingFieldRequiredDialog } from './EmbeddingFieldRequiredDialog'
 import { useUpdateVectorMutation } from '../../hooks/usePineconeQueries'
 import { useMetadataEditing } from '../../hooks/useMetadataEditing'
 import { SHORTCUTS, matchesShortcut } from '../../constants/keyboard-shortcuts'
@@ -17,6 +18,7 @@ interface VectorDetailPanelProps {
   isFirstVector?: boolean
   onDraftChange?: (updates: { id?: string; metadata?: Record<string, unknown> }) => void
   embeddingTextField?: string // The metadata field used for embedding text
+  isEmbeddingFieldConfigured?: boolean // Whether the embedding text field is explicitly configured
 }
 
 export default function VectorDetailPanel({
@@ -28,12 +30,14 @@ export default function VectorDetailPanel({
   isFirstVector = false,
   onDraftChange,
   embeddingTextField,
+  isEmbeddingFieldConfigured,
 }: VectorDetailPanelProps) {
   // Embedding editing state
   const [draftEmbedding, setDraftEmbedding] = useState<string>('')
   const [embeddingError, setEmbeddingError] = useState<string | null>(null)
   const [isEditingEmbedding, setIsEditingEmbedding] = useState(false)
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false)
+  const [showFieldRequiredDialog, setShowFieldRequiredDialog] = useState(false)
   const [pendingSaveData, setPendingSaveData] = useState<{
     metadata: Record<string, unknown>
     values?: number[]
@@ -135,6 +139,12 @@ export default function VectorDetailPanel({
   }, [getEmbeddingDisplayString, resetMetadata])
 
   const handleSave = useCallback(async () => {
+    // Gate: require embedding field to be configured before saving
+    if (!isEmbeddingFieldConfigured) {
+      setShowFieldRequiredDialog(true)
+      return
+    }
+
     try {
       const updates: {
         id: string
@@ -213,7 +223,7 @@ export default function VectorDetailPanel({
         setEmbeddingError(message)
       }
     }
-  }, [vector.id, vector.metadata, hasMetadataChanges, hasEmbeddingChanges, draftMetadata, draftEmbedding, updateMutation, embeddingTextField])
+  }, [vector.id, vector.metadata, hasMetadataChanges, hasEmbeddingChanges, draftMetadata, draftEmbedding, updateMutation, embeddingTextField, isEmbeddingFieldConfigured])
 
   // Handle regenerate dialog confirmation
   const handleRegenerateConfirm = useCallback(async (regenerate: boolean) => {
@@ -370,6 +380,13 @@ export default function VectorDetailPanel({
             {updateMutation.isPending ? 'Saving...' : 'Unsaved changes — ⌘↵ to save, ⌘Z to revert'}
           </div>
         )}
+
+        <EmbeddingFieldRequiredDialog
+          open={showFieldRequiredDialog}
+          onOpenChange={(open) => {
+            if (!open) setShowFieldRequiredDialog(false)
+          }}
+        />
 
         <RegenerateEmbeddingDialog
           open={showRegenerateDialog}
