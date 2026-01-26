@@ -27,7 +27,9 @@ A desktop application for exploring and managing Pinecone vector databases. Buil
 - **Multi-Profile Connections** - Connect to Pinecone indexes with saved profiles
 - **Index Management** - Create, configure, and delete indexes with custom settings
 - **Record Operations** - Browse, search, create, edit, and delete records with batch support
+- **Dense, Sparse & Hybrid Indexes** - Full support for dense, sparse, and hybrid index types
 - **Semantic Search** - Query records using natural language with 13+ embedding providers
+- **Reranking** - Rerank search results for improved relevance
 - **Metadata Filtering** - Filter records with flexible query syntax
 - **Resizable Layout** - Adjustable multi-panel interface with sidebar, table, and detail views
 
