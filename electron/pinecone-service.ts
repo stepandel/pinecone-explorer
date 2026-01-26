@@ -568,7 +568,7 @@ class PineconeService {
     }
 
     const index = this.getIndex(params.indexName)
-    const namespace = index.namespace(params.namespace || '')
+    const namespace = index.namespace(params.namespace || '__default__')
 
     // Generate query vector if queryText is provided
     let queryVector = params.vector
