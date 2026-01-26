@@ -4,31 +4,6 @@
   "description": "A desktop application for exploring and managing Pinecone vector databases",
   "main": "dist-electron/main.js",
   "type": "module",
-  "build": {
-    "appId": "com.pinecone.explorer",
-    "productName": "Pinecone Explorer",
-    "artifactName": "${name}-${version}-${arch}.${ext}",
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "icon": "build/icon.png",
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "dist-electron/**/*",
-      "dist/**/*"
-    ],
-    "publish": {
-      "provider": "github",
-      "owner": "stepandel",
-      "repo": "pinecone-explorer"
-    }
-  },
   "scripts": {
     "dev": "vite",
     "build": "vite build && electron-builder --dir",
@@ -42,7 +17,7 @@
     "pinecone",
     "vector-database"
   ],
-  "author": "",
+  "author": "stepandel",
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",

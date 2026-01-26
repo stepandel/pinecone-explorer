@@ -1,6 +1,6 @@
 appId: com.pineconeexplorer.app
 productName: Pinecone Explorer
-copyright: Copyright © 2025
+copyright: Copyright © 2025-2026
 
 directories:
   output: release
@@ -17,11 +17,11 @@ mac:
   target:
     - target: dmg
       arch:
-        - universal
+        - arm64
     - target: zip
       arch:
-        - universal
-  icon: build/icon.icns
+        - arm64
+  icon: build/icon.png
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
@@ -50,5 +50,5 @@ dmg:
 
 publish:
   provider: github
-  owner: your-username
+  owner: stepandel
   repo: pinecone-explorer

@@ -254,9 +254,13 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
           accelerator: 'CmdOrCtrl+Shift+R',
           role: 'reload',
         },
-        { role: 'forceReload', accelerator: 'CmdOrCtrl+Alt+R' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
+        ...(!app.isPackaged
+          ? [
+              { role: 'forceReload' as const, accelerator: 'CmdOrCtrl+Alt+R' },
+              { role: 'toggleDevTools' as const },
+              { type: 'separator' as const },
+            ]
+          : []),
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         { role: 'zoomOut' },
@@ -405,13 +409,13 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
         {
           label: 'Report an Issue...',
           click: async () => {
-            await shell.openExternal('https://github.com/your-repo/pinecone-explorer/issues')
+            await shell.openExternal('https://github.com/stepandel/pinecone-explorer/issues')
           },
         },
         {
           label: 'Propose a Feature...',
           click: async () => {
-            await shell.openExternal('https://github.com/your-repo/pinecone-explorer/issues')
+            await shell.openExternal('https://github.com/stepandel/pinecone-explorer/issues')
           },
         },
         { type: 'separator' },
