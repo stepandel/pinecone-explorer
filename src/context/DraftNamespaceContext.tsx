@@ -3,6 +3,8 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
+  useRef,
   useMemo,
   ReactNode,
 } from 'react'
@@ -162,8 +164,30 @@ export function DraftNamespaceProvider({ children }: { children: ReactNode }) {
   const [isSaving, setIsSaving] = useState(false)
 
   const { currentProfile } = usePinecone()
-  const { selectIndexAndNamespace } = useSelection()
+  const { activeIndex, activeNamespace, selectIndexAndNamespace } = useSelection()
   const queryClient = useQueryClient()
+
+  // Dismiss draft when user navigates to a different index or namespace
+  const draftOpenSelectionRef = useRef<{ index: string | null; namespace: string | null } | null>(null)
+
+  useEffect(() => {
+    if (draftNamespace) {
+      if (!draftOpenSelectionRef.current) {
+        // Draft just opened — capture current selection
+        draftOpenSelectionRef.current = { index: activeIndex, namespace: activeNamespace }
+      } else if (
+        draftOpenSelectionRef.current.index !== activeIndex ||
+        draftOpenSelectionRef.current.namespace !== activeNamespace
+      ) {
+        // Selection changed while draft is open — dismiss
+        setDraftNamespace(null)
+        setValidationErrors({})
+        draftOpenSelectionRef.current = null
+      }
+    } else {
+      draftOpenSelectionRef.current = null
+    }
+  }, [activeIndex, activeNamespace, draftNamespace])
 
   const startCreation = useCallback(async (indexName: string) => {
     // Fetch embedding text field for this index to pre-populate

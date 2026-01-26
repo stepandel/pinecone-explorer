@@ -177,7 +177,7 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
   const [cloneProgressOpen, setCloneProgressOpen] = useState(false)
 
   const { currentProfile, refreshIndexes } = usePinecone()
-  const { setActiveIndex, selectIndexAndNamespace } = useSelection()
+  const { activeIndex, setActiveIndex, selectIndexAndNamespace } = useSelection()
   const createMutation = useCreateIndexMutation(currentProfile?.id || '')
 
   // Listen for clone progress updates
@@ -203,6 +203,15 @@ export function DraftIndexProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [currentProfile])
+
+  // Dismiss draft when user navigates to an index (startCreation sets activeIndex to null,
+  // so this only fires when the user actively selects an index while the form is open)
+  useEffect(() => {
+    if (draftIndex && activeIndex !== null) {
+      setDraftIndex(null)
+      setValidationErrors({})
+    }
+  }, [activeIndex, draftIndex])
 
   const startCreation = useCallback(() => {
     setDraftIndex(createInitialDraft())
