@@ -32,7 +32,7 @@ import { withRetry } from './retry-utils'
  * Main Pinecone service class
  */
 class PineconeService {
-  private static readonly BATCH_SIZE = 100
+  private static readonly BATCH_SIZE = 50
 
   private client: Pinecone | null = null
   private embeddingService: EmbeddingService | null = null
