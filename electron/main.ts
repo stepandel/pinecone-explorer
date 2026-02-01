@@ -27,6 +27,7 @@ import {
   GetVectorsPaginatedParams,
 } from './types'
 import { initAutoUpdater, checkForUpdates } from './auto-updater'
+import { initAnalytics, track } from './analytics'
 
 // Inject stored API keys into process.env at startup
 settingsStore.injectIntoProcessEnv()
@@ -99,6 +100,7 @@ process.env.VITE_PUBLIC = app.isPackaged
 ipcMain.handle('pinecone:connect', async (_event, profileId: string, profile: ConnectionProfile) => {
   try {
     await pineconeConnectionPool.connect(profileId, profile)
+    track('pinecone_connected')
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to connect to Pinecone'
@@ -215,6 +217,7 @@ ipcMain.handle('pinecone:queryVectors', async (_event, profileId: string, params
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
     const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
     const result = await service.queryVectors(params, embeddingOverride || undefined, hybridOverride || undefined)
+    track('vectors_searched', { topK: params.topK })
     return { success: true, data: result }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to query vectors'
@@ -350,6 +353,13 @@ ipcMain.handle('pinecone:cloneIndex', async (event, profileId: string, params: C
 
     // Clean up abort controller
     activeCloneOperations.delete(profileId)
+
+    // Track successful index duplication
+    if (result.success) {
+      track('index_duplicated', {
+        vectorsCopied: result.copiedVectors
+      })
+    }
 
     return { success: result.success, data: result, error: result.error }
   } catch (error) {
@@ -916,6 +926,10 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
 // ============================================================================
 
 app.whenReady().then(() => {
+  // Initialize analytics
+  initAnalytics()
+  track('app_started')
+
   // Create application menu
   createApplicationMenu()
 
@@ -935,8 +949,13 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    track('app_closed')
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  track('app_closed')
 })
 
 app.on('activate', () => {
