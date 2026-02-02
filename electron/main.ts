@@ -27,6 +27,7 @@ import {
   GetVectorsPaginatedParams,
 } from './types'
 import { initAutoUpdater, checkForUpdates } from './auto-updater'
+import { initAnalytics, track } from './analytics'
 
 // Inject stored API keys into process.env at startup
 settingsStore.injectIntoProcessEnv()
@@ -99,6 +100,7 @@ process.env.VITE_PUBLIC = app.isPackaged
 ipcMain.handle('pinecone:connect', async (_event, profileId: string, profile: ConnectionProfile) => {
   try {
     await pineconeConnectionPool.connect(profileId, profile)
+    track('pinecone_connected')
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to connect to Pinecone'
@@ -232,6 +234,7 @@ ipcMain.handle('pinecone:createVector', async (_event, profileId: string, params
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
     const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
     await service.createVector(params, embeddingOverride || undefined, hybridOverride || undefined)
+    track('vector_created')
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create vector'
@@ -249,6 +252,7 @@ ipcMain.handle('pinecone:updateVector', async (_event, profileId: string, params
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
     const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
     await service.updateVector(params, embeddingOverride || undefined, hybridOverride || undefined)
+    track('vector_updated')
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update vector'
@@ -263,6 +267,13 @@ ipcMain.handle('pinecone:deleteVectors', async (_event, profileId: string, param
       return { success: false, error: 'Not connected to Pinecone' }
     }
     await service.deleteVectors(params)
+    // Track vector deletion with count if specific IDs provided
+    const count = params.ids?.length
+    if (count !== undefined) {
+      track('vectors_deleted', { count })
+    } else {
+      track('vectors_deleted')
+    }
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete vectors'
@@ -280,6 +291,9 @@ ipcMain.handle('pinecone:batchImport', async (_event, profileId: string, params:
     const embeddingOverride = connectionStore.getEmbeddingOverride(profileId, params.indexName)
     const hybridOverride = connectionStore.getHybridEmbeddingOverride(profileId, params.indexName)
     const result = await service.batchImport(params, embeddingOverride || undefined, undefined, hybridOverride || undefined)
+    track('vectors_imported', {
+      count: result.upsertedCount,
+    })
     return { success: true, data: result }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to import vectors'
@@ -294,6 +308,14 @@ ipcMain.handle('pinecone:createIndex', async (_event, profileId: string, params:
       return { success: false, error: 'Not connected to Pinecone' }
     }
     await service.createIndex(params)
+    // Track index creation with generic metadata
+    const spec = params.spec as { serverless?: { cloud?: string; region?: string } }
+    track('index_created', {
+      cloud: spec.serverless?.cloud,
+      region: spec.serverless?.region,
+      metric: params.metric,
+      dimension: params.dimension,
+    })
     return { success: true }
   } catch (error) {
     // Extract cloud/region from serverless spec for better error messages
@@ -313,6 +335,7 @@ ipcMain.handle('pinecone:deleteIndex', async (_event, profileId: string, indexNa
       return { success: false, error: 'Not connected to Pinecone' }
     }
     await service.deleteIndex(indexName)
+    track('index_deleted')
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete index'
@@ -350,6 +373,13 @@ ipcMain.handle('pinecone:cloneIndex', async (event, profileId: string, params: C
 
     // Clean up abort controller
     activeCloneOperations.delete(profileId)
+
+    // Track successful index duplication
+    if (result.success) {
+      track('index_duplicated', {
+        vectorsCopied: result.copiedVectors
+      })
+    }
 
     return { success: result.success, data: result, error: result.error }
   } catch (error) {
@@ -418,6 +448,9 @@ ipcMain.handle('pinecone:cloneNamespace', async (event, profileId: string, param
     activeNamespaceCloneOperations.delete(operationKey)
 
     if (result.success) {
+      track('namespace_duplicated', {
+        vectorsCopied: result.copiedVectors,
+      })
       event.sender.send('pinecone:cloneNamespaceProgress', {
         phase: 'complete',
         totalVectors,
@@ -916,6 +949,10 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
 // ============================================================================
 
 app.whenReady().then(() => {
+  // Initialize analytics
+  initAnalytics()
+  track('app_started')
+
   // Create application menu
   createApplicationMenu()
 
@@ -935,8 +972,13 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    track('app_closed')
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  track('app_closed')
 })
 
 app.on('activate', () => {
