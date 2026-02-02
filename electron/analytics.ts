@@ -1,4 +1,4 @@
-import { trackEvent, init } from '@aptabase/electron/main'
+import { trackEvent, initialize } from '@aptabase/electron/main'
 
 /**
  * Initialize Aptabase analytics
@@ -10,7 +10,7 @@ export function initAnalytics() {
   // Only initialize if a valid key is provided
   if (appKey && appKey !== 'YOUR_APTABASE_APP_KEY') {
     try {
-      init(appKey)
+      initialize(appKey)
       console.log('Analytics initialized')
     } catch (error) {
       console.error('Failed to initialize analytics:', error)
