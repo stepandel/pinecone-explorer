@@ -11,7 +11,6 @@ export function initAnalytics() {
   if (appKey && appKey !== 'YOUR_APTABASE_APP_KEY') {
     try {
       initialize(appKey)
-      console.log('Analytics initialized')
     } catch (error) {
       console.error('Failed to initialize analytics:', error)
     }
