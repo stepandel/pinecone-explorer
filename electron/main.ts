@@ -948,9 +948,10 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
 // App Lifecycle
 // ============================================================================
 
+// Initialize analytics BEFORE app.whenReady() as required by Aptabase SDK
+initAnalytics()
+
 app.whenReady().then(() => {
-  // Initialize analytics
-  initAnalytics()
   track('app_started')
 
   // Create application menu
