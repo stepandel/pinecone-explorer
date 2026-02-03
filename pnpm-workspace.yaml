@@ -1,0 +1,10 @@
+ignoredBuiltDependencies:
+  - bufferutil
+  - electron-winstaller
+  - esbuild
+  - protobufjs
+  - sharp
+  - utf-8-validate
+
+onlyBuiltDependencies:
+  - electron

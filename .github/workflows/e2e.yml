@@ -1,0 +1,99 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [master, feat/pine-27-e2e-setup]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      CI: true
+      QDRANT_URL: http://localhost:6333
+      WEAVIATE_URL: http://localhost:8080
+      PINECONE_URL: http://localhost:5080
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start Docker services
+        run: docker compose -f docker-compose.test.yml up -d
+
+      - name: Wait for Qdrant to be healthy
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:6333/healthz; do echo "Waiting for Qdrant..."; sleep 2; done'
+          echo "Qdrant is ready"
+
+      - name: Wait for Weaviate to be healthy
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:8080/v1/.well-known/ready; do echo "Waiting for Weaviate..."; sleep 2; done'
+          echo "Weaviate is ready"
+
+      - name: Verify Docker services status
+        run: docker compose -f docker-compose.test.yml ps
+
+      - name: Build Electron app
+        run: pnpm run test:build
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+
+      - name: Show Docker logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.test.yml logs
+
+      - name: Stop Docker services
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v
