@@ -6,6 +6,10 @@ dist-electron
 .DS_Store
 .env*
 
+# Test artifacts
+test-results/
+playwright-report/
+
 # Distribution / Release builds
 release/
 *.dmg
