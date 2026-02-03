@@ -94,12 +94,46 @@ pnpm run test:docker:down
 ```
 pinecone-explorer/
 ├── e2e/
-│   ├── electron.setup.ts      # Electron launcher and profile utilities
-│   └── example.spec.ts        # Example test suite
-├── playwright.config.ts       # Playwright configuration
-├── docker-compose.test.yml    # Docker services definition
-└── .github/workflows/e2e.yml  # CI workflow
+│   ├── electron.setup.ts                    # Electron launcher and profile utilities
+│   ├── connection-flow.spec.ts              # E2E-002: Connection flow tests
+│   ├── index-collection-management.spec.ts  # E2E-003: Index/collection management tests
+│   └── example.spec.ts                      # Example test suite
+├── playwright.config.ts                     # Playwright configuration
+├── docker-compose.test.yml                  # Docker services definition
+└── .github/workflows/e2e.yml                # CI workflow
 ```
+
+## Test Suites
+
+### E2E-002: Connection Flow Tests (`connection-flow.spec.ts`)
+Tests the connection and disconnection functionality for all three database providers:
+- **Pinecone**: API key validation, connection/reconnection, profile management
+- **Qdrant**: URL-based connection (TODO: pending adapter integration)
+- **Weaviate**: Host/scheme connection (TODO: pending adapter integration)
+
+Key tests:
+- Opening connection modal on app launch
+- Validating required fields
+- Handling connection errors (invalid credentials, unreachable servers)
+- Successful connection with valid credentials
+- Disconnect and reconnect functionality
+- Profile persistence and loading
+
+### E2E-003: Index/Collection Management Tests (`index-collection-management.spec.ts`)
+Tests index/collection CRUD operations and stats viewing:
+- **Pinecone**: Full index management (list, stats, create, delete)
+- **Qdrant**: Collection management (TODO: pending adapter integration)
+- **Weaviate**: Class management (TODO: pending adapter integration)
+
+Key tests:
+- Listing indexes/collections after connecting
+- Viewing index/collection stats (vector count, dimensions)
+- Creating new collections with provider-specific settings
+- Deleting collections (with confirmation flow)
+- Refreshing collection lists
+- Handling empty indexes and error cases
+
+**Note**: Only Pinecone tests are currently active. Qdrant and Weaviate tests are marked with `test.skip()` and TODO comments, pending the adapter system integration.
 
 ## Writing Tests
 
