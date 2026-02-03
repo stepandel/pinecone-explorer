@@ -18,6 +18,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "electron"],
-  "exclude": ["node_modules", "dist", "dist-electron"]
+  "include": ["src", "electron", "e2e"],
+  "exclude": ["node_modules", "dist", "dist-electron", "playwright-report", "test-results"]
 }
