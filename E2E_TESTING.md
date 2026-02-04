@@ -4,9 +4,9 @@ This document provides guidance for running and developing end-to-end (E2E) test
 
 ## Overview
 
-The E2E testing infrastructure consists of:
-- **Playwright** for Electron app automation
-- **GitHub Actions** for automated CI testing
+The E2E testing infrastructure uses **Playwright** for Electron app automation.
+
+> **Note**: E2E tests run locally only. Electron cannot run in CI sandbox environments like GitHub Actions.
 
 ## Architecture
 
@@ -59,8 +59,7 @@ pinecone-explorer/
 ├── e2e/
 │   ├── electron.setup.ts      # Electron launcher and profile utilities
 │   └── example.spec.ts        # Example test suite
-├── playwright.config.ts       # Playwright configuration
-└── .github/workflows/e2e.yml  # CI workflow
+└── playwright.config.ts       # Playwright configuration
 ```
 
 ## Writing Tests
@@ -140,21 +139,6 @@ NODE_ENV=test
 DISABLE_ANALYTICS=true
 ```
 
-## CI/CD Integration
-
-Tests run automatically on GitHub Actions:
-- Triggered on push to `master` and `feat/pine-27-e2e-setup` branches
-- Triggered on PRs to `master`
-- Can be manually triggered via `workflow_dispatch`
-
-The CI workflow:
-1. Sets up Node.js 22 and pnpm 9
-2. Installs dependencies with lockfile
-3. Builds the Electron app
-4. Installs Playwright browsers
-5. Runs E2E tests
-6. Uploads test artifacts (reports, screenshots, videos)
-
 ## Troubleshooting
 
 ### Electron won't launch
@@ -218,8 +202,7 @@ Since Pinecone requires a cloud connection, testing against real Pinecone requir
 2. **Use unique IDs**: All test profiles use timestamp-based IDs to avoid conflicts
 3. **Clean up resources**: Delete test indexes and profiles in `afterAll` hooks
 4. **Serial execution**: Tests run serially (workers: 1) to avoid conflicts
-5. **Retry on CI**: Tests retry twice on CI to handle flakiness
-6. **Capture artifacts**: Screenshots, videos, and traces are captured on failure
+5. **Capture artifacts**: Screenshots, videos, and traces are captured on failure
 
 ## Performance
 
@@ -233,5 +216,5 @@ Since Pinecone requires a cloud connection, testing against real Pinecone requir
 - [ ] Add performance benchmarks
 - [ ] Test more complex workflows (multi-step operations)
 - [ ] Add accessibility testing
-- [ ] Expand to test Windows/macOS builds
 - [ ] Test offline/error scenarios
+- [ ] Investigate CI options for Electron testing (self-hosted runners, etc.)
