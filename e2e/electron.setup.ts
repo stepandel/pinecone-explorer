@@ -60,8 +60,11 @@ export async function launchElectronApp(): Promise<ElectronTestContext> {
   const electronPath = path.join(__dirname, '../dist-electron/main.js')
 
   // Use a test-specific userData directory to isolate test data
+  const explicitUserDataDir = process.env.E2E_USER_DATA_DIR?.trim()
   const testUserDataDir =
-    process.env.E2E_USER_DATA_DIR ?? path.join(os.tmpdir(), 'pinecone-explorer-e2e')
+    explicitUserDataDir && explicitUserDataDir.length > 0
+      ? explicitUserDataDir
+      : path.join(os.tmpdir(), 'pinecone-explorer-e2e')
 
   // Clear encrypted stores to avoid encryption key mismatch
   clearEncryptedStores(testUserDataDir)
