@@ -75,7 +75,7 @@ test.describe('E2E-002: Connection Flow Tests', () => {
           id,
           name: 'Invalid Key Test',
           provider: 'pinecone' as const,
-          apiKey: 'invalid-api-key-12345',
+          apiKey: 'invalid-api-key-for-tests', // gitleaks:allow
         }
 
         try {

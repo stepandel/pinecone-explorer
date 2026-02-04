@@ -181,7 +181,7 @@ export async function createPineconeTestProfile(
 ): Promise<string> {
   const profileId = `test-pinecone-${Date.now()}`
   const profileName = name || `Test Pinecone ${Date.now()}`
-  const pineconeKey = apiKey || process.env.PINECONE_API_KEY || 'dummy-key-for-local-testing'
+  const pineconeKey = apiKey || process.env.PINECONE_API_KEY || 'dummy-key-for-local-testing' // gitleaks:allow
 
   await page.evaluate(
     async ({ id, name, apiKey }) => {
