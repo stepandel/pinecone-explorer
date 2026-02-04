@@ -142,7 +142,6 @@ export async function connectToProfile(page: Page, profileId: string): Promise<v
     }
     await (window as any).electronAPI.pinecone.connect(id, profile)
   }, profileId)
-  await page.waitForTimeout(1000)
 }
 
 /**
