@@ -13,8 +13,12 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
-  await cleanupTestProfiles(electronContext.page)
-  await closeElectronApp(electronContext.app)
+  if (electronContext?.page) {
+    await cleanupTestProfiles(electronContext.page)
+  }
+  if (electronContext?.app) {
+    await closeElectronApp(electronContext.app)
+  }
 })
 
 test.describe('Pinecone Explorer E2E', () => {

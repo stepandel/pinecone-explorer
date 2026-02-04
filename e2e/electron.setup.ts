@@ -65,8 +65,14 @@ export async function launchElectronApp(): Promise<ElectronTestContext> {
     DISABLE_ANALYTICS: 'true',
   }
 
+  // In CI environments, Electron needs to run without sandboxing
+  const args = [electronPath]
+  if (process.env.CI) {
+    args.push('--no-sandbox')
+  }
+
   const app = await electron.launch({
-    args: [electronPath],
+    args,
     env,
   })
 
