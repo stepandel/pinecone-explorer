@@ -1,5 +1,7 @@
 import { _electron as electron, ElectronApplication, Page } from '@playwright/test'
 import * as path from 'path'
+import * as os from 'os'
+import * as fs from 'fs'
 import { fileURLToPath } from 'url'
 
 export interface ElectronTestContext {
@@ -8,9 +10,52 @@ export interface ElectronTestContext {
 }
 
 /**
+ * Get the path to the app's userData directory
+ */
+function getAppDataPath(): string {
+  const appName = 'Pinecone Explorer'
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', appName)
+  } else if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || '', appName)
+  } else {
+    return path.join(os.homedir(), '.config', appName.toLowerCase().replace(/ /g, '-'))
+  }
+}
+
+/**
+ * Clear encrypted store files to avoid encryption key mismatch issues in tests.
+ * The encryption key is derived from app path, which differs between normal and test runs.
+ */
+function clearEncryptedStores(): void {
+  const appDataPath = getAppDataPath()
+  const filesToClear = [
+    'encryption-key.enc',
+    'pinecone-connections.json',
+    'pinecone-settings.json',
+    'chroma-settings-v2.json',
+  ]
+
+  for (const file of filesToClear) {
+    const filePath = path.join(appDataPath, file)
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+        console.log(`[E2E Setup] Cleared ${file}`)
+      }
+    } catch (error) {
+      console.warn(`[E2E Setup] Failed to clear ${file}:`, error)
+    }
+  }
+}
+
+/**
  * Launch the Electron application with test environment variables
  */
 export async function launchElectronApp(): Promise<ElectronTestContext> {
+  // Clear encrypted stores to avoid encryption key mismatch
+  clearEncryptedStores()
+
   const __dirname = path.dirname(fileURLToPath(import.meta.url))
   const electronPath = path.join(__dirname, '../dist-electron/main.js')
 
