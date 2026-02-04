@@ -152,7 +152,8 @@ test.describe('E2E-003: Index/Collection Management Tests', () => {
       }
     })
 
-    test('should create new index with provider-specific settings', async () => {
+    test.describe.serial('Index Create/Delete Operations', () => {
+      test('should create new index with provider-specific settings', async () => {
       const { page } = electronContext
 
       const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
@@ -196,9 +197,9 @@ test.describe('E2E-003: Index/Collection Management Tests', () => {
       expect(createdIndex).toBeDefined()
       expect(createdIndex?.dimension).toBe(384)
       expect(createdIndex?.metric).toBe('cosine')
-    })
+      })
 
-    test('should delete index (with confirmation flow)', async () => {
+      test('should delete index (with confirmation flow)', async () => {
       const { page } = electronContext
 
       const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
@@ -215,24 +216,30 @@ test.describe('E2E-003: Index/Collection Management Tests', () => {
         return
       }
 
-      // Wait a bit more for index to be fully ready before deletion
-      await page.waitForTimeout(10000)
+      // Poll to ensure index is fully ready before deletion
+      await expect(async () => {
+        const indexes = await page.evaluate(async (id) => {
+          return await (window as any).electronAPI.pinecone.listIndexes(id)
+        }, testProfileId)
+        const index = indexes.find((idx: any) => idx.name === testIndexName)
+        expect(index).toBeDefined()
+        expect(index?.status?.ready).toBe(true)
+      }).toPass({ timeout: 30000, intervals: [2000] })
 
       // Delete the test index
       await page.evaluate(async ({ id, name }) => {
         await (window as any).electronAPI.pinecone.deleteIndex(id, name)
       }, { id: testProfileId, name: testIndexName })
 
-      // Wait for deletion to complete
-      await page.waitForTimeout(3000)
-
-      // Verify index was deleted by listing indexes
-      const indexes = await page.evaluate(async (id) => {
-        return await (window as any).electronAPI.pinecone.listIndexes(id)
-      }, testProfileId)
-
-      const deletedIndex = indexes.find((idx: any) => idx.name === testIndexName)
-      expect(deletedIndex).toBeUndefined()
+      // Poll to verify index was deleted
+      await expect(async () => {
+        const indexes = await page.evaluate(async (id) => {
+          return await (window as any).electronAPI.pinecone.listIndexes(id)
+        }, testProfileId)
+        const deletedIndex = indexes.find((idx: any) => idx.name === testIndexName)
+        expect(deletedIndex).toBeUndefined()
+      }).toPass({ timeout: 30000, intervals: [2000] })
+      })
     })
 
     test('should handle index stats for empty index', async () => {
