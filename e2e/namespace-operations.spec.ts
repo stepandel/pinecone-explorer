@@ -22,6 +22,7 @@ test.describe('E2E-004: Namespace Operations Tests', () => {
   test.describe('Pinecone Namespace Management', () => {
     let testProfileId: string
     let testIndexName: string
+    const createdNamespaces: string[] = []
 
     test.beforeAll(async () => {
       const { page } = electronContext
@@ -56,6 +57,46 @@ test.describe('E2E-004: Namespace Operations Tests', () => {
 
         if (indexes.length > 0) {
           testIndexName = indexes[0].name
+        }
+      }
+    })
+
+    test.afterAll(async () => {
+      const { page } = electronContext
+
+      const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
+                           process.env.PINECONE_API_KEY !== 'dummy-key-for-local-testing'
+
+      if (!hasRealApiKey || !testIndexName || createdNamespaces.length === 0) {
+        return
+      }
+
+      // Clean up created namespaces by deleting their vectors
+      for (const namespace of createdNamespaces) {
+        try {
+          // Get all vectors in namespace
+          const vectors = await page.evaluate(async ({ id, indexName, namespace }) => {
+            return await (window as any).electronAPI.pinecone.getAllVectors(
+              id,
+              indexName,
+              namespace,
+              10000 // high limit to get all vectors
+            )
+          }, { id: testProfileId, indexName: testIndexName, namespace })
+
+          // Delete each vector
+          for (const vector of vectors) {
+            await page.evaluate(async ({ id, indexName, namespace, vectorId }) => {
+              await (window as any).electronAPI.pinecone.deleteVector(id, {
+                indexName,
+                namespace,
+                id: vectorId,
+              })
+            }, { id: testProfileId, indexName: testIndexName, namespace, vectorId: vector.id })
+          }
+        } catch (error) {
+          // Ignore errors during cleanup
+          console.warn(`Failed to clean up namespace ${namespace}:`, error)
         }
       }
     })
@@ -154,6 +195,7 @@ test.describe('E2E-004: Namespace Operations Tests', () => {
 
       // Create test namespace with a few vectors
       const testNamespace = `test-ns-${Date.now()}`
+      createdNamespaces.push(testNamespace)
       const testVectors = [
         {
           id: `test-vec-1`,
@@ -281,6 +323,7 @@ test.describe('E2E-004: Namespace Operations Tests', () => {
       }
 
       const targetNamespace = `cloned-ns-${Date.now()}`
+      createdNamespaces.push(targetNamespace)
 
       // Start cloning operation
       const clonePromise = page.evaluate(async ({ id, indexName, source, target }) => {
@@ -352,6 +395,7 @@ test.describe('E2E-004: Namespace Operations Tests', () => {
       }
 
       const targetNamespace = `progress-test-${Date.now()}`
+      createdNamespaces.push(targetNamespace)
 
       // Set up progress tracking
       const progressEvents: any[] = []
@@ -435,6 +479,7 @@ test.describe('E2E-004: Namespace Operations Tests', () => {
       }
 
       const targetNamespace = `cancel-test-${Date.now()}`
+      createdNamespaces.push(targetNamespace)
 
       // Set up progress tracking to detect when copying starts
       await page.evaluate(() => {

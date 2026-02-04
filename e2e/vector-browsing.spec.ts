@@ -60,57 +60,79 @@ test.describe('E2E-005: Vector Browsing Tests', () => {
         if (indexes.length > 0) {
           testIndexName = indexes[0].name
 
-          // Get a namespace with vectors for testing
-          const stats = await page.evaluate(async ({ id, name }) => {
-            return await (window as any).electronAPI.pinecone.getIndexStats(id, name)
-          }, { id: testProfileId, name: testIndexName })
+          // Always create a dedicated test namespace with known vectors
+          testNamespace = `test-vectors-${Date.now()}`
+          const dimension = indexes[0].dimension || 384
 
-          // Find first namespace with vectors
-          for (const [name, data] of Object.entries(stats.namespaces as Record<string, any>)) {
-            if (data.vectorCount > 0) {
-              testNamespace = name
-              break
-            }
-          }
+          // Create test vectors with deterministic metadata
+          const testVectors = Array.from({ length: 5 }, (_, i) => ({
+            id: `test-vector-${i}`,
+            values: Array(dimension).fill(0).map(() => Math.random()),
+            metadata: {
+              test: true,
+              index: i,
+              description: `Test vector ${i}`,
+              category: i % 2 === 0 ? 'even' : 'odd',
+            },
+          }))
 
-          // If no namespace has vectors, create test vectors
-          if (!testNamespace) {
-            testNamespace = `test-vectors-${Date.now()}`
-            const dimension = indexes[0].dimension || 384
-
-            // Create a few test vectors
-            const testVectors = Array.from({ length: 5 }, (_, i) => ({
-              id: `test-vector-${i}`,
-              values: Array(dimension).fill(0).map(() => Math.random()),
-              metadata: {
-                test: true,
-                index: i,
-                description: `Test vector ${i}`,
-                category: i % 2 === 0 ? 'even' : 'odd',
-              },
-            }))
-
-            for (const vector of testVectors) {
-              await page.evaluate(async ({ id, indexName, namespace, vector }) => {
-                await (window as any).electronAPI.pinecone.createVector(id, {
-                  indexName,
-                  namespace,
-                  id: vector.id,
-                  values: vector.values,
-                  metadata: vector.metadata,
-                })
-              }, {
-                id: testProfileId,
-                indexName: testIndexName,
-                namespace: testNamespace,
-                vector,
+          for (const vector of testVectors) {
+            await page.evaluate(async ({ id, indexName, namespace, vector }) => {
+              await (window as any).electronAPI.pinecone.createVector(id, {
+                indexName,
+                namespace,
+                id: vector.id,
+                values: vector.values,
+                metadata: vector.metadata,
               })
-            }
-
-            // Wait for vectors to be indexed
-            await page.waitForTimeout(3000)
+            }, {
+              id: testProfileId,
+              indexName: testIndexName,
+              namespace: testNamespace,
+              vector,
+            })
           }
+
+          // Wait for vectors to be indexed
+          await page.waitForTimeout(3000)
         }
+      }
+    })
+
+    test.afterAll(async () => {
+      const { page } = electronContext
+
+      const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
+                           process.env.PINECONE_API_KEY !== 'dummy-key-for-local-testing'
+
+      if (!hasRealApiKey || !testIndexName || !testNamespace) {
+        return
+      }
+
+      // Clean up test namespace by deleting all test vectors
+      try {
+        const vectors = await page.evaluate(async ({ id, indexName, namespace }) => {
+          return await (window as any).electronAPI.pinecone.getAllVectors(
+            id,
+            indexName,
+            namespace,
+            10000 // high limit to get all vectors
+          )
+        }, { id: testProfileId, indexName: testIndexName, namespace: testNamespace })
+
+        // Delete each vector
+        for (const vector of vectors) {
+          await page.evaluate(async ({ id, indexName, namespace, vectorId }) => {
+            await (window as any).electronAPI.pinecone.deleteVector(id, {
+              indexName,
+              namespace,
+              id: vectorId,
+            })
+          }, { id: testProfileId, indexName: testIndexName, namespace: testNamespace, vectorId: vector.id })
+        }
+      } catch (error) {
+        // Ignore errors during cleanup
+        console.warn(`Failed to clean up test namespace ${testNamespace}:`, error)
       }
     })
 
@@ -482,7 +504,9 @@ test.describe('E2E-005: Vector Browsing Tests', () => {
       const metadataKeys = new Set<string>()
       vectors.forEach((v: any) => {
         if (v.metadata) {
-          Object.keys(v.metadata).forEach(key => metadataKeys.add(key))
+          Object.keys(v.metadata).forEach((key) => {
+            metadataKeys.add(key)
+          })
         }
       })
 
