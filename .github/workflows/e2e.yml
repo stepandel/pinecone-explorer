@@ -14,9 +14,6 @@ jobs:
 
     env:
       CI: true
-      QDRANT_URL: http://localhost:6333
-      WEAVIATE_URL: http://localhost:8080
-      PINECONE_URL: http://localhost:5080
 
     steps:
       - name: Checkout repository
@@ -49,22 +46,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Start Docker services
-        run: docker compose -f docker-compose.test.yml up -d
-
-      - name: Wait for Qdrant to be healthy
-        run: |
-          timeout 60 bash -c 'until curl -f http://localhost:6333/healthz; do echo "Waiting for Qdrant..."; sleep 2; done'
-          echo "Qdrant is ready"
-
-      - name: Wait for Weaviate to be healthy
-        run: |
-          timeout 60 bash -c 'until curl -f http://localhost:8080/v1/.well-known/ready; do echo "Waiting for Weaviate..."; sleep 2; done'
-          echo "Weaviate is ready"
-
-      - name: Verify Docker services status
-        run: docker compose -f docker-compose.test.yml ps
-
       - name: Build Electron app
         run: pnpm run test:build
 
@@ -89,11 +70,3 @@ jobs:
           name: test-results
           path: test-results/
           retention-days: 7
-
-      - name: Show Docker logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.test.yml logs
-
-      - name: Stop Docker services
-        if: always()
-        run: docker compose -f docker-compose.test.yml down -v
