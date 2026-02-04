@@ -1,6 +1,12 @@
 import 'dotenv/config'
 import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
 
+// Redirect userData to test directory if running in test mode
+// This MUST happen before any store initialization
+if (process.env.NODE_ENV === 'test' && process.env.E2E_USER_DATA_DIR) {
+  app.setPath('userData', process.env.E2E_USER_DATA_DIR)
+}
+
 // Set app name before anything else (affects menu bar, about dialog, etc.)
 app.name = 'Pinecone Explorer'
 import path from 'node:path'

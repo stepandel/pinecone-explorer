@@ -11,8 +11,11 @@ export interface ElectronTestContext {
 
 /**
  * Get the path to the app's userData directory
+ * In test mode, uses E2E_USER_DATA_DIR if available to isolate test data
  */
 function getAppDataPath(): string {
+  const explicit = process.env.E2E_USER_DATA_DIR
+  if (explicit) return explicit
   const appName = 'Pinecone Explorer'
   if (process.platform === 'darwin') {
     return path.join(os.homedir(), 'Library', 'Application Support', appName)
@@ -26,9 +29,9 @@ function getAppDataPath(): string {
 /**
  * Clear encrypted store files to avoid encryption key mismatch issues in tests.
  * The encryption key is derived from app path, which differs between normal and test runs.
+ * @param appDataPath - The path to the app's userData directory (must be test-specific)
  */
-function clearEncryptedStores(): void {
-  const appDataPath = getAppDataPath()
+function clearEncryptedStores(appDataPath: string): void {
   const filesToClear = [
     'encryption-key.enc',
     'pinecone-connections.json',
@@ -53,16 +56,21 @@ function clearEncryptedStores(): void {
  * Launch the Electron application with test environment variables
  */
 export async function launchElectronApp(): Promise<ElectronTestContext> {
-  // Clear encrypted stores to avoid encryption key mismatch
-  clearEncryptedStores()
-
   const __dirname = path.dirname(fileURLToPath(import.meta.url))
   const electronPath = path.join(__dirname, '../dist-electron/main.js')
+
+  // Use a test-specific userData directory to isolate test data
+  const testUserDataDir =
+    process.env.E2E_USER_DATA_DIR ?? path.join(os.tmpdir(), 'pinecone-explorer-e2e')
+
+  // Clear encrypted stores to avoid encryption key mismatch
+  clearEncryptedStores(testUserDataDir)
 
   const env = {
     ...process.env,
     NODE_ENV: 'test',
     DISABLE_ANALYTICS: 'true',
+    E2E_USER_DATA_DIR: testUserDataDir,
   }
 
   // In CI environments, Electron needs to run without sandboxing
