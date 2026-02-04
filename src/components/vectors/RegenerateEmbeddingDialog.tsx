@@ -22,6 +22,7 @@ export function RegenerateEmbeddingDialog({
           className="fixed inset-0 z-50 bg-black/20 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         />
         <DialogPrimitive.Content
+          data-testid="regenerate-embedding-dialog"
           className={cn(
             "fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]",
             "w-[280px] rounded-xl",
@@ -47,6 +48,7 @@ export function RegenerateEmbeddingDialog({
           <div className="px-4 pb-4 flex gap-2">
             {/* Secondary button - subtle rounded rect */}
             <button
+              data-testid="regenerate-dialog-keep-button"
               onClick={() => onConfirm(false)}
               disabled={isLoading}
               className={cn(
@@ -67,6 +69,7 @@ export function RegenerateEmbeddingDialog({
             </button>
             {/* Primary button - blue filled */}
             <button
+              data-testid="regenerate-dialog-regenerate-button"
               onClick={() => onConfirm(true)}
               disabled={isLoading}
               className={cn(
