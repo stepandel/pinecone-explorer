@@ -28,4 +28,5 @@ release/
 # Test artifacts
 playwright-report/
 test-results/
+playwright/.cache/
 .playwright/

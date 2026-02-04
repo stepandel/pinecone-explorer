@@ -170,7 +170,7 @@ export function QueryToolbar({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="query-toolbar">
       {/* Main query row */}
       <div className="flex gap-2 items-center w-full">
         {/* Scope selector */}
@@ -179,6 +179,7 @@ export function QueryToolbar({
           onChange={(e) => onScopeChange(e.target.value as QueryScope)}
           className={`w-28 ${selectClassName}`}
           style={inputStyle}
+          data-testid="scope-select"
         >
           <option value="namespace">{getScopeLabel('namespace')}</option>
           <option value="id">{getScopeLabel('id')}</option>
@@ -194,6 +195,7 @@ export function QueryToolbar({
             placeholder="Enter vector ID to find similar..."
             className={`flex-1 ${inputClassName}`}
             style={inputStyle}
+            data-testid="id-search-input"
           />
         ) : (
           <input
@@ -204,6 +206,7 @@ export function QueryToolbar({
             placeholder="Search query..."
             className={`flex-1 ${inputClassName}`}
             style={inputStyle}
+            data-testid="search-text-input"
           />
         )}
 
@@ -215,6 +218,7 @@ export function QueryToolbar({
             onChange={(e) => onTopKChange(parseInt(e.target.value, 10))}
             className={selectClassName}
             style={inputStyle}
+            data-testid="limit-select"
           >
             <option value="10">10</option>
             <option value="25">25</option>
@@ -233,6 +237,7 @@ export function QueryToolbar({
               checked={rerankEnabled}
               onChange={(e) => onRerankEnabledChange?.(e.target.checked)}
               className="w-3 h-3 rounded border-black/20 dark:border-white/20 text-[#007AFF] focus:ring-[#007AFF]/50"
+              data-testid="rerank-checkbox"
             />
             <span className="text-[11px] text-muted-foreground">Rerank</span>
           </label>
@@ -243,6 +248,7 @@ export function QueryToolbar({
           <button
             onClick={handleAddFilter}
             className={`${buttonClassName} text-muted-foreground`}
+            data-testid="add-filter-button"
           >
             + Filter
           </button>
@@ -262,6 +268,7 @@ export function QueryToolbar({
             onChange={(e) => onAlphaChange?.(parseFloat(e.target.value))}
             className="flex-1 h-1 bg-black/[0.1] dark:bg-white/[0.1] rounded-lg appearance-none cursor-pointer accent-[#007AFF]"
             style={{ maxWidth: '120px' }}
+            data-testid="alpha-slider"
           />
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">Semantic</span>
           <span className="text-[11px] text-muted-foreground/70 ml-1 tabular-nums">{alpha.toFixed(1)}</span>
@@ -317,7 +324,7 @@ export function QueryToolbar({
 
       {/* Metadata filter rows */}
       {filters.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2" data-testid="metadata-filters-container">
           {filters.map((filter, index) => (
             <MetadataFilterRow
               key={filter.id}

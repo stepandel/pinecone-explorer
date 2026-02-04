@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
+ * Playwright configuration for Pinecone Explorer E2E tests
+ * Testing Electron application with metadata filtering across providers
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
@@ -24,7 +26,7 @@ export default defineConfig({
   /* Reporter to use */
   reporter: [
     ['list'],
-    ['html'],
+    ['html', { outputFolder: 'playwright-report' }],
     ['json', { outputFile: 'test-results/results.json' }]
   ],
 
@@ -40,11 +42,15 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
+  /* Test output directories */
+  outputDir: 'test-results/',
+
   /* Configure projects for major browsers - not needed for Electron but kept for future web testing */
   projects: [
     {
       name: 'electron',
       testMatch: /.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
 })
