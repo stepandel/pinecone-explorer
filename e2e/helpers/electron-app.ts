@@ -1,9 +1,5 @@
 import { _electron as electron, ElectronApplication, Page } from '@playwright/test';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Launch the Electron app for testing
@@ -11,8 +7,7 @@ const __dirname = path.dirname(__filename);
  */
 export async function launchApp(): Promise<{ app: ElectronApplication; page: Page }> {
   // Path to the built Electron main file
-  // Use dynamic import to get electron path in ES modules
-  const { default: electronPath } = await import('electron');
+  const electronPath = require('electron');
   const appPath = path.join(__dirname, '../../dist-electron/main.js');
 
   // Launch Electron app

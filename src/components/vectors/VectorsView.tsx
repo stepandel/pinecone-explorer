@@ -957,7 +957,7 @@ export default function VectorsView({
   }, [selectedVector, isDraft, onSelectedVectorChange])
 
   return (
-    <div className="flex flex-col h-full">
+    <div data-testid="vectors-view" className="flex flex-col h-full">
       {/* Toolbar area - elevated control surface */}
       <div className="flex-shrink-0 bg-white/60 dark:bg-white/[0.06] border-b border-transparent dark:border-white/[0.06]">
         {/* Row 1: Namespace name and count */}
@@ -1007,6 +1007,7 @@ export default function VectorsView({
               />
             </div>
             <NewButton
+              data-testid="new-vector-button"
               onClick={handleStartCreate}
               disabled={hasDrafts || markedForDeletion.size > 0}
               title="Add vector"
@@ -1107,6 +1108,7 @@ export default function VectorsView({
               </span>
               <div className="flex gap-2">
                 <button
+                  data-testid="cancel-draft-button"
                   onClick={handleCancelDraft}
                   disabled={createMutation.isPending || createBatchMutation.isPending}
                   className="h-6 px-2 text-[11px] rounded-md bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1114,6 +1116,7 @@ export default function VectorsView({
                   Cancel
                 </button>
                 <button
+                  data-testid="save-draft-button"
                   onClick={handleSaveDraft}
                   disabled={createMutation.isPending || createBatchMutation.isPending || draftVectors.some(d => !d.id.trim())}
                   className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1132,6 +1135,7 @@ export default function VectorsView({
                 {markedForDeletion.size} marked for deletion
               </span>
               <button
+                data-testid="cancel-deletion-button"
                 onClick={() => {
                   setMarkedForDeletion(new Set())
                   setDeleteError(null)
@@ -1142,6 +1146,7 @@ export default function VectorsView({
                 Cancel
               </button>
               <button
+                data-testid="commit-deletion-button"
                 onClick={handleCommitDeletions}
                 disabled={deleteMutation.isPending}
                 className="h-6 px-2 text-[11px] rounded-md bg-red-500 hover:bg-red-600 active:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"

@@ -72,6 +72,9 @@ export async function launchElectronApp(): Promise<ElectronTestContext> {
   const env = {
     ...process.env,
     NODE_ENV: 'test',
+    QDRANT_URL: process.env.QDRANT_URL || 'http://localhost:6333',
+    WEAVIATE_URL: process.env.WEAVIATE_URL || 'http://localhost:8080',
+    PINECONE_URL: process.env.PINECONE_URL || 'http://localhost:5080',
     DISABLE_ANALYTICS: 'true',
     E2E_USER_DATA_DIR: testUserDataDir,
   }
@@ -101,6 +104,70 @@ export async function launchElectronApp(): Promise<ElectronTestContext> {
   }
 
   return { app, page }
+}
+
+/**
+ * Create a Qdrant test profile programmatically via electronAPI
+ */
+export async function createQdrantTestProfile(
+  page: Page,
+  name?: string,
+  url?: string
+): Promise<string> {
+  const profileId = `test-qdrant-${Date.now()}`
+  const profileName = name || `Test Qdrant ${Date.now()}`
+  const qdrantUrl = url || process.env.QDRANT_URL || 'http://localhost:6333'
+
+  await page.evaluate(
+    async ({ id, name, url }) => {
+      const profile = {
+        id,
+        name,
+        provider: 'qdrant' as const,
+        url,
+      }
+      await (window as any).electronAPI.profiles.save(profile)
+      return id
+    },
+    { id: profileId, name: profileName, url: qdrantUrl }
+  )
+
+  return profileId
+}
+
+/**
+ * Create a Weaviate test profile programmatically via electronAPI
+ */
+export async function createWeaviateTestProfile(
+  page: Page,
+  name?: string,
+  host?: string
+): Promise<string> {
+  const profileId = `test-weaviate-${Date.now()}`
+  const profileName = name || `Test Weaviate ${Date.now()}`
+  const weaviateHost = host || process.env.WEAVIATE_URL || 'http://localhost:8080'
+
+  // Parse the URL to get scheme and host
+  const url = new URL(weaviateHost)
+  const scheme = url.protocol.replace(':', '') as 'http' | 'https'
+  const hostOnly = url.host
+
+  await page.evaluate(
+    async ({ id, name, scheme, host }) => {
+      const profile = {
+        id,
+        name,
+        provider: 'weaviate' as const,
+        scheme,
+        host,
+      }
+      await (window as any).electronAPI.profiles.save(profile)
+      return id
+    },
+    { id: profileId, name: profileName, scheme, host: hostOnly }
+  )
+
+  return profileId
 }
 
 /**
@@ -134,17 +201,32 @@ export async function createPineconeTestProfile(
 }
 
 /**
- * Connect to a Pinecone profile via IPC
+ * Connect to a profile via IPC
+ * Note: Currently only supports Pinecone profiles as the backend hasn't been
+ * updated to use the new multi-database adapter system yet.
  */
 export async function connectToProfile(page: Page, profileId: string): Promise<void> {
-  await page.evaluate(async (id) => {
-    const profiles = await (window as any).electronAPI.profiles.getAll()
-    const profile = profiles.find((p: any) => p.id === id)
-    if (!profile) {
-      throw new Error(`Profile ${id} not found`)
-    }
-    await (window as any).electronAPI.pinecone.connect(id, profile)
-  }, profileId)
+  await page.evaluate(
+    async (id) => {
+      // Get the profile first
+      const profiles = await (window as any).electronAPI.profiles.getAll()
+      const profile = profiles.find((p: any) => p.id === id)
+      if (!profile) {
+        throw new Error(`Profile ${id} not found`)
+      }
+
+      // Only Pinecone is currently supported in the backend
+      // Skip connection for other providers as they're not integrated yet
+      if (profile.provider === 'pinecone') {
+        await (window as any).electronAPI.pinecone.connect(id, profile)
+      }
+      // For Qdrant/Weaviate: Skip for now until adapter system is integrated
+    },
+    profileId
+  )
+
+  // Wait a bit for connection to establish
+  await page.waitForTimeout(1000)
 }
 
 /**

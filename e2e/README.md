@@ -40,43 +40,6 @@ pnpm test:e2e:report
 
 ## Test Suites
 
-### E2E-009: Layout and UI Interaction Tests (`layout-ui.spec.ts`)
-
-Comprehensive tests for general UI interactions and layout functionality:
-
-**Test Coverage:**
-- ✅ App launches without errors
-- ✅ TopBar displays correctly with connection status
-- ✅ Left panel (sidebar) toggle functionality
-- ✅ Right panel (inspector) toggle functionality
-- ✅ Left panel resizing with mouse drag
-- ✅ Right panel resizing with mouse drag
-- ✅ Disconnect confirmation dialog
-- ✅ MainContent renders without errors
-- ✅ Panel animations are smooth (transition classes)
-- ✅ Loading states are handled gracefully
-- ✅ Error boundary structure (prevents crashes)
-- ✅ Responsive layout adapts to window size
-- ✅ Cursor changes during panel resize
-- ✅ UI elements have proper accessibility attributes
-
-**Components Tested:**
-- `AppLayout.tsx` - Main app layout structure
-- `TopBar.tsx` - Top navigation bar with connection status and controls
-- `MainContent.tsx` - Main content area with resizable panels
-- `ErrorBoundary.tsx` - Error handling and display
-
-**Data Test IDs Added:**
-- `app-layout` - Main application container
-- `top-bar` - Top navigation bar
-- `connection-status`, `connection-indicator`, `connection-profile` - Connection info
-- `toggle-left-panel`, `toggle-right-panel` - Panel toggle buttons
-- `disconnect-button` - Disconnect button
-- `main-content` - Main content area
-- `indexes-panel`, `namespaces-panel`, `detail-panel` - Side panels
-- `left-panel-resize-handle`, `right-panel-resize-handle` - Resize handles
-- `error-boundary`, `error-title`, `error-message`, `error-reload-button` - Error UI
-
 ### E2E-007: Metadata Filter Tests (`metadata-filter.spec.ts`)
 
 Comprehensive tests for metadata filtering functionality across the Pinecone provider:

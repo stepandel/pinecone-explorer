@@ -268,6 +268,7 @@ export default function VectorDetailPanel({
 
   return (
     <div
+      data-testid="vector-detail-panel"
       className="h-full"
       style={{
         background: 'var(--panel-detail)',
@@ -282,6 +283,7 @@ export default function VectorDetailPanel({
           <h3 className="text-xs font-semibold text-muted-foreground mb-1">id</h3>
           {isDraft ? (
             <input
+              data-testid="vector-id-input"
               type="text"
               value={vector.id}
               onChange={e => onDraftChange?.({ id: e.target.value })}
@@ -289,7 +291,7 @@ export default function VectorDetailPanel({
               className="w-full text-xs font-mono p-2 bg-black/[0.03] dark:bg-white/[0.04] rounded-md ring-1 ring-blue-500/20 focus:outline-none focus:ring-blue-500/30"
             />
           ) : (
-            <div className="p-2 bg-black/[0.03] dark:bg-white/[0.04] rounded-md">
+            <div data-testid="vector-id-display" className="p-2 bg-black/[0.03] dark:bg-white/[0.04] rounded-md">
               <code className="text-xs font-mono break-all">{vector.id}</code>
             </div>
           )}
@@ -315,6 +317,7 @@ export default function VectorDetailPanel({
         {canEditSchema && (
           <section>
             <button
+              data-testid="add-metadata-field-button"
               type="button"
               onClick={handleAddMetadataField}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -447,10 +450,11 @@ function MetadataFieldSection({
   } focus-within:ring-1 focus-within:ring-blue-500/30 ${validationError ? 'border-destructive' : ''}`
 
   return (
-    <section>
+    <section data-testid={`metadata-field-${fieldKey}`}>
       {canEditSchema ? (
         <div className="flex items-center gap-1 mb-1">
           <input
+            data-testid={`metadata-field-key-${fieldKey}`}
             type="text"
             value={fieldKey}
             onChange={e => onKeyRename(fieldKey, e.target.value)}
@@ -459,6 +463,7 @@ function MetadataFieldSection({
           {typedField && (
             <div className="relative">
               <select
+                data-testid={`metadata-field-type-${fieldKey}`}
                 value={typedField.type}
                 onChange={e => onTypeChange(fieldKey, e.target.value as MetadataValueType)}
                 className="h-5 pl-1.5 pr-5 appearance-none rounded-md bg-black/[0.05] dark:bg-white/[0.08] text-[10px] focus:outline-none focus:ring-1 focus:ring-ring/50 cursor-pointer"
@@ -471,6 +476,7 @@ function MetadataFieldSection({
             </div>
           )}
           <button
+            data-testid={`metadata-field-remove-${fieldKey}`}
             type="button"
             onClick={() => onRemove(fieldKey)}
             className="p-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -482,6 +488,7 @@ function MetadataFieldSection({
         <h3 className="text-xs font-semibold text-muted-foreground mb-1">{fieldKey}</h3>
       )}
       <textarea
+        data-testid={`metadata-field-value-${fieldKey}`}
         rows={1}
         value={displayValue}
         onChange={e => onValueChange(fieldKey, e.target.value)}

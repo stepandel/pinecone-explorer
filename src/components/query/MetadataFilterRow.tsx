@@ -65,7 +65,7 @@ export function MetadataFilterRow({
   }
 
   return (
-    <div className="flex gap-2 items-center">
+    <div className="flex gap-2 items-center" data-testid="metadata-filter-row">
       {/* Field selector */}
       {availableFields.length > 0 ? (
         <select
@@ -73,6 +73,7 @@ export function MetadataFilterRow({
           onChange={(e) => handleFieldChange(e.target.value)}
           className={`w-28 ${selectClassName}`}
           style={inputStyle}
+          data-testid="filter-field-select"
         >
           <option value="">Select field...</option>
           {availableFields.map((field) => (
@@ -90,6 +91,7 @@ export function MetadataFilterRow({
           placeholder="field name"
           className={`w-28 ${inputClassName}`}
           style={inputStyle}
+          data-testid="filter-field-input"
         />
       )}
 
@@ -99,6 +101,7 @@ export function MetadataFilterRow({
         onChange={(e) => onChange(filter.id, { operator: e.target.value as MetadataOperator })}
         className={`w-16 ${selectClassName}`}
         style={inputStyle}
+        data-testid="filter-operator-select"
       >
         {availableOperators.map((op) => (
           <option key={op} value={op}>
@@ -116,6 +119,7 @@ export function MetadataFilterRow({
         placeholder={getPlaceholder()}
         className={`flex-1 min-w-[100px] ${inputClassName}`}
         style={inputStyle}
+        data-testid="filter-value-input"
       />
 
       {/* Remove button */}
@@ -123,6 +127,7 @@ export function MetadataFilterRow({
         onClick={() => onRemove(filter.id)}
         className={`${buttonClassName} text-muted-foreground hover:text-destructive`}
         title="Remove filter"
+        data-testid="remove-filter-button"
       >
         -
       </button>
@@ -133,6 +138,7 @@ export function MetadataFilterRow({
           onClick={onAdd}
           className={`${buttonClassName} text-muted-foreground`}
           title="Add filter"
+          data-testid="add-filter-button"
         >
           +
         </button>

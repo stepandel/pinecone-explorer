@@ -312,6 +312,7 @@ export default function VectorsTable({
 
   return (
     <div
+      data-testid="vectors-table"
       ref={tableContainerRef}
       className="overflow-auto h-full"
       onContextMenu={onTableContextMenu}
@@ -487,6 +488,7 @@ function DraftRow({
 }: DraftRowProps) {
   return (
     <div
+      data-testid={`draft-vector-row-${draft.id}`}
       className={`flex cursor-pointer transition-colors ${isSelected ? 'bg-primary/20 dark:bg-primary/30' : 'bg-primary/8 dark:bg-primary/15 hover:bg-primary/12 dark:hover:bg-primary/20'}`}
       style={{
         position: 'absolute',
@@ -508,6 +510,7 @@ function DraftRow({
       )}
       <div className="pl-3 py-0.5 flex-shrink-0" style={{ width: headerGroup?.headers[idColIndex]?.getSize() }}>
         <input
+          data-testid="draft-vector-id-input"
           ref={inputRef}
           type="text"
           value={draft.id}
@@ -670,6 +673,7 @@ function DataRow({
   // Normal row
   return (
     <div
+      data-testid={`vector-row-${vec.id}`}
       className={`flex transition-colors cursor-pointer ${rowBgClass} ${rowHoverClass}`}
       style={rowStyle}
       onClick={e => onRowClick(e, vec.id, rowIndex)}
