@@ -182,16 +182,17 @@ test.describe('E2E-003: Index/Collection Management Tests', () => {
         await (window as any).electronAPI.pinecone.createIndex(id, params)
       }, { id: testProfileId, params: createParams })
 
-      // Wait for index to be created and become ready
-      // Pinecone indexes can take a while to initialize
-      await page.waitForTimeout(5000)
+      // Poll for index to become ready (can take 30-60+ seconds for serverless)
+      let createdIndex: any
+      await expect(async () => {
+        const indexes = await page.evaluate(async (id) => {
+          return await (window as any).electronAPI.pinecone.listIndexes(id)
+        }, testProfileId)
+        createdIndex = indexes.find((idx: any) => idx.name === testIndexName)
+        expect(createdIndex).toBeDefined()
+        expect(createdIndex?.status?.ready).toBe(true)
+      }).toPass({ timeout: 90000, intervals: [5000] })
 
-      // Verify index was created by listing indexes
-      const indexes = await page.evaluate(async (id) => {
-        return await (window as any).electronAPI.pinecone.listIndexes(id)
-      }, testProfileId)
-
-      const createdIndex = indexes.find((idx: any) => idx.name === testIndexName)
       expect(createdIndex).toBeDefined()
       expect(createdIndex?.dimension).toBe(384)
       expect(createdIndex?.metric).toBe('cosine')
