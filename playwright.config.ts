@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 /**
  * Playwright configuration for Pinecone Explorer E2E tests
- * Testing Electron application with vector CRUD operations
+ * Testing Electron application with metadata filtering across providers
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
