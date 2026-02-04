@@ -22,6 +22,7 @@ release/
 .electron-builder-cache/
 
 # Test artifacts
-test-results/
 playwright-report/
+test-results/
 playwright/.cache/
+.playwright/
