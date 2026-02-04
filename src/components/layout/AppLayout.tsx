@@ -8,7 +8,7 @@ function AppLayoutContent() {
   useMenuHandlers()
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: 'var(--content-background)' }}>
+    <div className="flex flex-col h-screen" style={{ background: 'var(--content-background)' }} data-testid="app-layout">
       <TopBar />
       <MainContent />
     </div>

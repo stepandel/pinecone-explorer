@@ -118,19 +118,21 @@ export function MainContent() {
   const showVectors = activeIndex && activeNamespace !== null
 
   return (
-    <main className="flex-1 relative overflow-hidden bg-content">
+    <main className="flex-1 relative overflow-hidden bg-content" data-testid="main-content">
       {/* IndexesPanel - Collapsible */}
       <aside
         className={`absolute top-0 left-0 h-full z-30 transition-transform duration-200 ${
           indexesPanelOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ width: `${indexesPanelWidth}px` }}
+        data-testid="indexes-panel"
       >
         <IndexesPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
         {/* Resize handle */}
         {indexesPanelOpen && (
           <div
             className="absolute top-0 right-0 w-[5px] h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10"
+            data-testid="indexes-resize-handle"
             onMouseDown={(e) => {
               e.preventDefault()
               setIsResizingIndexes(true)
@@ -197,6 +199,7 @@ export function MainContent() {
           left: `${effectiveIndexesWidth}px`,
           width: `${leftPanelWidth}px`,
         }}
+        data-testid="namespaces-panel"
       >
         <NamespacesPanel
           showIndexesToggle={!indexesPanelOpen}
@@ -206,6 +209,7 @@ export function MainContent() {
         {leftPanelOpen && (
           <div
             className="absolute top-0 right-0 w-[5px] h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10"
+            data-testid="left-panel-resize-handle"
             onMouseDown={(e) => {
               e.preventDefault()
               setIsResizingLeft(true)
@@ -220,6 +224,7 @@ export function MainContent() {
           rightPanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         style={{ width: `${rightPanelWidth}px` }}
+        data-testid="detail-panel"
       >
         {selectedVector && activeIndex && currentProfile ? (
           <VectorDetailPanel
@@ -252,6 +257,7 @@ export function MainContent() {
         {rightPanelOpen && (
           <div
             className="absolute top-0 left-0 w-[5px] h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-20"
+            data-testid="right-panel-resize-handle"
             onMouseDown={(e) => {
               e.preventDefault()
               setIsResizingRight(true)

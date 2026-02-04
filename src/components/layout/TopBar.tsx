@@ -23,6 +23,7 @@ export function TopBar() {
   return (
     <header
       className="h-11 flex items-center"
+      data-testid="top-bar"
       style={{
         WebkitAppRegion: 'drag',
         background: 'var(--sidebar)',
@@ -34,9 +35,9 @@ export function TopBar() {
       <div className="w-[76px]" />
 
       {/* Center - Connection info */}
-      <div className="flex-1 flex items-center justify-center gap-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" />
-        <span className="text-[12px] font-medium text-foreground/80">
+      <div className="flex-1 flex items-center justify-center gap-2" data-testid="connection-status">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" data-testid="connection-indicator" />
+        <span className="text-[12px] font-medium text-foreground/80" data-testid="connection-profile">
           {currentProfile?.name || 'Connected'}
         </span>
       </div>
@@ -50,6 +51,7 @@ export function TopBar() {
           onClick={() => setLeftPanelOpen(!leftPanelOpen)}
           className={iconButtonClass}
           title="Toggle sidebar"
+          data-testid="toggle-left-panel"
         >
           {leftPanelOpen ? (
             <PanelLeft className="h-4 w-4 text-foreground/70" />
@@ -61,6 +63,7 @@ export function TopBar() {
           onClick={() => setRightPanelOpen(!rightPanelOpen)}
           className={iconButtonClass}
           title="Toggle inspector"
+          data-testid="toggle-right-panel"
         >
           {rightPanelOpen ? (
             <PanelRight className="h-4 w-4 text-foreground/70" />
@@ -73,6 +76,7 @@ export function TopBar() {
           onClick={handleDisconnect}
           className={`${iconButtonClass} hover:bg-destructive/10 hover:text-destructive`}
           title="Disconnect"
+          data-testid="disconnect-button"
         >
           <Power className="h-3.5 w-3.5 text-foreground/50" />
         </button>
