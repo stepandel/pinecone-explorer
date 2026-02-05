@@ -39,7 +39,7 @@ declare global {
   type ExplorerMode = 'index' | 'assistant'
 
   // Assistant API Types
-  type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating'
+  type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating' | 'InitializationFailed'
 
   interface AssistantModel {
     name: string

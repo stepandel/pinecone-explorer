@@ -405,7 +405,7 @@ export interface GetVectorsPaginatedParams {
 /**
  * Assistant status
  */
-export type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating'
+export type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating' | 'InitializationFailed'
 
 /**
  * Assistant model representing a Pinecone Assistant
