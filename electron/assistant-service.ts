@@ -78,7 +78,7 @@ export class AssistantService {
       name: model.name,
       status: model.status as AssistantModel['status'],
       instructions: model.instructions ?? undefined,
-      metadata: model.metadata as Record<string, string> | undefined,
+      metadata: (model.metadata ?? undefined) as Record<string, string> | undefined,
       host: model.host,
       createdAt: model.createdAt?.toISOString(),
       updatedAt: model.updatedAt?.toISOString(),
