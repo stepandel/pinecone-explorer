@@ -798,6 +798,85 @@ ipcMain.handle('profiles:setPreferredMode', async (_event, profileId: string, mo
 })
 
 // ============================================================================
+// Assistant IPC Handlers
+// ============================================================================
+
+ipcMain.handle('assistant:list', async (_event, profileId: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistants = await assistantService.listAssistants()
+    return { success: true, data: assistants }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to list assistants'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:create', async (_event, profileId: string, params: { name: string; instructions?: string; metadata?: Record<string, string>; region?: 'us' | 'eu' }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistant = await assistantService.createAssistant(params)
+    return { success: true, data: assistant }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create assistant'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:describe', async (_event, profileId: string, name: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistant = await assistantService.describeAssistant(name)
+    return { success: true, data: assistant }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to describe assistant'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:update', async (_event, profileId: string, name: string, params: { instructions?: string; metadata?: Record<string, string> }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistant = await assistantService.updateAssistant(name, params)
+    return { success: true, data: assistant }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update assistant'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:delete', async (_event, profileId: string, name: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    await assistantService.deleteAssistant(name)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete assistant'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
 // Window Management IPC Handlers
 // ============================================================================
 

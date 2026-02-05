@@ -38,6 +38,31 @@ declare global {
 
   type ExplorerMode = 'index' | 'assistant'
 
+  // Assistant API Types
+  type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating'
+
+  interface AssistantModel {
+    name: string
+    status: AssistantStatus
+    instructions?: string
+    metadata?: Record<string, string>
+    host?: string
+    createdAt?: string
+    updatedAt?: string
+  }
+
+  interface CreateAssistantParams {
+    name: string
+    instructions?: string
+    metadata?: Record<string, string>
+    region?: 'us' | 'eu'
+  }
+
+  interface UpdateAssistantParams {
+    instructions?: string
+    metadata?: Record<string, string>
+  }
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -313,6 +338,13 @@ declare global {
       clearTextFieldOverride: (profileId: string, indexName: string) => Promise<void>
       getPreferredMode: (profileId: string) => Promise<ExplorerMode | null>
       setPreferredMode: (profileId: string, mode: ExplorerMode) => Promise<void>
+    }
+    assistant: {
+      list: (profileId: string) => Promise<AssistantModel[]>
+      create: (profileId: string, params: CreateAssistantParams) => Promise<AssistantModel>
+      describe: (profileId: string, name: string) => Promise<AssistantModel>
+      update: (profileId: string, name: string, params: UpdateAssistantParams) => Promise<AssistantModel>
+      delete: (profileId: string, name: string) => Promise<void>
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>

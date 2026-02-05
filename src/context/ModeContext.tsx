@@ -32,6 +32,18 @@ export function ModeProvider({ children }: { children: ReactNode }) {
       })
   }, [currentProfile])
 
+  const setMode = useCallback((newMode: ExplorerMode) => {
+    setModeState(newMode)
+    
+    // Persist to electron-store
+    if (currentProfile) {
+      window.electronAPI.profiles.setPreferredMode(currentProfile.id, newMode)
+        .catch((err) => {
+          console.warn('Failed to persist mode preference:', err)
+        })
+    }
+  }, [currentProfile])
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,19 +61,7 @@ export function ModeProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const setMode = useCallback((newMode: ExplorerMode) => {
-    setModeState(newMode)
-    
-    // Persist to electron-store
-    if (currentProfile) {
-      window.electronAPI.profiles.setPreferredMode(currentProfile.id, newMode)
-        .catch((err) => {
-          console.warn('Failed to persist mode preference:', err)
-        })
-    }
-  }, [currentProfile])
+  }, [setMode])
 
   // Don't render children until we've loaded the initial mode
   if (!isInitialized) {

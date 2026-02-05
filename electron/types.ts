@@ -398,3 +398,43 @@ export interface GetVectorsPaginatedParams {
   cursor?: string
 }
 
+// ============================================================================
+// Assistant API Types
+// ============================================================================
+
+/**
+ * Assistant status
+ */
+export type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating'
+
+/**
+ * Assistant model representing a Pinecone Assistant
+ */
+export interface AssistantModel {
+  name: string
+  status: AssistantStatus
+  instructions?: string
+  metadata?: Record<string, string>
+  host?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+/**
+ * Parameters for creating a new assistant
+ */
+export interface CreateAssistantParams {
+  name: string
+  instructions?: string
+  metadata?: Record<string, string>
+  region?: 'us' | 'eu'
+}
+
+/**
+ * Parameters for updating an assistant
+ */
+export interface UpdateAssistantParams {
+  instructions?: string
+  metadata?: Record<string, string>
+}
+
