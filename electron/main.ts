@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
 
 // Redirect userData to test directory if running in test mode
 // This MUST happen before any store initialization
@@ -9,7 +9,6 @@ if (process.env.NODE_ENV === 'test' && process.env.E2E_USER_DATA_DIR) {
 // Set app name before anything else (affects menu bar, about dialog, etc.)
 app.name = 'Pinecone Explorer'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { pineconeConnectionPool } from './pinecone-service'
 import { connectionStore } from './connection-store'
@@ -634,46 +633,6 @@ ipcMain.on('context-menu:show-namespace', (event, namespace: string) => {
   }
 })
 
-// Assistant context menu handler
-ipcMain.on('context-menu:show-assistant', (event, assistantName: string) => {
-  const template: MenuItemConstructorOptions[] = [
-    {
-      label: 'Edit',
-      click: () => event.sender.send('context-menu:assistant-action', { action: 'edit', assistantName })
-    },
-    { type: 'separator' },
-    {
-      label: 'Delete',
-      click: () => event.sender.send('context-menu:assistant-action', { action: 'delete', assistantName })
-    }
-  ]
-  const menu = Menu.buildFromTemplate(template)
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (win) {
-    menu.popup({ window: win })
-  }
-})
-
-// File context menu handler
-ipcMain.on('context-menu:show-file', (event, assistantName: string, fileId: string, fileName: string) => {
-  const template: MenuItemConstructorOptions[] = [
-    {
-      label: 'Download',
-      click: () => event.sender.send('context-menu:file-action', { action: 'download', assistantName, fileId, fileName })
-    },
-    { type: 'separator' },
-    {
-      label: 'Delete',
-      click: () => event.sender.send('context-menu:file-action', { action: 'delete', assistantName, fileId, fileName })
-    }
-  ]
-  const menu = Menu.buildFromTemplate(template)
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (win) {
-    menu.popup({ window: win })
-  }
-})
-
 // ============================================================================
 // Profile Management IPC Handlers
 // ============================================================================
@@ -982,75 +941,6 @@ ipcMain.handle('assistant:files:delete', async (_event, profileId: string, assis
 })
 
 // ============================================================================
-// Assistant Chat IPC Handlers
-// ============================================================================
-
-// Track active chat streams for cancellation
-const activeChatStreams: Map<string, AbortController> = new Map()
-
-ipcMain.handle('assistant:chat', async (_event, profileId: string, assistantName: string, params: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; model?: string; filter?: Record<string, unknown> }) => {
-  try {
-    const service = pineconeConnectionPool.getConnection(profileId)
-    if (!service) {
-      return { success: false, error: 'Not connected to Pinecone' }
-    }
-    const assistantService = service.getAssistantService()
-    const response = await assistantService.chat(assistantName, params)
-    return { success: true, data: response }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to send chat message'
-    return { success: false, error: message }
-  }
-})
-
-ipcMain.handle('assistant:chat:stream:start', async (event, profileId: string, assistantName: string, params: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; model?: string; filter?: Record<string, unknown> }) => {
-  try {
-    const service = pineconeConnectionPool.getConnection(profileId)
-    if (!service) {
-      return { success: false, error: 'Not connected to Pinecone' }
-    }
-    
-    const streamId = crypto.randomUUID()
-    const abortController = new AbortController()
-    activeChatStreams.set(streamId, abortController)
-
-    const assistantService = service.getAssistantService()
-    
-    // Start streaming in background
-    assistantService.chatStream(
-      assistantName,
-      params,
-      (chunk) => {
-        // Send chunk to renderer
-        event.sender.send('assistant:chat:chunk', streamId, chunk)
-      },
-      abortController.signal
-    ).finally(() => {
-      activeChatStreams.delete(streamId)
-    })
-
-    return { success: true, data: { streamId } }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to start chat stream'
-    return { success: false, error: message }
-  }
-})
-
-ipcMain.handle('assistant:chat:stream:cancel', async (_event, streamId: string) => {
-  try {
-    const controller = activeChatStreams.get(streamId)
-    if (controller) {
-      controller.abort()
-      activeChatStreams.delete(streamId)
-    }
-    return { success: true }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to cancel chat stream'
-    return { success: false, error: message }
-  }
-})
-
-// ============================================================================
 // Window Management IPC Handlers
 // ============================================================================
 
@@ -1218,30 +1108,6 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to open URL'
-    return { success: false, error: message }
-  }
-})
-
-// ============================================================================
-// Dialog IPC Handlers
-// ============================================================================
-
-ipcMain.handle('dialog:showOpenDialog', async (_event, options: {
-  properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles'>
-  filters?: Array<{ name: string; extensions: string[] }>
-  title?: string
-  defaultPath?: string
-}) => {
-  try {
-    const result = await dialog.showOpenDialog({
-      properties: options.properties || ['openFile'],
-      filters: options.filters,
-      title: options.title,
-      defaultPath: options.defaultPath,
-    })
-    return { success: true, data: result }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to show dialog'
     return { success: false, error: message }
   }
 })
