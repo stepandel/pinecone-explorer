@@ -1025,7 +1025,13 @@ ipcMain.handle('assistant:chat:stream:start', async (event, profileId: string, a
         event.sender.send('assistant:chat:chunk', streamId, chunk)
       },
       abortController.signal
-    ).finally(() => {
+    ).catch((error) => {
+      // Send error chunk to renderer
+      event.sender.send('assistant:chat:chunk', streamId, {
+        type: 'error',
+        error: error instanceof Error ? error.message : 'Stream failed',
+      })
+    }).finally(() => {
       activeChatStreams.delete(streamId)
     })
 

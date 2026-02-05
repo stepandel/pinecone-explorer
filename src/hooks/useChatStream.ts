@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { usePinecone } from '../providers/PineconeProvider'
+import type { ChatMessage, Citation, ChatUsage, ChatStreamChunk } from '../../electron/types'
 
 export interface ChatMessageWithMeta extends ChatMessage {
   id?: string

@@ -22,17 +22,23 @@ export function ModeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentProfile) return
 
+    let cancelled = false
+
     window.electronAPI.profiles.getPreferredMode(currentProfile.id)
       .then((savedMode) => {
+        if (cancelled) return
         if (savedMode) {
           setModeState(savedMode)
         }
         setIsInitialized(true)
       })
       .catch((err) => {
+        if (cancelled) return
         console.warn('Failed to load saved mode, using default:', err)
         setIsInitialized(true)
       })
+
+    return () => { cancelled = true }
   }, [currentProfile])
 
   const setMode = useCallback((newMode: ExplorerMode) => {

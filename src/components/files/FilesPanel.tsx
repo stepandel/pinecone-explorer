@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { FileText, Upload, Check, AlertCircle, Loader2, Trash2 } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useAssistantSelection } from '../../context/AssistantSelectionContext'
@@ -93,14 +93,25 @@ export function FilesPanel({ className }: FilesPanelProps) {
     !!fileToDownload
   )
 
+  // Track if download was already initiated to prevent duplicates on refetch
+  const downloadInitiatedRef = useRef<string | null>(null)
+
   // Handle download when file detail is fetched
   useEffect(() => {
-    if (fileDetail?.signedUrl && fileToDownload) {
+    if (fileDetail?.signedUrl && fileToDownload && downloadInitiatedRef.current !== fileToDownload.id) {
+      downloadInitiatedRef.current = fileToDownload.id
       // Open the signed URL in the browser to trigger download
       window.electronAPI.shell.openExternal(fileDetail.signedUrl)
       setFileToDownload(null)
     }
   }, [fileDetail, fileToDownload])
+
+  // Reset download tracker when fileToDownload is cleared
+  useEffect(() => {
+    if (!fileToDownload) {
+      downloadInitiatedRef.current = null
+    }
+  }, [fileToDownload])
 
   // Handle upload button click - open upload dialog
   const handleUploadClick = useCallback(() => {
