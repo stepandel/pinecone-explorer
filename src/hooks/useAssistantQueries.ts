@@ -142,6 +142,42 @@ export function useDeleteAssistantMutation(profileId: string) {
   })
 }
 
+// Describe a Single File Query
+export function useFileQuery(
+  profileId: string | null,
+  assistantName: string | null,
+  fileId: string | null,
+  enabled: boolean = true
+) {
+  return useQuery({
+    queryKey: [...assistantQueryKeys.files(profileId || '', assistantName || ''), fileId],
+    queryFn: async (): Promise<AssistantFile> => {
+      if (!profileId || !assistantName || !fileId) {
+        throw new Error('Profile ID, Assistant name, and File ID are required')
+      }
+      return await window.electronAPI.assistant.files.describe(profileId, assistantName, fileId)
+    },
+    enabled: enabled && !!profileId && !!assistantName && !!fileId,
+    staleTime: QUERY.STALE_TIME_STATS,
+  })
+}
+
+// Delete File Mutation
+export function useDeleteFileMutation(profileId: string, assistantName: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (fileId: string) => {
+      await window.electronAPI.assistant.files.delete(profileId, assistantName, fileId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: assistantQueryKeys.files(profileId, assistantName),
+      })
+    },
+  })
+}
+
 // Poll interval for files (5 seconds while processing)
 const FILES_POLL_INTERVAL = 5000
 
