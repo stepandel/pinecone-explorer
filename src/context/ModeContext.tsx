@@ -17,7 +17,10 @@ export function ModeProvider({ children }: { children: ReactNode }) {
 
   // Load initial mode from electron-store
   useEffect(() => {
-    if (!currentProfile) return
+    if (!currentProfile) {
+      setIsInitialized(true)
+      return
+    }
     let cancelled = false
     const profileId = currentProfile.id
 
