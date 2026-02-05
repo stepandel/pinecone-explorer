@@ -28,8 +28,11 @@ interface UseChatStreamReturn {
 
 const DEFAULT_MODELS = [
   'gpt-4o',
-  'claude-3-5-sonnet',
-  'gemini-2.0-flash',
+  'gpt-4.1',
+  'gpt-5',
+  'o4-mini',
+  'claude-sonnet-4-5',
+  'gemini-2.5-pro',
 ]
 
 export function useChatStream({
