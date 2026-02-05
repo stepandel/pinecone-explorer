@@ -51,11 +51,6 @@ export interface HybridEmbeddingConfig {
 }
 
 /**
- * Explorer mode type - Index Explorer or Assistant Explorer
- */
-export type ExplorerMode = 'index' | 'assistant'
-
-/**
  * Connection profile for Pinecone
  */
 export interface ConnectionProfile {
@@ -82,7 +77,7 @@ export interface ConnectionProfile {
   textFieldOverrides?: Record<string, string>
 
   // Preferred explorer mode (index or assistant)
-  preferredMode?: ExplorerMode
+  preferredMode?: 'index' | 'assistant'
 }
 
 /**
