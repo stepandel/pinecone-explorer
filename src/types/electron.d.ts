@@ -87,6 +87,40 @@ declare global {
     metadata?: Record<string, string | number>
   }
 
+  // Chat types for assistant streaming
+  interface ChatMessage {
+    role: 'user' | 'assistant'
+    content: string
+  }
+
+  interface CitationReference {
+    file: {
+      name: string
+      id: string
+      status?: string
+      signedUrl?: string | null
+    }
+    pages?: number[]
+  }
+
+  interface Citation {
+    position: number
+    references: CitationReference[]
+  }
+
+  interface ChatUsage {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
+
+  type ChatStreamChunk =
+    | { type: 'message_start'; id: string; model: string; role: 'assistant' }
+    | { type: 'content'; content: string }
+    | { type: 'citation'; citation: Citation | undefined }
+    | { type: 'message_end'; usage?: ChatUsage; finishReason?: string }
+    | { type: 'error'; error: string }
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -376,6 +410,15 @@ declare global {
         describe: (profileId: string, assistantName: string, fileId: string) => Promise<AssistantFile>
         upload: (profileId: string, assistantName: string, params: UploadAssistantFileParams) => Promise<AssistantFile>
         delete: (profileId: string, assistantName: string, fileId: string) => Promise<void>
+      }
+      chatStream: {
+        start: (profileId: string, assistantName: string, params: {
+          messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+          model?: string;
+          filter?: Record<string, unknown>;
+        }) => Promise<string>
+        cancel: (streamId: string) => Promise<void>
+        onChunk: (callback: (streamId: string, chunk: ChatStreamChunk) => void) => () => void
       }
     }
     window: {

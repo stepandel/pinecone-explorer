@@ -486,3 +486,88 @@ export interface UploadAssistantFileParams {
   multimodal?: boolean
 }
 
+// ============================================================================
+// Assistant Chat Types
+// ============================================================================
+
+/**
+ * Chat message structure
+ */
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
+ * A single reference within a citation
+ */
+export interface CitationReference {
+  file: {
+    name: string
+    id: string
+    status?: string
+    signedUrl?: string | null
+  }
+  pages?: number[]
+}
+
+/**
+ * Citation reference in assistant responses
+ */
+export interface Citation {
+  position: number
+  references: CitationReference[]
+}
+
+/**
+ * Token usage statistics for chat
+ */
+export interface ChatUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+/**
+ * Context options for chat requests
+ */
+export interface ChatContextOptions {
+  topK?: number
+  snippetSize?: number
+}
+
+/**
+ * Parameters for chat requests
+ */
+export interface ChatParams {
+  messages: ChatMessage[]
+  model?: string
+  filter?: Record<string, unknown>
+  jsonResponse?: boolean
+  includeHighlights?: boolean
+  temperature?: number
+  contextOptions?: ChatContextOptions
+}
+
+/**
+ * Response from non-streaming chat
+ */
+export interface ChatResponse {
+  id: string
+  message: ChatMessage
+  citations?: Citation[]
+  usage?: ChatUsage
+  finishReason?: string
+  model?: string
+}
+
+/**
+ * Stream chunk types for streaming chat responses
+ */
+export type ChatStreamChunk =
+  | { type: 'message_start'; id: string; model: string; role: 'assistant' }
+  | { type: 'content'; content: string }
+  | { type: 'citation'; citation: Citation | undefined }
+  | { type: 'message_end'; usage?: ChatUsage; finishReason?: string }
+  | { type: 'error'; error: string }
+
