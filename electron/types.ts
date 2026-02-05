@@ -482,5 +482,7 @@ export interface UploadAssistantFileParams {
   filePath: string
   /** Optional metadata to attach to the file */
   metadata?: Record<string, string | number>
+  /** Enable multimodal processing for PDFs (extracts images and charts) */
+  multimodal?: boolean
 }
 

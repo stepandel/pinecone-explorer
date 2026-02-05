@@ -7,6 +7,11 @@ import {
   AssistantFileStatus,
   ListAssistantFilesFilter,
   UploadAssistantFileParams,
+  ChatParams,
+  ChatResponse,
+  ChatStreamChunk,
+  ChatMessage,
+  Citation,
 } from './types'
 
 /**
@@ -86,7 +91,7 @@ export class AssistantService {
       name: model.name,
       status: model.status as AssistantModel['status'],
       instructions: model.instructions ?? undefined,
-      metadata: model.metadata as Record<string, string> | undefined,
+      metadata: (model.metadata ?? undefined) as Record<string, string> | undefined,
       host: model.host,
       createdAt: model.createdAt?.toISOString(),
       updatedAt: model.updatedAt?.toISOString(),
@@ -123,7 +128,8 @@ export class AssistantService {
     const response = await assistant.uploadFile({
       path: params.filePath,
       metadata: params.metadata,
-    })
+      multimodal: params.multimodal,
+    } as Parameters<typeof assistant.uploadFile>[0])
     return this.mapFileModel(response)
   }
 
@@ -159,6 +165,140 @@ export class AssistantService {
       errorMessage: file.errorMessage,
       createdOn: file.createdOn?.toISOString(),
       updatedOn: file.updatedOn?.toISOString(),
+    }
+  }
+
+  // ============================================================================
+  // Chat Operations
+  // ============================================================================
+
+  /**
+   * Send a chat message to an assistant (non-streaming)
+   */
+  async chat(assistantName: string, params: ChatParams): Promise<ChatResponse> {
+    const assistant = this.client.assistant(assistantName)
+    const response = await assistant.chat({
+      messages: params.messages.map(m => ({ role: m.role, content: m.content })),
+      model: params.model,
+      filter: params.filter,
+      jsonResponse: params.jsonResponse,
+      includeHighlights: params.includeHighlights,
+      temperature: params.temperature,
+      contextOptions: params.contextOptions,
+    } as Parameters<typeof assistant.chat>[0])
+
+    return {
+      id: response.id || crypto.randomUUID(),
+      message: {
+        role: 'assistant' as const,
+        content: response.message?.content || '',
+      },
+      citations: this.mapCitations(response.citations),
+      usage: response.usage ? {
+        promptTokens: response.usage.promptTokens || 0,
+        completionTokens: response.usage.completionTokens || 0,
+        totalTokens: response.usage.totalTokens || 0,
+      } : undefined,
+      model: response.model,
+      finishReason: response.finishReason,
+    }
+  }
+
+  /**
+   * Send a chat message to an assistant with streaming response
+   * @param onChunk Callback for each chunk received
+   * @param signal AbortSignal for cancellation
+   */
+  async chatStream(
+    assistantName: string,
+    params: ChatParams,
+    onChunk: (chunk: ChatStreamChunk) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const assistant = this.client.assistant(assistantName)
+
+    try {
+      const stream = await assistant.chat({
+        messages: params.messages.map(m => ({ role: m.role, content: m.content })),
+        model: params.model,
+        filter: params.filter,
+        stream: true,
+      })
+
+      // Process the stream
+      for await (const chunk of stream) {
+        if (signal?.aborted) {
+          break
+        }
+
+        // Map chunk type based on content
+        if (chunk.type === 'message_start') {
+          onChunk({
+            type: 'message_start',
+            id: chunk.id,
+            model: chunk.model,
+            role: 'assistant',
+          })
+        } else if (chunk.type === 'content_chunk' || chunk.contentDelta) {
+          onChunk({
+            type: 'content',
+            content: chunk.contentDelta || chunk.delta?.content || '',
+          })
+        } else if (chunk.type === 'citation') {
+          onChunk({
+            type: 'citation',
+            citation: this.mapSingleCitation(chunk.citation),
+          })
+        } else if (chunk.type === 'message_end') {
+          onChunk({
+            type: 'message_end',
+            usage: chunk.usage ? {
+              promptTokens: chunk.usage.promptTokens || 0,
+              completionTokens: chunk.usage.completionTokens || 0,
+              totalTokens: chunk.usage.totalTokens || 0,
+            } : undefined,
+            finishReason: chunk.finishReason,
+          })
+        }
+      }
+    } catch (error) {
+      if (signal?.aborted) {
+        return // Don't send error for intentional abort
+      }
+      onChunk({
+        type: 'error',
+        error: error instanceof Error ? error.message : 'Stream error',
+      })
+    }
+  }
+
+  /**
+   * Map SDK citations to our Citation type
+   */
+  private mapCitations(citations?: unknown[]): Citation[] | undefined {
+    if (!citations || !Array.isArray(citations)) return undefined
+    return citations.map(c => this.mapSingleCitation(c)).filter((c): c is Citation => c !== undefined)
+  }
+
+  /**
+   * Map a single citation
+   */
+  private mapSingleCitation(citation: unknown): Citation | undefined {
+    if (!citation || typeof citation !== 'object') return undefined
+    const c = citation as Record<string, unknown>
+    return {
+      position: (c.position as number) || 0,
+      references: Array.isArray(c.references) ? c.references.map((ref: unknown) => {
+        const r = ref as Record<string, unknown>
+        const file = r.file as Record<string, unknown> | undefined
+        return {
+          file: {
+            name: (file?.name as string) || '',
+            id: (file?.id as string) || '',
+          },
+          pages: r.pages as number[] | undefined,
+        }
+      }) : [],
     }
   }
 }
