@@ -64,6 +64,7 @@ class PineconeService {
    */
   async connect(profile: ConnectionProfile): Promise<void> {
     try {
+      this.assistantService = null
       this.client = new Pinecone({
         apiKey: profile.apiKey,
       })
@@ -81,6 +82,7 @@ class PineconeService {
     } catch (error) {
       this.client = null
       this.embeddingService = null
+      this.assistantService = null
       this.profile = null
       throw error
     }

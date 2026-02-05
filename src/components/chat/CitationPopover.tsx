@@ -6,16 +6,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-
-interface CitationReference {
-  file: { name: string; id: string }
-  pages?: number[]
-}
-
-interface Citation {
-  position: number
-  references: CitationReference[]
-}
+import type { Citation, CitationReference } from '../../../electron/types'
 
 interface CitationPopoverProps {
   citation: Citation

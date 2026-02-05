@@ -122,6 +122,8 @@ export function ChatView({ assistantName }: ChatViewProps) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Don't submit during IME composition (CJK input)
+      if (e.nativeEvent.isComposing) return
       // Submit on Enter (without Shift) or Cmd/Ctrl+Enter
       if (e.key === 'Enter' && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
         e.preventDefault()

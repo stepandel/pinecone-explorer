@@ -72,15 +72,17 @@ function renderContentWithCitations(content: string, citations?: Citation[]) {
     return content
   }
 
-  // Sort citations by position (descending) to insert from end to avoid offset issues
-  const sortedCitations = [...citations].sort((a, b) => b.position - a.position)
+  // Sort citations by position (descending) with original indices preserved
+  const sortedCitations = citations
+    .map((c, i) => ({ citation: c, originalIndex: i }))
+    .sort((a, b) => b.citation.position - a.citation.position)
   
   // Create segments with citation markers
   const segments: Array<{ text: string; citationIndex?: number }> = []
   let remainingContent = content
   let currentOffset = content.length
 
-  for (const citation of sortedCitations) {
+  for (const { citation, originalIndex } of sortedCitations) {
     const pos = citation.position
     if (pos >= 0 && pos <= currentOffset) {
       // Text after this citation position
@@ -90,7 +92,7 @@ function renderContentWithCitations(content: string, citations?: Citation[]) {
       // Add citation marker
       segments.unshift({ 
         text: '', 
-        citationIndex: citations.indexOf(citation)
+        citationIndex: originalIndex
       })
       currentOffset = pos
       remainingContent = remainingContent.slice(0, pos)
