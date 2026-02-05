@@ -23,6 +23,9 @@ import {
   HybridEmbeddingConfig,
   GetVectorsPaginatedParams,
   PaginatedVectorsResult,
+  AssistantModel,
+  CreateAssistantParams,
+  UpdateAssistantParams,
 } from './types'
 
 console.log('Preload script is running!')
@@ -303,6 +306,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     setPreferredMode: async (profileId: string, mode: 'index' | 'assistant'): Promise<void> => {
       const result = await ipcRenderer.invoke('profiles:setPreferredMode', profileId, mode)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+  },
+  assistant: {
+    list: async (profileId: string): Promise<AssistantModel[]> => {
+      const result = await ipcRenderer.invoke('assistant:list', profileId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    create: async (profileId: string, params: CreateAssistantParams): Promise<AssistantModel> => {
+      const result = await ipcRenderer.invoke('assistant:create', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    describe: async (profileId: string, name: string): Promise<AssistantModel> => {
+      const result = await ipcRenderer.invoke('assistant:describe', profileId, name)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    update: async (profileId: string, name: string, params: UpdateAssistantParams): Promise<AssistantModel> => {
+      const result = await ipcRenderer.invoke('assistant:update', profileId, name, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    delete: async (profileId: string, name: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('assistant:delete', profileId, name)
       if (!result.success) {
         throw new Error(result.error)
       }

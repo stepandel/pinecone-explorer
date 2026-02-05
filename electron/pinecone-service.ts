@@ -27,6 +27,7 @@ import {
 } from './types'
 import { EmbeddingService, SparseVector, EmbeddingResult } from './embedding-service'
 import { withRetry } from './retry-utils'
+import { AssistantService } from './assistant-service'
 
 /**
  * Main Pinecone service class
@@ -36,12 +37,26 @@ class PineconeService {
 
   private client: Pinecone | null = null
   private embeddingService: EmbeddingService | null = null
+  private assistantService: AssistantService | null = null
   private profile: ConnectionProfile | null = null
   private indexCache: Map<string, Index<RecordMetadata>> = new Map()
   private indexInfoCache: Map<string, IndexInfo> = new Map()
 
   getProfile(): ConnectionProfile | null {
     return this.profile
+  }
+
+  /**
+   * Get the AssistantService for this connection
+   */
+  getAssistantService(): AssistantService {
+    if (!this.client) {
+      throw new Error('Not connected to Pinecone')
+    }
+    if (!this.assistantService) {
+      this.assistantService = new AssistantService(this.client)
+    }
+    return this.assistantService
   }
 
   /**
