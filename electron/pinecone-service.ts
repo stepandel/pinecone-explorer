@@ -92,6 +92,7 @@ class PineconeService {
   disconnect(): void {
     this.client = null
     this.embeddingService = null
+    this.assistantService = null
     this.profile = null
     this.indexCache.clear()
     this.indexInfoCache.clear()
