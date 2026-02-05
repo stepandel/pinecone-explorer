@@ -9,7 +9,7 @@ interface ModeOption {
 }
 
 const modes: ModeOption[] = [
-  { value: 'index', icon: Database, label: 'Index Explorer', shortcut: '⌘1' },
+  { value: 'index', icon: Database, label: 'Database Explorer', shortcut: '⌘1' },
   { value: 'assistant', icon: Bot, label: 'Assistant Explorer', shortcut: '⌘2' },
 ]
 
@@ -43,7 +43,7 @@ export function ModeSwitcher() {
             data-testid={`mode-${value}`}
           >
             <Icon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{value === 'index' ? 'Index' : 'Assistant'}</span>
+            <span className="hidden sm:inline">{value === 'index' ? 'Database' : 'Assistant'}</span>
           </button>
         )
       })}
