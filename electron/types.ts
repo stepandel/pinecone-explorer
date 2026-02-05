@@ -438,3 +438,168 @@ export interface UpdateAssistantParams {
   metadata?: Record<string, string>
 }
 
+// ============================================================================
+// Assistant File Types
+// ============================================================================
+
+/**
+ * File status enum for assistant files
+ */
+export type AssistantFileStatus = 'Processing' | 'Available' | 'Deleting' | 'ProcessingFailed'
+
+/**
+ * Represents a file associated with an assistant
+ */
+export interface AssistantFile {
+  /** Unique identifier for the file */
+  id: string
+  /** The name of the file */
+  name: string
+  /** Current processing status */
+  status: AssistantFileStatus
+  /** Processing progress (0-1) */
+  percentDone?: number | null
+  /** Optional metadata attached to the file */
+  metadata?: Record<string, string | number> | null
+  /** Signed URL for accessing the file content */
+  signedUrl?: string | null
+  /** Error message if processing failed */
+  errorMessage?: string | null
+  /** Creation timestamp */
+  createdOn?: string
+  /** Last update timestamp */
+  updatedOn?: string
+}
+
+/**
+ * Filter options for listing assistant files
+ */
+export interface ListAssistantFilesFilter {
+  /** Filter by metadata key-value pairs */
+  [key: string]: unknown
+}
+
+/**
+ * Parameters for uploading a file to an assistant
+ */
+export interface UploadAssistantFileParams {
+  /** Path to the file on disk */
+  filePath: string
+  /** Optional metadata to attach to the file */
+  metadata?: Record<string, string | number>
+}
+
+// ============================================================================
+// Assistant Chat Types
+// ============================================================================
+
+/**
+ * A message in a chat conversation
+ */
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
+ * Context options for controlling context snippets sent to the LLM
+ */
+export interface ChatContextOptions {
+  /** Maximum number of context snippets to use. Default is 16. Maximum is 64. */
+  topK?: number
+  /** Maximum context snippet size. Default is 2048 tokens. Minimum is 512. Maximum is 8192. */
+  snippetSize?: number
+}
+
+/**
+ * Parameters for chat requests
+ */
+export interface ChatParams {
+  /** Messages to send to the assistant */
+  messages: ChatMessage[]
+  /** Model to use for generation (e.g., 'gpt-4o', 'claude-3-5-sonnet') */
+  model?: string
+  /** Temperature for response randomness (0-1) */
+  temperature?: number
+  /** Filter against which documents can be retrieved */
+  filter?: Record<string, unknown>
+  /** If true, the assistant will return a JSON response */
+  jsonResponse?: boolean
+  /** If true, include highlights from referenced documents */
+  includeHighlights?: boolean
+  /** Context options for controlling snippets */
+  contextOptions?: ChatContextOptions
+}
+
+/**
+ * Reference to a file in a citation
+ */
+export interface CitationReference {
+  file: {
+    name: string
+    id: string
+  }
+  pages?: number[]
+}
+
+/**
+ * A citation from assistant response
+ */
+export interface Citation {
+  /** Position in the response text */
+  position: number
+  /** References to files */
+  references: CitationReference[]
+}
+
+/**
+ * Usage statistics for a chat response
+ */
+export interface ChatUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+/**
+ * Complete chat response (non-streaming)
+ */
+export interface ChatResponse {
+  /** Unique identifier for the response */
+  id: string
+  /** The assistant's response message */
+  message: ChatMessage
+  /** Citations from the response */
+  citations?: Citation[]
+  /** Token usage statistics */
+  usage?: ChatUsage
+  /** Model used for generation */
+  model?: string
+  /** Reason for completion (stop, length, content_filter, function_call) */
+  finishReason?: string
+}
+
+/**
+ * A chunk from a streaming chat response
+ */
+export interface ChatStreamChunk {
+  /** Type of chunk */
+  type: 'message_start' | 'content' | 'citation' | 'message_end' | 'error'
+  /** Response ID (present in all chunks) */
+  id?: string
+  /** Model used (present in all chunks) */
+  model?: string
+  /** Role (only in message_start) */
+  role?: string
+  /** Content delta (only in content chunks) */
+  content?: string
+  /** Citation data (only in citation chunks) */
+  citation?: Citation
+  /** Usage statistics (only in message_end) */
+  usage?: ChatUsage
+  /** Finish reason (only in message_end) */
+  finishReason?: string
+  /** Error message (only in error chunks) */
+  error?: string
+}
+

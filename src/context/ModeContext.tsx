@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
 import { usePinecone } from '../providers/PineconeProvider'
 
 export type ExplorerMode = 'index' | 'assistant'
@@ -14,6 +14,9 @@ export function ModeProvider({ children }: { children: ReactNode }) {
   const { currentProfile } = usePinecone()
   const [mode, setModeState] = useState<ExplorerMode>('index')
   const [isInitialized, setIsInitialized] = useState(false)
+
+  // Store setMode in a ref for stable access in event handlers
+  const setModeRef = useRef<(mode: ExplorerMode) => void>(() => {})
 
   // Load initial mode from electron-store
   useEffect(() => {
@@ -44,6 +47,11 @@ export function ModeProvider({ children }: { children: ReactNode }) {
     }
   }, [currentProfile])
 
+  // Update ref when setMode changes
+  useEffect(() => {
+    setModeRef.current = setMode
+  }, [setMode])
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -51,17 +59,32 @@ export function ModeProvider({ children }: { children: ReactNode }) {
       if (e.metaKey || e.ctrlKey) {
         if (e.key === '1') {
           e.preventDefault()
-          setMode('index')
+          setModeRef.current('index')
         } else if (e.key === '2') {
           e.preventDefault()
-          setMode('assistant')
+          setModeRef.current('assistant')
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [setMode])
+  }, [])
+
+  // Handle menu IPC events for mode switching
+  useEffect(() => {
+    const unsubIndexMode = window.electronAPI.menu.onSwitchToIndexMode(() => {
+      setModeRef.current('index')
+    })
+    const unsubAssistantMode = window.electronAPI.menu.onSwitchToAssistantMode(() => {
+      setModeRef.current('assistant')
+    })
+
+    return () => {
+      unsubIndexMode()
+      unsubAssistantMode()
+    }
+  }, [])
 
   // Don't render children until we've loaded the initial mode
   if (!isInitialized) {

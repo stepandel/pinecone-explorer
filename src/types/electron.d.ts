@@ -63,6 +63,88 @@ declare global {
     metadata?: Record<string, string>
   }
 
+  // Assistant File types
+  type AssistantFileStatus = 'Processing' | 'Available' | 'Deleting' | 'ProcessingFailed'
+
+  interface AssistantFile {
+    id: string
+    name: string
+    status: AssistantFileStatus
+    percentDone?: number | null
+    metadata?: Record<string, string | number> | null
+    signedUrl?: string | null
+    errorMessage?: string | null
+    createdOn?: string
+    updatedOn?: string
+  }
+
+  interface ListAssistantFilesFilter {
+    [key: string]: unknown
+  }
+
+  interface UploadAssistantFileParams {
+    filePath: string
+    metadata?: Record<string, string | number>
+  }
+
+  // Assistant Chat types
+  interface ChatMessage {
+    role: 'user' | 'assistant'
+    content: string
+  }
+
+  interface ChatContextOptions {
+    topK?: number
+    snippetSize?: number
+  }
+
+  interface ChatParams {
+    messages: ChatMessage[]
+    model?: string
+    temperature?: number
+    filter?: Record<string, unknown>
+    jsonResponse?: boolean
+    includeHighlights?: boolean
+    contextOptions?: ChatContextOptions
+  }
+
+  interface CitationReference {
+    file: { name: string; id: string }
+    pages?: number[]
+  }
+
+  interface Citation {
+    position: number
+    references: CitationReference[]
+  }
+
+  interface ChatUsage {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
+
+  interface ChatResponse {
+    id: string
+    message: ChatMessage
+    citations?: Citation[]
+    usage?: ChatUsage
+    model?: string
+    finishReason?: string
+  }
+
+  interface ChatStreamChunk {
+    type: 'message_start' | 'content' | 'citation' | 'message_end' | 'error'
+    id?: string
+    model?: string
+    role?: string
+    content?: string
+    citation?: Citation
+    usage?: ChatUsage
+    finishReason?: string
+    error?: string
+  }
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -320,6 +402,10 @@ declare global {
       onProfileAction: (callback: (action: { action: string; profileId: string }) => void) => () => void
       showNamespaceMenu: (namespace: string) => void
       onNamespaceAction: (callback: (action: { action: string; namespace: string }) => void) => () => void
+      showAssistantMenu: (assistantName: string) => void
+      onAssistantAction: (callback: (action: { action: string; assistantName: string }) => void) => () => void
+      showFileMenu: (assistantName: string, fileId: string, fileName: string) => void
+      onFileAction: (callback: (action: { action: string; assistantName: string; fileId: string; fileName: string }) => void) => () => void
     }
     profiles: {
       getAll: () => Promise<ConnectionProfile[]>
@@ -345,6 +431,18 @@ declare global {
       describe: (profileId: string, name: string) => Promise<AssistantModel>
       update: (profileId: string, name: string, params: UpdateAssistantParams) => Promise<AssistantModel>
       delete: (profileId: string, name: string) => Promise<void>
+      files: {
+        list: (profileId: string, assistantName: string, filter?: ListAssistantFilesFilter) => Promise<AssistantFile[]>
+        describe: (profileId: string, assistantName: string, fileId: string) => Promise<AssistantFile>
+        upload: (profileId: string, assistantName: string, params: UploadAssistantFileParams) => Promise<AssistantFile>
+        delete: (profileId: string, assistantName: string, fileId: string) => Promise<void>
+      }
+      chat: (profileId: string, assistantName: string, params: ChatParams) => Promise<ChatResponse>
+      chatStream: {
+        start: (profileId: string, assistantName: string, params: ChatParams) => Promise<string>
+        cancel: (streamId: string) => Promise<void>
+        onChunk: (callback: (streamId: string, chunk: ChatStreamChunk) => void) => () => void
+      }
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>
@@ -363,6 +461,14 @@ declare global {
     }
     shell: {
       openExternal: (url: string) => Promise<void>
+    }
+    dialog: {
+      showOpenDialog: (options: {
+        properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles'>
+        filters?: Array<{ name: string; extensions: string[] }>
+        title?: string
+        defaultPath?: string
+      }) => Promise<{ canceled: boolean; filePaths: string[] }>
     }
     updater: {
       checkForUpdates: () => Promise<UpdateInfo | undefined>
@@ -397,6 +503,17 @@ declare global {
       onClearFilters: (callback: () => void) => () => void
       onAddFilter: (callback: () => void) => () => void
       onRemoveFilter: (callback: () => void) => () => void
+      // Mode switching events
+      onSwitchToIndexMode: (callback: () => void) => () => void
+      onSwitchToAssistantMode: (callback: () => void) => () => void
+      // Assistant menu events
+      onNewAssistant: (callback: () => void) => () => void
+      onEditAssistant: (callback: () => void) => () => void
+      onDeleteAssistant: (callback: () => void) => () => void
+      // Chat menu events
+      onSendMessage: (callback: () => void) => () => void
+      onFocusChatInput: (callback: () => void) => () => void
+      onClearConversation: (callback: () => void) => () => void
       // Window menu events
       onDisconnect: (callback: () => void) => () => void
       // Help menu events

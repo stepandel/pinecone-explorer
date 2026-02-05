@@ -14,7 +14,7 @@ export interface KeyboardShortcut {
   keys: string
   accelerator: string
   action: string
-  category: 'general' | 'indexes' | 'namespaces' | 'vectors' | 'view' | 'editing'
+  category: 'general' | 'indexes' | 'namespaces' | 'vectors' | 'view' | 'editing' | 'assistant' | 'chat'
 }
 
 // Helper to check if a keyboard event matches a shortcut
@@ -151,19 +151,19 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
     category: 'vectors',
   },
 
-  // View
-  TOGGLE_LEFT_PANEL: {
-    id: 'toggle-left-panel',
+  // View - Mode Switching
+  INDEX_MODE: {
+    id: 'index-mode',
     keys: '⌘1',
     accelerator: 'CmdOrCtrl+1',
-    action: 'Toggle Namespaces Panel',
+    action: 'Switch to Index Mode',
     category: 'view',
   },
-  TOGGLE_RIGHT_PANEL: {
-    id: 'toggle-right-panel',
+  ASSISTANT_MODE: {
+    id: 'assistant-mode',
     keys: '⌘2',
     accelerator: 'CmdOrCtrl+2',
-    action: 'Toggle Details Panel',
+    action: 'Switch to Assistant Mode',
     category: 'view',
   },
   FOCUS_SEARCH: {
@@ -231,6 +231,38 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
     action: 'Keyboard Shortcuts',
     category: 'general',
   },
+
+  // Assistant
+  NEW_ASSISTANT: {
+    id: 'new-assistant',
+    keys: '⌘⇧N',
+    accelerator: 'CmdOrCtrl+Shift+N',
+    action: 'New Assistant',
+    category: 'assistant',
+  },
+
+  // Chat
+  SEND_MESSAGE: {
+    id: 'send-message',
+    keys: '⌘↵',
+    accelerator: 'CmdOrCtrl+Return',
+    action: 'Send Message',
+    category: 'chat',
+  },
+  FOCUS_CHAT_INPUT: {
+    id: 'focus-chat-input',
+    keys: '⌘K',
+    accelerator: 'CmdOrCtrl+K',
+    action: 'Focus Chat Input',
+    category: 'chat',
+  },
+  CLEAR_CONVERSATION: {
+    id: 'clear-conversation',
+    keys: '⌘⇧⌫',
+    accelerator: 'CmdOrCtrl+Shift+Backspace',
+    action: 'Clear Conversation',
+    category: 'chat',
+  },
 } as const
 
 // Get shortcuts grouped by category for display
@@ -246,9 +278,11 @@ export function getShortcutsByCategory(): Array<{
     vectors: 'Vectors',
     view: 'View',
     editing: 'Editing',
+    assistant: 'Assistant',
+    chat: 'Chat',
   }
 
-  const categoryOrder = ['general', 'indexes', 'namespaces', 'vectors', 'view', 'editing']
+  const categoryOrder = ['general', 'indexes', 'namespaces', 'vectors', 'assistant', 'chat', 'view', 'editing']
   const grouped: Record<string, KeyboardShortcut[]> = {}
 
   // Group shortcuts by category
