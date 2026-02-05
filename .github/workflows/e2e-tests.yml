@@ -1,0 +1,61 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CI: true
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install system dependencies for Electron
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2
+
+      - name: Build Electron app
+        run: pnpm test:build
+
+      - name: Run E2E tests with Xvfb
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" pnpm exec playwright test
+        env:
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
