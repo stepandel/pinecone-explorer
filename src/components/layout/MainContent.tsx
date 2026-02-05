@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useDraftNamespace } from '../../context/DraftNamespaceContext'
+import { useDraftAssistant } from '../../context/DraftAssistantContext'
 import { usePanel } from '../../context/PanelContext'
 import { useEmbedding } from '../../context/EmbeddingContext'
 import { usePinecone } from '../../providers/PineconeProvider'
@@ -11,6 +12,7 @@ import { IndexesPanel } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
 import { IndexConfigView } from '../indexes/IndexConfigView'
 import { NamespaceConfigView } from '../namespaces/NamespaceConfigView'
+import { AssistantConfigView } from '../assistants/AssistantConfigView'
 import VectorsView from '../vectors/VectorsView'
 import VectorDetailPanel from '../vectors/VectorDetailPanel'
 import { AssistantsPanel } from '../assistants/AssistantsPanel'
@@ -28,6 +30,7 @@ export function MainContent() {
   const { activeIndex, activeNamespace } = useSelection()
   const { draftIndex } = useDraftIndex()
   const { draftNamespace } = useDraftNamespace()
+  const { draftAssistant, startCreation: startAssistantCreation, startEditing: startAssistantEditing } = useDraftAssistant()
   const { currentProfile } = usePinecone()
   const { mode } = useMode()
   const { activeAssistant } = useAssistantSelection()
@@ -136,7 +139,11 @@ export function MainContent() {
         data-testid={mode === 'assistant' ? 'assistants-panel' : 'indexes-panel'}
       >
         {mode === 'assistant' ? (
-          <AssistantsPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
+          <AssistantsPanel
+            onToggleCollapse={() => setIndexesPanelOpen(false)}
+            onCreateNew={startAssistantCreation}
+            onEditAssistant={startAssistantEditing}
+          />
         ) : (
           <IndexesPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
         )}
@@ -158,8 +165,10 @@ export function MainContent() {
         className="h-full transition-[padding] duration-200"
         style={{ paddingLeft: `${leftPadding}px`, paddingRight: `${rightPadding}px` }}
       >
-        {/* Assistant mode - Chat View */}
-        {mode === 'assistant' && activeAssistant ? (
+        {/* Assistant mode - Config View or Chat View */}
+        {mode === 'assistant' && draftAssistant ? (
+          <AssistantConfigView />
+        ) : mode === 'assistant' && activeAssistant ? (
           <ChatView
             key={activeAssistant}
             assistantName={activeAssistant}
@@ -283,7 +292,9 @@ export function MainContent() {
             }}
           >
             <div className="text-center text-muted-foreground">
-              <p className="text-sm">No vector selected</p>
+              <p className="text-sm">
+                {mode === 'assistant' ? 'No file selected' : 'No vector selected'}
+              </p>
             </div>
           </div>
         )}
