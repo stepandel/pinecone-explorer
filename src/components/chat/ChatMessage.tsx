@@ -2,6 +2,8 @@ import { memo, Fragment } from 'react'
 import Markdown from 'react-markdown'
 import { Bot, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useFileSelection } from '@/context/FileSelectionContext'
+import { CitationPopover } from './CitationPopover'
 
 interface CitationReference {
   file: { name: string; id: string }
@@ -41,20 +43,21 @@ function TypingIndicator() {
 
 function CitationSuperscript({ 
   citation, 
-  index 
+  index,
+  onViewFile,
 }: { 
   citation: Citation
-  index: number 
+  index: number
+  onViewFile?: (fileId: string) => void
 }) {
-  const fileNames = citation.references.map(ref => ref.file.name).join(', ')
-  
   return (
-    <sup
-      className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 ml-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors"
-      title={fileNames}
-    >
-      {index + 1}
-    </sup>
+    <CitationPopover citation={citation} onViewFile={onViewFile}>
+      <sup
+        className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 ml-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors"
+      >
+        {index + 1}
+      </sup>
+    </CitationPopover>
   )
 }
 
@@ -111,11 +114,13 @@ function UserMessage({ content }: { content: string }) {
 function AssistantMessage({ 
   content, 
   citations,
-  isStreaming 
+  isStreaming,
+  onViewFile,
 }: { 
   content: string
   citations?: Citation[]
   isStreaming?: boolean
+  onViewFile?: (fileId: string) => void
 }) {
   // Show typing indicator if streaming with no content
   if (isStreaming && !content) {
@@ -234,7 +239,8 @@ function AssistantMessage({
           {segment.citationIndex !== undefined && citations && (
             <CitationSuperscript 
               citation={citations[segment.citationIndex]} 
-              index={segment.citationIndex} 
+              index={segment.citationIndex}
+              onViewFile={onViewFile}
             />
           )}
         </Fragment>
@@ -252,6 +258,7 @@ export const ChatMessage = memo(function ChatMessage({
   citations,
   isStreaming,
 }: ChatMessageProps) {
+  const { setActiveFile } = useFileSelection()
   const isUser = role === 'user'
 
   return (
@@ -302,7 +309,8 @@ export const ChatMessage = memo(function ChatMessage({
             <AssistantMessage 
               content={content} 
               citations={citations} 
-              isStreaming={isStreaming} 
+              isStreaming={isStreaming}
+              onViewFile={setActiveFile}
             />
           )}
         </div>
