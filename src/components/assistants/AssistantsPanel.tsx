@@ -32,6 +32,7 @@ function getStatusColor(status: AssistantStatus): string {
     case 'Initializing':
       return 'bg-yellow-500'
     case 'Failed':
+    case 'InitializationFailed':
       return 'bg-red-500'
     case 'Terminating':
       return 'bg-orange-500'
@@ -49,6 +50,8 @@ function getStatusTooltip(status: AssistantStatus): string {
       return 'Initializing...'
     case 'Failed':
       return 'Failed'
+    case 'InitializationFailed':
+      return 'Initialization failed'
     case 'Terminating':
       return 'Terminating...'
     default:

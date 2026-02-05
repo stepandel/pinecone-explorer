@@ -65,9 +65,19 @@ export function FileDetailPanel() {
     }
   }, [activeFile, currentProfile?.id, activeAssistant, deleteMutation, setActiveFile])
 
-  const handleDownload = useCallback(() => {
-    if (file?.signedUrl) {
-      window.electronAPI.shell.openExternal(file.signedUrl)
+  const handleDownload = useCallback(async () => {
+    if (!file?.signedUrl) return
+    
+    // Validate URL for security - only allow https:
+    try {
+      const url = new URL(file.signedUrl)
+      if (url.protocol !== 'https:') {
+        console.error('Invalid URL protocol for download:', url.protocol)
+        return
+      }
+      await window.electronAPI.shell.openExternal(file.signedUrl)
+    } catch (err) {
+      console.error('Failed to open download URL:', err)
     }
   }, [file?.signedUrl])
 
@@ -204,11 +214,11 @@ export function FileDetailPanel() {
             onClick={handleDelete}
             size="sm"
             variant="destructive"
-            disabled={deleteMutation.isPending}
+            disabled={deleteMutation.isPending || file.status === 'Deleting'}
             className="w-full h-7 text-[11px] gap-1.5"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            {deleteMutation.isPending ? 'Deleting...' : 'Delete File'}
+            {deleteMutation.isPending || file.status === 'Deleting' ? 'Deleting...' : 'Delete File'}
           </Button>
         </div>
       )}

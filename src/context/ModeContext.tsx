@@ -18,18 +18,26 @@ export function ModeProvider({ children }: { children: ReactNode }) {
   // Load initial mode from electron-store
   useEffect(() => {
     if (!currentProfile) return
+    let cancelled = false
+    const profileId = currentProfile.id
 
-    window.electronAPI.profiles.getPreferredMode(currentProfile.id)
+    window.electronAPI.profiles.getPreferredMode(profileId)
       .then((savedMode) => {
+        if (cancelled) return
         if (savedMode) {
           setModeState(savedMode)
         }
         setIsInitialized(true)
       })
       .catch((err) => {
+        if (cancelled) return
         console.warn('Failed to load saved mode, using default:', err)
         setIsInitialized(true)
       })
+    
+    return () => {
+      cancelled = true
+    }
   }, [currentProfile])
 
   const setMode = useCallback((newMode: ExplorerMode) => {

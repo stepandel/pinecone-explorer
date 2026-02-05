@@ -279,6 +279,7 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
           click: () => {
             sendToFocusedWindow('menu:new-index')
           },
+          registerAccelerator: false, // Also used for New Assistant in assistant mode
         },
         { type: 'separator' },
         {

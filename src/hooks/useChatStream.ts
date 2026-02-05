@@ -56,6 +56,23 @@ export function useChatStream({
     }
   }, [])
 
+  // Clear messages when assistant changes
+  useEffect(() => {
+    // Cancel any active stream
+    if (currentStreamIdRef.current) {
+      window.electronAPI.assistant.chatStream.cancel(currentStreamIdRef.current).catch(console.error)
+      currentStreamIdRef.current = null
+    }
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current()
+      unsubscribeRef.current = null
+    }
+    // Reset state for new assistant
+    setMessages([])
+    setIsStreaming(false)
+    setError(null)
+  }, [assistantName])
+
   const sendMessage = useCallback(async (content: string) => {
     if (!currentProfile?.id || !assistantName || !content.trim()) return
     if (isStreaming) return
