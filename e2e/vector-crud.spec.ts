@@ -14,6 +14,9 @@
 
 import { test, expect, Page, _electron as electron, ElectronApplication } from '@playwright/test';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let electronApp: ElectronApplication;
 let page: Page;
@@ -22,11 +25,9 @@ let page: Page;
  * Helper to launch the Electron app
  */
 async function launchApp(): Promise<{ app: ElectronApplication; page: Page }> {
-  const electronPath = require('electron');
   const appPath = path.join(__dirname, '../dist-electron/main.js');
 
   const app = await electron.launch({
-    executablePath: electronPath as string,
     args: [appPath],
     env: {
       ...process.env,
@@ -286,7 +287,13 @@ async function handleRegenerateDialog(page: Page, regenerate: boolean): Promise<
   await expect(dialog).not.toBeVisible({ timeout: 2000 });
 }
 
+// Skip all tests if no real Pinecone API key - these tests require actual connection
+const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
+  process.env.PINECONE_API_KEY !== 'dummy-key-for-local-testing';
+
 test.describe('E2E-008: Vector CRUD Operations', () => {
+  test.skip(!hasRealApiKey, 'Requires PINECONE_API_KEY environment variable');
+
   test.beforeEach(async () => {
     const { app, page: appPage } = await launchApp();
     electronApp = app;
