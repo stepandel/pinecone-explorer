@@ -6,6 +6,7 @@ import { useFileSelection } from '../../context/FileSelectionContext'
 import { useFilesQuery } from '../../hooks/useAssistantQueries'
 import { Button } from '../ui/button'
 import { NewButton } from '../ui/new-button'
+import { UploadFileDialog } from './UploadFileDialog'
 import { AssistantFile, AssistantFileStatus } from '../../../electron/types'
 
 const inputClassName = "w-full h-6 text-[11px] py-0 px-1.5 pr-5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] placeholder:text-sidebar-foreground/50 text-sidebar-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-ring/50 transition-colors"
@@ -58,6 +59,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
   const { activeAssistant } = useAssistantSelection()
   const { activeFile, setActiveFile } = useFileSelection()
   const [searchTerm, setSearchTerm] = useState('')
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
 
   // Fetch files for the selected assistant
   const { data: files = [], isLoading, error, refetch } = useFilesQuery(
@@ -66,35 +68,11 @@ export function FilesPanel({ className }: FilesPanelProps) {
     !!activeAssistant
   )
 
-  // Handle upload button click - open file picker
-  const handleUploadClick = useCallback(async () => {
+  // Handle upload button click - open upload dialog
+  const handleUploadClick = useCallback(() => {
     if (!currentProfile?.id || !activeAssistant) return
-
-    try {
-      // Open native file picker dialog
-      const result = await window.electronAPI.dialog.showOpenDialog({
-        properties: ['openFile', 'multiSelections'],
-        filters: [
-          { name: 'Documents', extensions: ['pdf', 'txt', 'md', 'json', 'csv', 'doc', 'docx'] },
-          { name: 'All Files', extensions: ['*'] },
-        ],
-      })
-
-      if (result.canceled || !result.filePaths.length) return
-
-      // Upload each selected file
-      for (const filePath of result.filePaths) {
-        await window.electronAPI.assistant.files.upload(currentProfile.id, activeAssistant, {
-          filePath,
-        })
-      }
-
-      // Refetch to show new files
-      refetch()
-    } catch (err) {
-      console.error('Failed to upload file:', err)
-    }
-  }, [currentProfile?.id, activeAssistant, refetch])
+    setUploadDialogOpen(true)
+  }, [currentProfile?.id, activeAssistant])
 
   // Filter files by search term
   const filteredFiles = useMemo(() => {
@@ -285,6 +263,16 @@ export function FilesPanel({ className }: FilesPanelProps) {
           </div>
         )}
       </div>
+
+      {/* Upload File Dialog */}
+      {currentProfile?.id && activeAssistant && (
+        <UploadFileDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          profileId={currentProfile.id}
+          assistantName={activeAssistant}
+        />
+      )}
     </aside>
   )
 }

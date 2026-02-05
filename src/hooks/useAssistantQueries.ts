@@ -142,6 +142,29 @@ export function useDeleteAssistantMutation(profileId: string) {
   })
 }
 
+// Upload File Mutation
+export function useUploadFileMutation(profileId: string, assistantName: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      filePath: string
+      metadata?: Record<string, string | number>
+    }) => {
+      return await window.electronAPI.assistant.files.upload(profileId, assistantName, params)
+    },
+    onSuccess: () => {
+      // Invalidate files query to refetch with new file
+      queryClient.invalidateQueries({
+        queryKey: assistantQueryKeys.files(profileId, assistantName),
+      })
+    },
+    onError: (error) => {
+      console.error('Failed to upload file:', error)
+    },
+  })
+}
+
 // Poll interval for files (5 seconds while processing)
 const FILES_POLL_INTERVAL = 5000
 
