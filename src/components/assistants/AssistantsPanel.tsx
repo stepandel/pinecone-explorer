@@ -205,6 +205,7 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
         boxShadow: 'var(--sidebar-shadow)',
       }}
       onContextMenu={handlePanelContextMenu}
+      data-testid="assistants-panel"
     >
       {/* Header */}
       <div className="px-2 py-2 flex items-center justify-between">
@@ -217,6 +218,7 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
             label="Assistant"
             title="Create new assistant"
             iconOnly
+            data-testid="new-assistant-button"
           />
         </div>
         {onToggleCollapse && (
@@ -266,12 +268,16 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
                   onClick={() => handleAssistantClick(assistant.name)}
                   onContextMenu={(e) => handleAssistantContextMenu(e, assistant.name)}
                   title={`${assistant.name}\nStatus: ${getStatusTooltip(assistant.status)}`}
+                  data-testid="assistant-item"
+                  data-assistant-name={assistant.name}
                 >
                   <div className="flex items-center gap-1.5">
                     {/* Status indicator */}
                     <div
                       className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusColor(assistant.status)}`}
                       title={getStatusTooltip(assistant.status)}
+                      data-testid="assistant-status"
+                      data-status={assistant.status}
                     />
                     <div
                       className={`text-[11px] truncate flex-1 ${

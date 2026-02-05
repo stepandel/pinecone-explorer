@@ -130,6 +130,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
           WebkitBackdropFilter: 'blur(20px) saturate(1.1)',
           boxShadow: 'var(--sidebar-shadow)',
         }}
+        data-testid="files-panel"
       >
         {/* Header */}
         <div className="px-3 py-2">
@@ -140,7 +141,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center text-muted-foreground px-4">
+          <div className="text-center text-muted-foreground px-4" data-testid="files-empty-state">
             <p className="text-sm">Select an assistant</p>
             <p className="text-[11px] mt-1">to view files</p>
           </div>
@@ -158,6 +159,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
         WebkitBackdropFilter: 'blur(20px) saturate(1.1)',
         boxShadow: 'var(--sidebar-shadow)',
       }}
+      data-testid="files-panel"
     >
       {/* Header */}
       <div className="px-3 py-2">
@@ -171,6 +173,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
               label="File"
               title="Upload file"
               iconOnly
+              data-testid="upload-file-button"
             />
           </div>
           <div className="text-[10px] text-muted-foreground truncate" title={activeAssistant}>
@@ -258,6 +261,9 @@ export function FilesPanel({ className }: FilesPanelProps) {
                   }`}
                   style={{ width: 'calc(100% - 8px)' }}
                   title={file.errorMessage || file.name}
+                  data-testid="file-item"
+                  data-file-id={file.id}
+                  data-file-name={file.name}
                 >
                   <div className="flex items-center gap-2">
                     <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />

@@ -34,6 +34,7 @@ export function CitationPopover({
         align="start"
         sideOffset={4}
         showArrow={false}
+        data-testid="citation-popover"
       >
         <div className="p-3 space-y-2">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -44,11 +45,12 @@ export function CitationPopover({
               <li
                 key={`${ref.file.id}-${idx}`}
                 className="flex flex-col gap-1.5"
+                data-testid="citation-reference"
               >
                 <div className="flex items-start gap-2">
                   <FileText className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" title={ref.file.name}>
+                    <div className="text-sm font-medium truncate" title={ref.file.name} data-testid="citation-file-name">
                       {ref.file.name}
                     </div>
                     {ref.pages && ref.pages.length > 0 && (
@@ -64,6 +66,7 @@ export function CitationPopover({
                     size="sm"
                     className="h-7 text-xs justify-start ml-6"
                     onClick={() => onViewFile(ref.file.id)}
+                    data-testid="citation-view-file-button"
                   >
                     View File
                   </Button>

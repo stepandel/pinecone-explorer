@@ -96,6 +96,8 @@ function CitationSuperscript({
         type="button"
         aria-label={`View citation ${index + 1}`}
         className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 ml-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors align-super"
+        data-testid="citation-superscript"
+        data-citation-index={index}
       >
         {index + 1}
       </button>

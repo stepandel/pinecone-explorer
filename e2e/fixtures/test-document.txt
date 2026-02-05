@@ -1,0 +1,36 @@
+# Test Document for E2E Testing
+
+This is a test document used for E2E testing of the Pinecone Assistant feature.
+
+## Section 1: Introduction
+
+The Pinecone Assistant allows users to upload documents and chat with an AI
+that can reference the content of those documents. This test file contains
+sample content that can be used to verify the assistant's citation functionality.
+
+## Section 2: Key Features
+
+The assistant supports the following features:
+- Document upload and processing
+- Natural language chat interface
+- Citation of source documents
+- Multiple model selection
+
+## Section 3: Test Data
+
+Here is some specific information that can be verified in tests:
+
+- The capital of France is Paris.
+- Water freezes at 0 degrees Celsius (32 degrees Fahrenheit).
+- The speed of light is approximately 299,792,458 meters per second.
+- Mount Everest is the tallest mountain on Earth at 8,848.86 meters.
+
+## Section 4: Conclusion
+
+This document provides a simple set of facts that can be used to verify
+that the assistant is correctly reading and citing information from
+uploaded documents during E2E tests.
+
+---
+Test Document Version: 1.0
+Created for: PINE-51 E2E Test Suite
