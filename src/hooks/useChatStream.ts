@@ -104,6 +104,10 @@ export function useChatStream({
       // Subscribe to chunk events
       unsubscribeRef.current = window.electronAPI.assistant.chatStream.onChunk(
         (streamId: string, chunk: ChatStreamChunk) => {
+          // Initialize stream id from first chunk if not yet set (handles race condition)
+          if (!currentStreamIdRef.current) {
+            currentStreamIdRef.current = streamId
+          }
           if (streamId !== currentStreamIdRef.current) return
 
           switch (chunk.type) {

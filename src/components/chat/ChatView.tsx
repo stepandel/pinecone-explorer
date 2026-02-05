@@ -201,7 +201,7 @@ export function ChatView({ assistantName }: ChatViewProps) {
           <div className="py-4">
             {messages.map((message, idx) => (
               <ChatMessage 
-                key={idx} 
+                key={message.id ?? `msg-${idx}`} 
                 role={message.role}
                 content={message.content}
                 citations={message.citations}

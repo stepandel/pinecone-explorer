@@ -109,7 +109,7 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
   }, [])
 
   const handleConfirmDelete = useCallback(async () => {
-    if (!assistantToDelete) return
+    if (!assistantToDelete || !currentProfile?.id) return
 
     // Verify the confirmation input matches the assistant name
     if (confirmationInput !== assistantToDelete) {
