@@ -30,6 +30,7 @@ export function ModeSwitcher() {
             key={value}
             role="radio"
             aria-checked={isActive}
+            aria-label={label}
             onClick={() => setMode(value)}
             className={`
               flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-all
