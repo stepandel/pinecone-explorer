@@ -5,12 +5,15 @@ import { useDraftNamespace } from '../../context/DraftNamespaceContext'
 import { usePanel } from '../../context/PanelContext'
 import { useEmbedding } from '../../context/EmbeddingContext'
 import { usePinecone } from '../../providers/PineconeProvider'
+import { useMode } from '../../context/ModeContext'
+import { useAssistantSelection } from '../../context/AssistantSelectionContext'
 import { IndexesPanel } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
 import { IndexConfigView } from '../indexes/IndexConfigView'
 import { NamespaceConfigView } from '../namespaces/NamespaceConfigView'
 import VectorsView from '../vectors/VectorsView'
 import VectorDetailPanel from '../vectors/VectorDetailPanel'
+import ChatView from '../chat/ChatView'
 
 interface VectorRecord {
   id: string
@@ -23,6 +26,8 @@ export function MainContent() {
   const { draftIndex } = useDraftIndex()
   const { draftNamespace } = useDraftNamespace()
   const { currentProfile } = usePinecone()
+  const { mode } = useMode()
+  const { activeAssistant } = useAssistantSelection()
   const { indexEmbedConfig, clientTextFieldOverride } = useEmbedding()
   const isEmbeddingFieldConfigured = !!indexEmbedConfig || !!clientTextFieldOverride
   const {
@@ -146,7 +151,23 @@ export function MainContent() {
         className="h-full transition-[padding] duration-200"
         style={{ paddingLeft: `${leftPadding}px`, paddingRight: `${rightPadding}px` }}
       >
-        {draftIndex ? (
+        {/* Assistant mode - Chat View */}
+        {mode === 'assistant' && activeAssistant ? (
+          <ChatView
+            key={activeAssistant}
+            assistantName={activeAssistant}
+          />
+        ) : mode === 'assistant' ? (
+          <div
+            className="flex items-center justify-center h-full"
+            style={{ background: 'var(--canvas-background)' }}
+          >
+            <div className="text-center text-muted-foreground">
+              <p className="text-lg mb-2">No assistant selected</p>
+              <p className="text-sm">Select an assistant from the sidebar to start chatting</p>
+            </div>
+          </div>
+        ) : draftIndex ? (
           <IndexConfigView />
         ) : draftNamespace ? (
           <NamespaceConfigView />
