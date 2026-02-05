@@ -210,6 +210,7 @@ export function UploadFileDialog({
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
           )}
+          data-testid="upload-file-dialog"
         >
           {/* Header */}
           <div className="px-5 pt-5 pb-3">
@@ -284,6 +285,7 @@ export function UploadFileDialog({
                 "active:bg-white/25 dark:active:bg-white/20",
                 "disabled:opacity-40 disabled:cursor-not-allowed"
               )}
+              data-testid="browse-files-button"
             >
               Browse Files
             </button>
@@ -385,6 +387,7 @@ export function UploadFileDialog({
                 "disabled:opacity-40 disabled:cursor-not-allowed",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#007AFF]/50 focus-visible:ring-offset-1"
               )}
+              data-testid="upload-submit-button"
             >
               {isUploading ? 'Uploading...' : 'Upload'}
             </button>

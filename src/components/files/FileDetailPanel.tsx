@@ -92,8 +92,9 @@ export function FileDetailPanel() {
           WebkitBackdropFilter: 'blur(24px) saturate(1.5)',
           boxShadow: 'var(--panel-detail-shadow)',
         }}
+        data-testid="file-detail-panel"
       >
-        <div className="text-center text-muted-foreground">
+        <div className="text-center text-muted-foreground" data-testid="file-detail-empty-state">
           <p className="text-sm">No file selected</p>
         </div>
       </div>
@@ -109,6 +110,7 @@ export function FileDetailPanel() {
         WebkitBackdropFilter: 'blur(24px) saturate(1.5)',
         boxShadow: 'var(--panel-detail-shadow)',
       }}
+      data-testid="file-detail-panel"
     >
       {/* Header */}
       <div className="px-4 py-3 border-b border-border">
@@ -205,6 +207,7 @@ export function FileDetailPanel() {
               size="sm"
               variant="outline"
               className="w-full h-7 text-[11px] gap-1.5"
+              data-testid="file-download-button"
             >
               <Download className="h-3.5 w-3.5" />
               Download
@@ -216,6 +219,7 @@ export function FileDetailPanel() {
             variant="destructive"
             disabled={deleteMutation.isPending || file.status === 'Deleting'}
             className="w-full h-7 text-[11px] gap-1.5"
+            data-testid="file-delete-button"
           >
             <Trash2 className="h-3.5 w-3.5" />
             {deleteMutation.isPending || file.status === 'Deleting' ? 'Deleting...' : 'Delete File'}

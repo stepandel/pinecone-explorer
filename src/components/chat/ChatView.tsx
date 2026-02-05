@@ -159,7 +159,7 @@ export function ChatView({ assistantName }: ChatViewProps) {
           <div className="flex items-center gap-2">
             {/* Model selector */}
             <Select value={currentModel} onValueChange={setModel}>
-              <SelectTrigger className="h-8 w-[180px] text-xs">
+              <SelectTrigger className="h-8 w-[180px] text-xs" data-testid="chat-model-selector">
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
               <SelectContent>
@@ -181,6 +181,7 @@ export function ChatView({ assistantName }: ChatViewProps) {
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
               title="Clear conversation"
+              data-testid="chat-clear-button"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -198,7 +199,7 @@ export function ChatView({ assistantName }: ChatViewProps) {
         {messages.length === 0 ? (
           <EmptyState assistantName={assistantName} />
         ) : (
-          <div className="py-4">
+          <div className="py-4" data-testid="chat-message-list">
             {messages.map((message, idx) => (
               <ChatMessage 
                 key={message.id ?? `msg-${idx}`} 
@@ -239,6 +240,7 @@ export function ChatView({ assistantName }: ChatViewProps) {
                 'min-h-[40px] max-h-[200px]'
               )}
               rows={1}
+              data-testid="chat-input"
             />
           </div>
           
@@ -251,6 +253,7 @@ export function ChatView({ assistantName }: ChatViewProps) {
                 'transition-colors'
               )}
               title="Stop generation"
+              data-testid="chat-stop-button"
             >
               <StopCircle className="w-5 h-5" />
             </button>
@@ -265,6 +268,7 @@ export function ChatView({ assistantName }: ChatViewProps) {
                 'transition-colors'
               )}
               title="Send message"
+              data-testid="chat-send-button"
             >
               <Send className="w-5 h-5" />
             </button>

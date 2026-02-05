@@ -36,7 +36,7 @@ export function AssistantConfigView() {
     : !isSubmitting && isNameValid && draftAssistant.name.trim().length > 0
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background" data-testid="assistant-config-view">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border">
         <h2 className="text-[13px] font-semibold">
@@ -73,6 +73,7 @@ export function AssistantConfigView() {
             style={inputStyle}
             autoFocus={!isEditing}
             disabled={isEditing}
+            data-testid="assistant-name-input"
           />
           {validationErrors.name && (
             <p className="text-[10px] text-destructive">{validationErrors.name}</p>
@@ -96,6 +97,7 @@ export function AssistantConfigView() {
             placeholder="You are a helpful assistant that answers questions based on the provided documents..."
             className="w-full h-32 text-[11px] px-1.5 py-1.5 rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
             style={inputStyle}
+            data-testid="assistant-instructions-input"
           />
           {validationErrors.instructions && (
             <p className="text-[10px] text-destructive">{validationErrors.instructions}</p>
@@ -169,6 +171,7 @@ export function AssistantConfigView() {
             disabled={isSubmitting}
             className="h-6 px-2 text-[11px] rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             style={inputStyle}
+            data-testid="assistant-cancel-button"
           >
             Cancel
           </button>
@@ -176,6 +179,7 @@ export function AssistantConfigView() {
             onClick={handleSave}
             disabled={!canSubmit}
             className="h-6 px-2 text-[11px] rounded-md bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#006DD9] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="assistant-save-button"
           >
             {isSubmitting
               ? (isEditing ? 'Saving...' : 'Creating...')
