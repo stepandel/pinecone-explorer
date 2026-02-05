@@ -209,6 +209,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('context-menu:namespace-action', handler)
       return () => ipcRenderer.removeListener('context-menu:namespace-action', handler)
     },
+    showAssistantMenu: (assistantName: string): void => {
+      ipcRenderer.send('context-menu:show-assistant', assistantName)
+    },
+    onAssistantAction: (callback: (action: { action: string; assistantName: string }) => void): (() => void) => {
+      const handler = (_event: any, data: { action: string; assistantName: string }) => callback(data)
+      ipcRenderer.on('context-menu:assistant-action', handler)
+      return () => ipcRenderer.removeListener('context-menu:assistant-action', handler)
+    },
   },
   profiles: {
     getAll: async (): Promise<ConnectionProfile[]> => {
