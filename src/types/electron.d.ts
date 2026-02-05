@@ -402,6 +402,10 @@ declare global {
       onProfileAction: (callback: (action: { action: string; profileId: string }) => void) => () => void
       showNamespaceMenu: (namespace: string) => void
       onNamespaceAction: (callback: (action: { action: string; namespace: string }) => void) => () => void
+      showAssistantMenu: (assistantName: string) => void
+      onAssistantAction: (callback: (action: { action: string; assistantName: string }) => void) => () => void
+      showFileMenu: (assistantName: string, fileId: string, fileName: string) => void
+      onFileAction: (callback: (action: { action: string; assistantName: string; fileId: string; fileName: string }) => void) => () => void
     }
     profiles: {
       getAll: () => Promise<ConnectionProfile[]>

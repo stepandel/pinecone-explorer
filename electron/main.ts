@@ -634,6 +634,46 @@ ipcMain.on('context-menu:show-namespace', (event, namespace: string) => {
   }
 })
 
+// Assistant context menu handler
+ipcMain.on('context-menu:show-assistant', (event, assistantName: string) => {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Edit',
+      click: () => event.sender.send('context-menu:assistant-action', { action: 'edit', assistantName })
+    },
+    { type: 'separator' },
+    {
+      label: 'Delete',
+      click: () => event.sender.send('context-menu:assistant-action', { action: 'delete', assistantName })
+    }
+  ]
+  const menu = Menu.buildFromTemplate(template)
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) {
+    menu.popup({ window: win })
+  }
+})
+
+// File context menu handler
+ipcMain.on('context-menu:show-file', (event, assistantName: string, fileId: string, fileName: string) => {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Download',
+      click: () => event.sender.send('context-menu:file-action', { action: 'download', assistantName, fileId, fileName })
+    },
+    { type: 'separator' },
+    {
+      label: 'Delete',
+      click: () => event.sender.send('context-menu:file-action', { action: 'delete', assistantName, fileId, fileName })
+    }
+  ]
+  const menu = Menu.buildFromTemplate(template)
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) {
+    menu.popup({ window: win })
+  }
+})
+
 // ============================================================================
 // Profile Management IPC Handlers
 // ============================================================================

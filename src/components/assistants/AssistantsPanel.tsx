@@ -1,14 +1,25 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ChevronsLeft } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useAssistantSelection } from '../../context/AssistantSelectionContext'
-import { useAssistantsQuery } from '../../hooks/useAssistantQueries'
+import { useAssistantsQuery, useDeleteAssistantMutation } from '../../hooks/useAssistantQueries'
 import { NewButton } from '../ui/new-button'
+import { Button } from '../ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../ui/dialog'
+import { cn } from '@/lib/utils'
 import { AssistantStatus } from '../../../electron/types'
 
 interface AssistantsPanelProps {
   onToggleCollapse?: () => void
   onCreateNew?: () => void
+  onEditAssistant?: (assistantName: string) => void
 }
 
 // Status indicator colors based on assistant status
@@ -43,7 +54,7 @@ function getStatusTooltip(status: AssistantStatus): string {
   }
 }
 
-export function AssistantsPanel({ onToggleCollapse, onCreateNew }: AssistantsPanelProps) {
+export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant }: AssistantsPanelProps) {
   const { currentProfile } = usePinecone()
   const { activeAssistant, setActiveAssistant } = useAssistantSelection()
 
@@ -53,6 +64,13 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew }: AssistantsPan
     isLoading: assistantsLoading,
     error: assistantsError,
   } = useAssistantsQuery(currentProfile?.id || null)
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [assistantToDelete, setAssistantToDelete] = useState<string | null>(null)
+  const [confirmationInput, setConfirmationInput] = useState('')
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const deleteMutation = useDeleteAssistantMutation(currentProfile?.id || '')
 
   const handleAssistantClick = useCallback(
     (assistantName: string) => {
@@ -66,9 +84,7 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew }: AssistantsPan
     (e: React.MouseEvent, assistantName: string) => {
       e.preventDefault()
       e.stopPropagation()
-      // TODO: Implement context menu for assistants when needed
-      // window.electronAPI.contextMenu.showAssistantMenu(assistantName)
-      console.log('Context menu for assistant:', assistantName)
+      window.electronAPI.contextMenu.showAssistantMenu(assistantName)
     },
     []
   )
@@ -76,10 +92,69 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew }: AssistantsPan
   // Handle right-click on panel background
   const handlePanelContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    // TODO: Implement panel context menu for assistants when needed
-    // window.electronAPI.contextMenu.showAssistantPanelMenu()
-    console.log('Panel context menu')
+    // No panel-level context menu for assistants currently
   }, [])
+
+  // Handle delete action - opens confirmation dialog
+  const openDeleteDialog = useCallback((assistantName: string) => {
+    setAssistantToDelete(assistantName)
+    setConfirmationInput('')
+    setDeleteError(null)
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!assistantToDelete) return
+
+    // Verify the confirmation input matches the assistant name
+    if (confirmationInput !== assistantToDelete) {
+      setDeleteError('Assistant name does not match')
+      return
+    }
+
+    try {
+      await deleteMutation.mutateAsync(assistantToDelete)
+      // If we deleted the active assistant, clear selection
+      if (activeAssistant === assistantToDelete) {
+        setActiveAssistant(null)
+      }
+      setDeleteDialogOpen(false)
+      setAssistantToDelete(null)
+      setConfirmationInput('')
+      setDeleteError(null)
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete assistant')
+    }
+  }, [assistantToDelete, confirmationInput, deleteMutation, activeAssistant, setActiveAssistant])
+
+  const handleCancelDelete = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setAssistantToDelete(null)
+    setConfirmationInput('')
+    setDeleteError(null)
+  }, [])
+
+  // Handle edit action
+  const handleEditAssistant = useCallback((assistantName: string) => {
+    // Select the assistant first
+    setActiveAssistant(assistantName)
+    // Call the edit callback if provided
+    if (onEditAssistant) {
+      onEditAssistant(assistantName)
+    }
+  }, [setActiveAssistant, onEditAssistant])
+
+  // Listen for native context menu actions
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.contextMenu.onAssistantAction((data) => {
+      if (data.action === 'delete' && data.assistantName) {
+        openDeleteDialog(data.assistantName)
+      } else if (data.action === 'edit' && data.assistantName) {
+        handleEditAssistant(data.assistantName)
+      }
+    })
+    return unsubscribe
+  }, [openDeleteDialog, handleEditAssistant])
 
   const handleCreateNew = useCallback(() => {
     if (onCreateNew) {
@@ -183,6 +258,72 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew }: AssistantsPan
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => !open && handleCancelDelete()}>
+        <DialogContent className="sm:max-w-[320px] p-0 gap-0 rounded-xl border-0 bg-background/80 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.3)] ring-1 ring-black/10 dark:ring-white/10">
+          <DialogHeader className="px-5 pt-5 pb-4 text-center space-y-2">
+            <DialogTitle className="text-[13px] font-semibold text-destructive">
+              Delete Assistant
+            </DialogTitle>
+            <DialogDescription className="text-[11px] text-muted-foreground leading-[1.4]">
+              This will permanently delete the <span className="font-medium text-foreground">{assistantToDelete}</span> assistant
+              and all its files. This action cannot be undone.
+            </DialogDescription>
+
+            {/* Confirmation input */}
+            <div className="pt-1">
+              <label className="text-[10px] text-muted-foreground">
+                Type <span className="font-mono text-foreground">{assistantToDelete}</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={confirmationInput}
+                onChange={(e) => {
+                  setConfirmationInput(e.target.value)
+                  setDeleteError(null)
+                }}
+                placeholder={assistantToDelete || ''}
+                className={cn(
+                  "mt-1.5 w-full h-7 px-2 text-[11px] text-center",
+                  "rounded-md border border-input bg-background/50",
+                  "placeholder:text-muted-foreground/40",
+                  "focus:outline-none focus:ring-1 focus:ring-ring"
+                )}
+                style={{ boxShadow: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)' }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && confirmationInput === assistantToDelete) {
+                    handleConfirmDelete()
+                  }
+                }}
+              />
+              {deleteError && (
+                <p className="mt-2 text-[10px] text-destructive">{deleteError}</p>
+              )}
+            </div>
+          </DialogHeader>
+
+          <DialogFooter className="px-4 pb-4 flex-row gap-2 sm:space-x-0">
+            <Button
+              variant="outline"
+              onClick={handleCancelDelete}
+              disabled={deleteMutation.isPending}
+              className="flex-1 h-[26px] text-[12px] font-normal"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending || confirmationInput !== assistantToDelete}
+              className="flex-1 h-[26px] text-[12px] font-medium"
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   )
 }
