@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AssistantModel, CreateAssistantParams, UpdateAssistantParams } from '../../electron/types'
+import { AssistantModel, AssistantFile, CreateAssistantParams, UpdateAssistantParams } from '../../electron/types'
 import { QUERY } from '../constants/ui'
 
 // Query Keys
@@ -7,6 +7,7 @@ export const assistantQueryKeys = {
   all: ['assistant'] as const,
   list: (profileId: string) => [...assistantQueryKeys.all, 'list', profileId] as const,
   detail: (profileId: string, name: string) => [...assistantQueryKeys.all, 'detail', profileId, name] as const,
+  files: (profileId: string, assistantName: string) => [...assistantQueryKeys.all, 'files', profileId, assistantName] as const,
 }
 
 // List Assistants Query
@@ -137,6 +138,37 @@ export function useDeleteAssistantMutation(profileId: string) {
       queryClient.removeQueries({
         queryKey: assistantQueryKeys.detail(data.profileId, data.assistantName),
       })
+    },
+  })
+}
+
+// Poll interval for files (5 seconds while processing)
+const FILES_POLL_INTERVAL = 5000
+
+// List Files Query for an Assistant
+// Polls every 5 seconds while any file has 'Processing' status
+export function useFilesQuery(
+  profileId: string | null,
+  assistantName: string | null,
+  enabled: boolean = true
+) {
+  return useQuery({
+    queryKey: assistantQueryKeys.files(profileId || '', assistantName || ''),
+    queryFn: async (): Promise<AssistantFile[]> => {
+      if (!profileId || !assistantName) {
+        throw new Error('Profile ID and Assistant name are required')
+      }
+      const files = await window.electronAPI.assistant.files.list(profileId, assistantName)
+      return files
+    },
+    enabled: enabled && !!profileId && !!assistantName,
+    staleTime: QUERY.STALE_TIME_STATS,
+    // Dynamic refetchInterval: poll every 5s while any file is Processing
+    refetchInterval: (query) => {
+      const files = query.state.data
+      if (!files || !Array.isArray(files)) return false
+      const hasProcessingFiles = files.some((file: AssistantFile) => file.status === 'Processing')
+      return hasProcessingFiles ? FILES_POLL_INTERVAL : false
     },
   })
 }

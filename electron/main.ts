@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
 
 // Redirect userData to test directory if running in test mode
 // This MUST happen before any store initialization
@@ -1108,6 +1108,30 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to open URL'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
+// Dialog IPC Handlers
+// ============================================================================
+
+ipcMain.handle('dialog:showOpenDialog', async (_event, options: {
+  properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles'>
+  filters?: Array<{ name: string; extensions: string[] }>
+  title?: string
+  defaultPath?: string
+}) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: options.properties || ['openFile'],
+      filters: options.filters,
+      title: options.title,
+      defaultPath: options.defaultPath,
+    })
+    return { success: true, data: result }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to show dialog'
     return { success: false, error: message }
   }
 })

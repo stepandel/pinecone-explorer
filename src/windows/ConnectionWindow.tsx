@@ -6,6 +6,8 @@ import { DraftIndexProvider } from '../context/DraftIndexContext'
 import { DraftNamespaceProvider } from '../context/DraftNamespaceContext'
 import { ClipboardProvider } from '../context/ClipboardContext'
 import { ModeProvider } from '../context/ModeContext'
+import { AssistantSelectionProvider } from '../context/AssistantSelectionContext'
+import { FileSelectionProvider } from '../context/FileSelectionContext'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { AppLayout } from '../components/layout/AppLayout'
 import { useProfileQuery } from '../hooks/usePineconeQueries'
@@ -41,17 +43,21 @@ export function ConnectionWindow({ windowId, profileId }: ConnectionWindowProps)
       <ModeProvider>
         <ClipboardProvider>
           <SelectionProvider>
-            <QueryStateProvider>
-              <EmbeddingProvider>
-                <DraftIndexProvider>
-                  <DraftNamespaceProvider>
-                    <ErrorBoundary>
-                      <AppLayout />
-                    </ErrorBoundary>
-                  </DraftNamespaceProvider>
-                </DraftIndexProvider>
-              </EmbeddingProvider>
-            </QueryStateProvider>
+            <AssistantSelectionProvider>
+              <FileSelectionProvider>
+                <QueryStateProvider>
+                  <EmbeddingProvider>
+                    <DraftIndexProvider>
+                      <DraftNamespaceProvider>
+                        <ErrorBoundary>
+                          <AppLayout />
+                        </ErrorBoundary>
+                      </DraftNamespaceProvider>
+                    </DraftIndexProvider>
+                  </EmbeddingProvider>
+                </QueryStateProvider>
+              </FileSelectionProvider>
+            </AssistantSelectionProvider>
           </SelectionProvider>
         </ClipboardProvider>
       </ModeProvider>

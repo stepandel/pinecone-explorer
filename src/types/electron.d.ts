@@ -394,6 +394,14 @@ declare global {
     shell: {
       openExternal: (url: string) => Promise<void>
     }
+    dialog: {
+      showOpenDialog: (options: {
+        properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles'>
+        filters?: Array<{ name: string; extensions: string[] }>
+        title?: string
+        defaultPath?: string
+      }) => Promise<{ canceled: boolean; filePaths: string[] }>
+    }
     updater: {
       checkForUpdates: () => Promise<UpdateInfo | undefined>
       downloadUpdate: () => Promise<void>
