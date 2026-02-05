@@ -877,6 +877,70 @@ ipcMain.handle('assistant:delete', async (_event, profileId: string, name: strin
 })
 
 // ============================================================================
+// Assistant File IPC Handlers
+// ============================================================================
+
+ipcMain.handle('assistant:files:list', async (_event, profileId: string, assistantName: string, filter?: Record<string, unknown>) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const files = await assistantService.listFiles(assistantName, filter)
+    return { success: true, data: files }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to list files'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:files:describe', async (_event, profileId: string, assistantName: string, fileId: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const file = await assistantService.describeFile(assistantName, fileId)
+    return { success: true, data: file }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to describe file'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:files:upload', async (_event, profileId: string, assistantName: string, params: { filePath: string; metadata?: Record<string, string | number> }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const file = await assistantService.uploadFile(assistantName, params)
+    return { success: true, data: file }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to upload file'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:files:delete', async (_event, profileId: string, assistantName: string, fileId: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    await assistantService.deleteFile(assistantName, fileId)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete file'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
 // Window Management IPC Handlers
 // ============================================================================
 

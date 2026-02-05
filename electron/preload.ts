@@ -26,6 +26,9 @@ import {
   AssistantModel,
   CreateAssistantParams,
   UpdateAssistantParams,
+  AssistantFile,
+  ListAssistantFilesFilter,
+  UploadAssistantFileParams,
 } from './types'
 
 console.log('Preload script is running!')
@@ -345,6 +348,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
       if (!result.success) {
         throw new Error(result.error)
       }
+    },
+    // File operations
+    files: {
+      list: async (profileId: string, assistantName: string, filter?: ListAssistantFilesFilter): Promise<AssistantFile[]> => {
+        const result = await ipcRenderer.invoke('assistant:files:list', profileId, assistantName, filter)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data
+      },
+      describe: async (profileId: string, assistantName: string, fileId: string): Promise<AssistantFile> => {
+        const result = await ipcRenderer.invoke('assistant:files:describe', profileId, assistantName, fileId)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data
+      },
+      upload: async (profileId: string, assistantName: string, params: UploadAssistantFileParams): Promise<AssistantFile> => {
+        const result = await ipcRenderer.invoke('assistant:files:upload', profileId, assistantName, params)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data
+      },
+      delete: async (profileId: string, assistantName: string, fileId: string): Promise<void> => {
+        const result = await ipcRenderer.invoke('assistant:files:delete', profileId, assistantName, fileId)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+      },
     },
   },
   window: {

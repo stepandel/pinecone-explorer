@@ -63,6 +63,30 @@ declare global {
     metadata?: Record<string, string>
   }
 
+  // Assistant File types
+  type AssistantFileStatus = 'Processing' | 'Available' | 'Deleting' | 'ProcessingFailed'
+
+  interface AssistantFile {
+    id: string
+    name: string
+    status: AssistantFileStatus
+    percentDone?: number | null
+    metadata?: Record<string, string | number> | null
+    signedUrl?: string | null
+    errorMessage?: string | null
+    createdOn?: string
+    updatedOn?: string
+  }
+
+  interface ListAssistantFilesFilter {
+    [key: string]: unknown
+  }
+
+  interface UploadAssistantFileParams {
+    filePath: string
+    metadata?: Record<string, string | number>
+  }
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -345,6 +369,12 @@ declare global {
       describe: (profileId: string, name: string) => Promise<AssistantModel>
       update: (profileId: string, name: string, params: UpdateAssistantParams) => Promise<AssistantModel>
       delete: (profileId: string, name: string) => Promise<void>
+      files: {
+        list: (profileId: string, assistantName: string, filter?: ListAssistantFilesFilter) => Promise<AssistantFile[]>
+        describe: (profileId: string, assistantName: string, fileId: string) => Promise<AssistantFile>
+        upload: (profileId: string, assistantName: string, params: UploadAssistantFileParams) => Promise<AssistantFile>
+        delete: (profileId: string, assistantName: string, fileId: string) => Promise<void>
+      }
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>

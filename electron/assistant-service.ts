@@ -1,5 +1,13 @@
 import { Pinecone } from '@pinecone-database/pinecone'
-import { AssistantModel, CreateAssistantParams, UpdateAssistantParams } from './types'
+import {
+  AssistantModel,
+  CreateAssistantParams,
+  UpdateAssistantParams,
+  AssistantFile,
+  AssistantFileStatus,
+  ListAssistantFilesFilter,
+  UploadAssistantFileParams,
+} from './types'
 
 /**
  * Service layer for Pinecone Assistant API operations.
@@ -82,6 +90,75 @@ export class AssistantService {
       host: model.host,
       createdAt: model.createdAt?.toISOString(),
       updatedAt: model.updatedAt?.toISOString(),
+    }
+  }
+
+  // ============================================================================
+  // File Operations
+  // ============================================================================
+
+  /**
+   * List files for an assistant with optional filter
+   */
+  async listFiles(assistantName: string, filter?: ListAssistantFilesFilter): Promise<AssistantFile[]> {
+    const assistant = this.client.assistant(assistantName)
+    const response = await assistant.listFiles(filter ? { filter } : undefined)
+    return (response.files || []).map(this.mapFileModel)
+  }
+
+  /**
+   * Get details of a specific file by ID
+   */
+  async describeFile(assistantName: string, fileId: string): Promise<AssistantFile> {
+    const assistant = this.client.assistant(assistantName)
+    const response = await assistant.describeFile(fileId, true) // include signed URL
+    return this.mapFileModel(response)
+  }
+
+  /**
+   * Upload a file to an assistant from a local path
+   */
+  async uploadFile(assistantName: string, params: UploadAssistantFileParams): Promise<AssistantFile> {
+    const assistant = this.client.assistant(assistantName)
+    const response = await assistant.uploadFile({
+      path: params.filePath,
+      metadata: params.metadata,
+    })
+    return this.mapFileModel(response)
+  }
+
+  /**
+   * Delete a file from an assistant
+   */
+  async deleteFile(assistantName: string, fileId: string): Promise<void> {
+    const assistant = this.client.assistant(assistantName)
+    await assistant.deleteFile(fileId)
+  }
+
+  /**
+   * Map SDK AssistantFileModel to our internal type
+   */
+  private mapFileModel(file: {
+    id: string
+    name: string
+    status?: string
+    percentDone?: number | null
+    metadata?: object | null
+    signedUrl?: string | null
+    errorMessage?: string | null
+    createdOn?: Date
+    updatedOn?: Date
+  }): AssistantFile {
+    return {
+      id: file.id,
+      name: file.name,
+      status: (file.status || 'Processing') as AssistantFileStatus,
+      percentDone: file.percentDone,
+      metadata: file.metadata as Record<string, string | number> | null | undefined,
+      signedUrl: file.signedUrl,
+      errorMessage: file.errorMessage,
+      createdOn: file.createdOn?.toISOString(),
+      updatedOn: file.updatedOn?.toISOString(),
     }
   }
 }

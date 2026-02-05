@@ -438,3 +438,54 @@ export interface UpdateAssistantParams {
   metadata?: Record<string, string>
 }
 
+// ============================================================================
+// Assistant File Types
+// ============================================================================
+
+/**
+ * File status enum for assistant files
+ */
+export type AssistantFileStatus = 'Processing' | 'Available' | 'Deleting' | 'ProcessingFailed'
+
+/**
+ * Represents a file associated with an assistant
+ */
+export interface AssistantFile {
+  /** Unique identifier for the file */
+  id: string
+  /** The name of the file */
+  name: string
+  /** Current processing status */
+  status: AssistantFileStatus
+  /** Processing progress (0-1) */
+  percentDone?: number | null
+  /** Optional metadata attached to the file */
+  metadata?: Record<string, string | number> | null
+  /** Signed URL for accessing the file content */
+  signedUrl?: string | null
+  /** Error message if processing failed */
+  errorMessage?: string | null
+  /** Creation timestamp */
+  createdOn?: string
+  /** Last update timestamp */
+  updatedOn?: string
+}
+
+/**
+ * Filter options for listing assistant files
+ */
+export interface ListAssistantFilesFilter {
+  /** Filter by metadata key-value pairs */
+  [key: string]: unknown
+}
+
+/**
+ * Parameters for uploading a file to an assistant
+ */
+export interface UploadAssistantFileParams {
+  /** Path to the file on disk */
+  filePath: string
+  /** Optional metadata to attach to the file */
+  metadata?: Record<string, string | number>
+}
+
