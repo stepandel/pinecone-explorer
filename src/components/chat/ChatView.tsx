@@ -3,6 +3,8 @@ import { Send, Trash2, StopCircle, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useChatStream, DEFAULT_MODELS } from '@/hooks/useChatStream'
 import { useAssistantSelection } from '@/context/AssistantSelectionContext'
+import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
+import { SHORTCUTS } from '@/constants/keyboard-shortcuts'
 import { ChatMessage } from './ChatMessage'
 import {
   Select,
@@ -73,6 +75,41 @@ export function ChatView({ assistantName }: ChatViewProps) {
     textareaRef.current?.focus()
   }, [activeAssistant])
 
+  // Focus chat input handler
+  const focusChatInput = useCallback(() => {
+    textareaRef.current?.focus()
+  }, [])
+
+  // Keyboard shortcuts
+  useKeyboardShortcut(SHORTCUTS.FOCUS_CHAT_INPUT, focusChatInput, {
+    skipInputs: false, // Allow focusing even when already in input
+  })
+
+  useKeyboardShortcut(SHORTCUTS.CLEAR_CONVERSATION, () => {
+    if (messages.length > 0 && !isStreaming) {
+      clearMessages()
+    }
+  }, {
+    skipInputs: false,
+  })
+
+  // Listen for menu IPC events
+  useEffect(() => {
+    const unsubFocus = window.electronAPI.menu.onFocusChatInput(() => {
+      textareaRef.current?.focus()
+    })
+    const unsubClear = window.electronAPI.menu.onClearConversation(() => {
+      if (messages.length > 0 && !isStreaming) {
+        clearMessages()
+      }
+    })
+
+    return () => {
+      unsubFocus()
+      unsubClear()
+    }
+  }, [messages.length, isStreaming, clearMessages])
+
   const handleSubmit = useCallback(() => {
     if (!inputValue.trim() || isStreaming) return
     sendMessage(inputValue)
@@ -85,14 +122,22 @@ export function ChatView({ assistantName }: ChatViewProps) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      // Submit on Enter (without Shift)
-      if (e.key === 'Enter' && !e.shiftKey) {
+      // Submit on Enter (without Shift) or Cmd/Ctrl+Enter
+      if (e.key === 'Enter' && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         handleSubmit()
       }
     },
     [handleSubmit]
   )
+
+  // Listen for menu send message event
+  useEffect(() => {
+    const unsubSend = window.electronAPI.menu.onSendMessage(() => {
+      handleSubmit()
+    })
+    return () => unsubSend()
+  }, [handleSubmit])
 
   const handleStopGeneration = useCallback(() => {
     cancelStream()

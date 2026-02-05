@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { usePanel } from '../context/PanelContext'
 import { useSelection } from '../context/SelectionContext'
 import { useDraftIndex } from '../context/DraftIndexContext'
 import { useDraftNamespace } from '../context/DraftNamespaceContext'
@@ -13,19 +12,14 @@ import { useDraftNamespace } from '../context/DraftNamespaceContext'
  * registration/deregistration which causes performance issues.
  */
 export function useMenuHandlers() {
-  const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } = usePanel()
   const { activeIndex, activeNamespace } = useSelection()
   const { startCreation: startIndexCreation } = useDraftIndex()
   const { startCreation: startNamespaceCreation } = useDraftNamespace()
 
   // Store current values in refs for stable access in event handlers
   const stateRef = useRef({
-    leftPanelOpen,
-    rightPanelOpen,
     activeIndex,
     activeNamespace,
-    setLeftPanelOpen,
-    setRightPanelOpen,
     startIndexCreation,
     startNamespaceCreation,
   })
@@ -33,12 +27,8 @@ export function useMenuHandlers() {
   // Update ref when dependencies change (doesn't trigger re-subscription)
   useEffect(() => {
     stateRef.current = {
-      leftPanelOpen,
-      rightPanelOpen,
       activeIndex,
       activeNamespace,
-      setLeftPanelOpen,
-      setRightPanelOpen,
       startIndexCreation,
       startNamespaceCreation,
     }
@@ -47,14 +37,6 @@ export function useMenuHandlers() {
   // Subscribe once on mount with stable handlers that read from refs
   useEffect(() => {
     // View menu handlers
-    const handleToggleLeftPanel = () => {
-      stateRef.current.setLeftPanelOpen(!stateRef.current.leftPanelOpen)
-    }
-
-    const handleToggleRightPanel = () => {
-      stateRef.current.setRightPanelOpen(!stateRef.current.rightPanelOpen)
-    }
-
     const handleFocusSearch = () => {
       window.dispatchEvent(new CustomEvent('menu:focus-search'))
     }
@@ -159,8 +141,6 @@ export function useMenuHandlers() {
 
     // Subscribe to menu events from main process
     // View menu
-    const unsubToggleLeft = window.electronAPI.menu.onToggleLeftPanel(handleToggleLeftPanel)
-    const unsubToggleRight = window.electronAPI.menu.onToggleRightPanel(handleToggleRightPanel)
     const unsubFocusSearch = window.electronAPI.menu.onFocusSearch(handleFocusSearch)
     const unsubClearFilters = window.electronAPI.menu.onClearFilters(handleClearFilters)
     const unsubAddFilter = window.electronAPI.menu.onAddFilter(handleAddFilter)
@@ -193,8 +173,6 @@ export function useMenuHandlers() {
     const unsubShowShortcuts = window.electronAPI.menu.onShowShortcuts(handleShowShortcuts)
 
     return () => {
-      unsubToggleLeft()
-      unsubToggleRight()
       unsubFocusSearch()
       unsubClearFilters()
       unsubAddFilter()

@@ -503,6 +503,17 @@ declare global {
       onClearFilters: (callback: () => void) => () => void
       onAddFilter: (callback: () => void) => () => void
       onRemoveFilter: (callback: () => void) => () => void
+      // Mode switching events
+      onSwitchToIndexMode: (callback: () => void) => () => void
+      onSwitchToAssistantMode: (callback: () => void) => () => void
+      // Assistant menu events
+      onNewAssistant: (callback: () => void) => () => void
+      onEditAssistant: (callback: () => void) => () => void
+      onDeleteAssistant: (callback: () => void) => () => void
+      // Chat menu events
+      onSendMessage: (callback: () => void) => () => void
+      onFocusChatInput: (callback: () => void) => () => void
+      onClearConversation: (callback: () => void) => () => void
       // Window menu events
       onDisconnect: (callback: () => void) => () => void
       // Help menu events

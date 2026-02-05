@@ -201,17 +201,17 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
         },
         { type: 'separator' },
         {
-          label: 'Toggle Namespaces Panel',
+          label: 'Index Mode',
           accelerator: 'CmdOrCtrl+1',
           click: () => {
-            sendToFocusedWindow('menu:toggle-left-panel')
+            sendToFocusedWindow('menu:switch-to-index-mode')
           },
         },
         {
-          label: 'Toggle Details Panel',
+          label: 'Assistant Mode',
           accelerator: 'CmdOrCtrl+2',
           click: () => {
-            sendToFocusedWindow('menu:toggle-right-panel')
+            sendToFocusedWindow('menu:switch-to-assistant-mode')
           },
         },
         { type: 'separator' },
@@ -364,6 +364,63 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
           label: 'Configure Embedding Function...',
           click: () => {
             sendToFocusedWindow('menu:configure-embedding')
+          },
+        },
+      ],
+    },
+
+    // Assistant menu
+    {
+      label: 'Assistant',
+      submenu: [
+        {
+          label: 'New Assistant...',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => {
+            sendToFocusedWindow('menu:new-assistant')
+          },
+          registerAccelerator: false, // Also used for New Index in index mode
+        },
+        { type: 'separator' },
+        {
+          label: 'Chat',
+          submenu: [
+            {
+              label: 'Send Message',
+              accelerator: 'CmdOrCtrl+Return',
+              click: () => {
+                sendToFocusedWindow('menu:send-message')
+              },
+              registerAccelerator: false, // Don't override globally, handle in component
+            },
+            {
+              label: 'Focus Input',
+              accelerator: 'CmdOrCtrl+K',
+              click: () => {
+                sendToFocusedWindow('menu:focus-chat-input')
+              },
+            },
+            { type: 'separator' },
+            {
+              label: 'Clear Conversation',
+              accelerator: 'CmdOrCtrl+Shift+Backspace',
+              click: () => {
+                sendToFocusedWindow('menu:clear-conversation')
+              },
+            },
+          ],
+        },
+        { type: 'separator' },
+        {
+          label: 'Edit Assistant...',
+          click: () => {
+            sendToFocusedWindow('menu:edit-assistant')
+          },
+        },
+        {
+          label: 'Delete Assistant',
+          click: () => {
+            sendToFocusedWindow('menu:delete-assistant')
           },
         },
       ],

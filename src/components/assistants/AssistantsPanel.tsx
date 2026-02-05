@@ -3,6 +3,8 @@ import { ChevronsLeft } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useAssistantSelection } from '../../context/AssistantSelectionContext'
 import { useAssistantsQuery, useDeleteAssistantMutation } from '../../hooks/useAssistantQueries'
+import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut'
+import { SHORTCUTS } from '../../constants/keyboard-shortcuts'
 import { NewButton } from '../ui/new-button'
 import { Button } from '../ui/button'
 import {
@@ -161,6 +163,32 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
       onCreateNew()
     }
   }, [onCreateNew])
+
+  // Keyboard shortcut for new assistant (Cmd+Shift+N)
+  useKeyboardShortcut(SHORTCUTS.NEW_ASSISTANT, handleCreateNew)
+
+  // Listen for menu IPC events
+  useEffect(() => {
+    const unsubNewAssistant = window.electronAPI.menu.onNewAssistant(() => {
+      handleCreateNew()
+    })
+    const unsubEditAssistant = window.electronAPI.menu.onEditAssistant(() => {
+      if (activeAssistant) {
+        handleEditAssistant(activeAssistant)
+      }
+    })
+    const unsubDeleteAssistant = window.electronAPI.menu.onDeleteAssistant(() => {
+      if (activeAssistant) {
+        openDeleteDialog(activeAssistant)
+      }
+    })
+
+    return () => {
+      unsubNewAssistant()
+      unsubEditAssistant()
+      unsubDeleteAssistant()
+    }
+  }, [handleCreateNew, activeAssistant, handleEditAssistant, openDeleteDialog])
 
   return (
     <aside
