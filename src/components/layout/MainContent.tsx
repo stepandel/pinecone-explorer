@@ -13,6 +13,9 @@ import { IndexConfigView } from '../indexes/IndexConfigView'
 import { NamespaceConfigView } from '../namespaces/NamespaceConfigView'
 import VectorsView from '../vectors/VectorsView'
 import VectorDetailPanel from '../vectors/VectorDetailPanel'
+import { AssistantsPanel } from '../assistants/AssistantsPanel'
+import { FilesPanel } from '../files/FilesPanel'
+import { FileDetailPanel } from '../files/FileDetailPanel'
 import ChatView from '../chat/ChatView'
 
 interface VectorRecord {
@@ -124,15 +127,19 @@ export function MainContent() {
 
   return (
     <main className="flex-1 relative overflow-hidden bg-content" data-testid="main-content">
-      {/* IndexesPanel - Collapsible */}
+      {/* Left-most Panel: IndexesPanel (index mode) or AssistantsPanel (assistant mode) - Collapsible */}
       <aside
         className={`absolute top-0 left-0 h-full z-30 transition-transform duration-200 ${
           indexesPanelOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ width: `${indexesPanelWidth}px` }}
-        data-testid="indexes-panel"
+        data-testid={mode === 'assistant' ? 'assistants-panel' : 'indexes-panel'}
       >
-        <IndexesPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
+        {mode === 'assistant' ? (
+          <AssistantsPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
+        ) : (
+          <IndexesPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
+        )}
         {/* Resize handle */}
         {indexesPanelOpen && (
           <div
@@ -211,7 +218,7 @@ export function MainContent() {
         )}
       </div>
 
-      {/* Namespaces Panel - Collapsible, positioned after IndexesPanel */}
+      {/* Secondary Left Panel: NamespacesPanel (index mode) or FilesPanel (assistant mode) - Collapsible */}
       <aside
         className={`absolute top-0 h-full transition-transform duration-200 ${
           leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
@@ -220,12 +227,16 @@ export function MainContent() {
           left: `${effectiveIndexesWidth}px`,
           width: `${leftPanelWidth}px`,
         }}
-        data-testid="namespaces-panel"
+        data-testid={mode === 'assistant' ? 'files-panel' : 'namespaces-panel'}
       >
-        <NamespacesPanel
-          showIndexesToggle={!indexesPanelOpen}
-          onToggleIndexesPanel={() => setIndexesPanelOpen(true)}
-        />
+        {mode === 'assistant' ? (
+          <FilesPanel />
+        ) : (
+          <NamespacesPanel
+            showIndexesToggle={!indexesPanelOpen}
+            onToggleIndexesPanel={() => setIndexesPanelOpen(true)}
+          />
+        )}
         {/* Resize handle */}
         {leftPanelOpen && (
           <div
@@ -239,7 +250,7 @@ export function MainContent() {
         )}
       </aside>
 
-      {/* Right Panel: Vector Detail - Floating glass overlay */}
+      {/* Right Panel: VectorDetailPanel (index mode) or FileDetailPanel (assistant mode) - Floating glass overlay */}
       <aside
         className={`absolute top-0 right-0 h-full transition-transform duration-200 ${
           rightPanelOpen ? 'translate-x-0' : 'translate-x-full'
@@ -247,7 +258,9 @@ export function MainContent() {
         style={{ width: `${rightPanelWidth}px` }}
         data-testid="detail-panel"
       >
-        {selectedVector && activeIndex && currentProfile ? (
+        {mode === 'assistant' ? (
+          <FileDetailPanel />
+        ) : selectedVector && activeIndex && currentProfile ? (
           <VectorDetailPanel
             vector={selectedVector}
             indexName={activeIndex}
