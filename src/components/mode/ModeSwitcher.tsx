@@ -19,7 +19,7 @@ export function ModeSwitcher() {
   return (
     <div 
       className="flex items-center bg-black/[0.04] dark:bg-white/[0.06] rounded-md p-0.5"
-      role="tablist"
+      role="radiogroup"
       aria-label="Explorer mode"
       data-testid="mode-switcher"
     >
@@ -28,8 +28,8 @@ export function ModeSwitcher() {
         return (
           <button
             key={value}
-            role="tab"
-            aria-selected={isActive}
+            role="radio"
+            aria-checked={isActive}
             onClick={() => setMode(value)}
             className={`
               flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-medium transition-all

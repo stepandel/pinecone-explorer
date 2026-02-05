@@ -313,10 +313,12 @@ export class ConnectionStore {
     const profiles = this.getProfiles()
     const profile = profiles.find((p) => p.id === profileId)
 
-    if (profile) {
-      profile.preferredMode = mode
-      getStore().set('profiles', profiles)
+    if (!profile) {
+      throw new Error(`Profile not found: ${profileId}`)
     }
+
+    profile.preferredMode = mode
+    getStore().set('profiles', profiles)
   }
 }
 
