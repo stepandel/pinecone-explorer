@@ -87,6 +87,64 @@ declare global {
     metadata?: Record<string, string | number>
   }
 
+  // Assistant Chat types
+  interface ChatMessage {
+    role: 'user' | 'assistant'
+    content: string
+  }
+
+  interface ChatContextOptions {
+    topK?: number
+    snippetSize?: number
+  }
+
+  interface ChatParams {
+    messages: ChatMessage[]
+    model?: string
+    temperature?: number
+    filter?: Record<string, unknown>
+    jsonResponse?: boolean
+    includeHighlights?: boolean
+    contextOptions?: ChatContextOptions
+  }
+
+  interface CitationReference {
+    file: { name: string; id: string }
+    pages?: number[]
+  }
+
+  interface Citation {
+    position: number
+    references: CitationReference[]
+  }
+
+  interface ChatUsage {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
+
+  interface ChatResponse {
+    id: string
+    message: ChatMessage
+    citations?: Citation[]
+    usage?: ChatUsage
+    model?: string
+    finishReason?: string
+  }
+
+  interface ChatStreamChunk {
+    type: 'message_start' | 'content' | 'citation' | 'message_end' | 'error'
+    id?: string
+    model?: string
+    role?: string
+    content?: string
+    citation?: Citation
+    usage?: ChatUsage
+    finishReason?: string
+    error?: string
+  }
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -374,6 +432,12 @@ declare global {
         describe: (profileId: string, assistantName: string, fileId: string) => Promise<AssistantFile>
         upload: (profileId: string, assistantName: string, params: UploadAssistantFileParams) => Promise<AssistantFile>
         delete: (profileId: string, assistantName: string, fileId: string) => Promise<void>
+      }
+      chat: (profileId: string, assistantName: string, params: ChatParams) => Promise<ChatResponse>
+      chatStream: {
+        start: (profileId: string, assistantName: string, params: ChatParams) => Promise<string>
+        cancel: (streamId: string) => Promise<void>
+        onChunk: (callback: (streamId: string, chunk: ChatStreamChunk) => void) => () => void
       }
     }
     window: {

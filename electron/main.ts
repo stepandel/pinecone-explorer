@@ -9,6 +9,7 @@ if (process.env.NODE_ENV === 'test' && process.env.E2E_USER_DATA_DIR) {
 // Set app name before anything else (affects menu bar, about dialog, etc.)
 app.name = 'Pinecone Explorer'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { pineconeConnectionPool } from './pinecone-service'
 import { connectionStore } from './connection-store'
@@ -936,6 +937,75 @@ ipcMain.handle('assistant:files:delete', async (_event, profileId: string, assis
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete file'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
+// Assistant Chat IPC Handlers
+// ============================================================================
+
+// Track active chat streams for cancellation
+const activeChatStreams: Map<string, AbortController> = new Map()
+
+ipcMain.handle('assistant:chat', async (_event, profileId: string, assistantName: string, params: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; model?: string; filter?: Record<string, unknown> }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const response = await assistantService.chat(assistantName, params)
+    return { success: true, data: response }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to send chat message'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:chat:stream:start', async (event, profileId: string, assistantName: string, params: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; model?: string; filter?: Record<string, unknown> }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    
+    const streamId = crypto.randomUUID()
+    const abortController = new AbortController()
+    activeChatStreams.set(streamId, abortController)
+
+    const assistantService = service.getAssistantService()
+    
+    // Start streaming in background
+    assistantService.chatStream(
+      assistantName,
+      params,
+      (chunk) => {
+        // Send chunk to renderer
+        event.sender.send('assistant:chat:chunk', streamId, chunk)
+      },
+      abortController.signal
+    ).finally(() => {
+      activeChatStreams.delete(streamId)
+    })
+
+    return { success: true, data: { streamId } }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to start chat stream'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:chat:stream:cancel', async (_event, streamId: string) => {
+  try {
+    const controller = activeChatStreams.get(streamId)
+    if (controller) {
+      controller.abort()
+      activeChatStreams.delete(streamId)
+    }
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to cancel chat stream'
     return { success: false, error: message }
   }
 })

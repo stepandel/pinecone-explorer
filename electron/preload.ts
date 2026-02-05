@@ -29,6 +29,9 @@ import {
   AssistantFile,
   ListAssistantFilesFilter,
   UploadAssistantFileParams,
+  ChatParams,
+  ChatResponse,
+  ChatStreamChunk,
 } from './types'
 
 console.log('Preload script is running!')
@@ -376,6 +379,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const result = await ipcRenderer.invoke('assistant:files:delete', profileId, assistantName, fileId)
         if (!result.success) {
           throw new Error(result.error)
+        }
+      },
+    },
+    chat: async (profileId: string, assistantName: string, params: ChatParams): Promise<ChatResponse> => {
+      const result = await ipcRenderer.invoke('assistant:chat', profileId, assistantName, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    chatStream: {
+      start: async (profileId: string, assistantName: string, params: ChatParams): Promise<string> => {
+        const result = await ipcRenderer.invoke('assistant:chat:stream:start', profileId, assistantName, params)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data.streamId
+      },
+      cancel: async (streamId: string): Promise<void> => {
+        const result = await ipcRenderer.invoke('assistant:chat:stream:cancel', streamId)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+      },
+      onChunk: (callback: (streamId: string, chunk: ChatStreamChunk) => void): (() => void) => {
+        const handler = (_event: unknown, streamId: string, chunk: ChatStreamChunk) => {
+          callback(streamId, chunk)
+        }
+        ipcRenderer.on('assistant:chat:chunk', handler)
+        return () => {
+          ipcRenderer.removeListener('assistant:chat:chunk', handler)
         }
       },
     },
