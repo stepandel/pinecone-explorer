@@ -4,6 +4,7 @@ import { QueryStateProvider } from '../context/QueryStateContext'
 import { EmbeddingProvider } from '../context/EmbeddingContext'
 import { DraftIndexProvider } from '../context/DraftIndexContext'
 import { DraftNamespaceProvider } from '../context/DraftNamespaceContext'
+import { DraftAssistantProvider } from '../context/DraftAssistantContext'
 import { ClipboardProvider } from '../context/ClipboardContext'
 import { ModeProvider } from '../context/ModeContext'
 import { AssistantSelectionProvider } from '../context/AssistantSelectionContext'
@@ -49,9 +50,11 @@ export function ConnectionWindow({ windowId, profileId }: ConnectionWindowProps)
                   <EmbeddingProvider>
                     <DraftIndexProvider>
                       <DraftNamespaceProvider>
-                        <ErrorBoundary>
-                          <AppLayout />
-                        </ErrorBoundary>
+                        <DraftAssistantProvider>
+                          <ErrorBoundary>
+                            <AppLayout />
+                          </ErrorBoundary>
+                        </DraftAssistantProvider>
                       </DraftNamespaceProvider>
                     </DraftIndexProvider>
                   </EmbeddingProvider>
