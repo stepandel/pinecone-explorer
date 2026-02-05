@@ -496,6 +496,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }
     },
   },
+  dialog: {
+    showOpenDialog: async (options: {
+      properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+      filters?: Array<{ name: string; extensions: string[] }>
+    }): Promise<{ canceled: boolean; filePaths: string[] }> => {
+      return await ipcRenderer.invoke('dialog:showOpenDialog', options)
+    },
+  },
   updater: {
     checkForUpdates: async (): Promise<any> => {
       const result = await ipcRenderer.invoke('updater:check')
