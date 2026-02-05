@@ -297,6 +297,29 @@ export class ConnectionStore {
 
     return result
   }
+
+  /**
+   * Get the preferred explorer mode for a profile
+   */
+  getPreferredMode(profileId: string): 'index' | 'assistant' | null {
+    const profile = this.getProfile(profileId)
+    return profile?.preferredMode ?? null
+  }
+
+  /**
+   * Set the preferred explorer mode for a profile
+   */
+  setPreferredMode(profileId: string, mode: 'index' | 'assistant'): void {
+    const profiles = this.getProfiles()
+    const profile = profiles.find((p) => p.id === profileId)
+
+    if (!profile) {
+      throw new Error(`Profile not found: ${profileId}`)
+    }
+
+    profile.preferredMode = mode
+    getStore().set('profiles', profiles)
+  }
 }
 
 export const connectionStore = new ConnectionStore()

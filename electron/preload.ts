@@ -294,6 +294,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw new Error(result.error)
       }
     },
+    getPreferredMode: async (profileId: string): Promise<'index' | 'assistant' | null> => {
+      const result = await ipcRenderer.invoke('profiles:getPreferredMode', profileId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    setPreferredMode: async (profileId: string, mode: 'index' | 'assistant'): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:setPreferredMode', profileId, mode)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
   },
   window: {
     createConnection: async (profile: ConnectionProfile): Promise<{ windowId: string }> => {

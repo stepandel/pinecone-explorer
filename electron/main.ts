@@ -777,6 +777,26 @@ ipcMain.handle('profiles:clearHybridEmbeddingOverride', async (_event, profileId
   }
 })
 
+ipcMain.handle('profiles:getPreferredMode', async (_event, profileId: string) => {
+  try {
+    const mode = connectionStore.getPreferredMode(profileId)
+    return { success: true, data: mode }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get preferred mode'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:setPreferredMode', async (_event, profileId: string, mode: 'index' | 'assistant') => {
+  try {
+    connectionStore.setPreferredMode(profileId, mode)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to set preferred mode'
+    return { success: false, error: message }
+  }
+})
+
 // ============================================================================
 // Window Management IPC Handlers
 // ============================================================================
