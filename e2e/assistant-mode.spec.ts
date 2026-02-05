@@ -129,7 +129,7 @@ test.describe.serial('E2E-ASSISTANT-001: Mode Switching Tests', () => {
     await expect(indexesPanel).toBeVisible({ timeout: 5000 })
   })
 
-  test('keyboard shortcut Cmd+1 should switch to index mode', async () => {
+  test('keyboard shortcut Cmd/Ctrl+1 should switch to index mode', async () => {
     const { page } = electronContext
 
     const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
@@ -144,15 +144,16 @@ test.describe.serial('E2E-ASSISTANT-001: Mode Switching Tests', () => {
     await switchToAssistantMode(page)
     expect(await getCurrentMode(page)).toBe('assistant')
 
-    // Use keyboard shortcut to switch to index mode
-    await page.keyboard.press('Meta+1')
+    // Use cross-platform keyboard shortcut to switch to index mode
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+    await page.keyboard.press(`${modifier}+1`)
     await page.waitForTimeout(500)
     
     const mode = await getCurrentMode(page)
     expect(mode).toBe('index')
   })
 
-  test('keyboard shortcut Cmd+2 should switch to assistant mode', async () => {
+  test('keyboard shortcut Cmd/Ctrl+2 should switch to assistant mode', async () => {
     const { page } = electronContext
 
     const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
@@ -167,8 +168,9 @@ test.describe.serial('E2E-ASSISTANT-001: Mode Switching Tests', () => {
     await switchToIndexMode(page)
     expect(await getCurrentMode(page)).toBe('index')
 
-    // Use keyboard shortcut to switch to assistant mode
-    await page.keyboard.press('Meta+2')
+    // Use cross-platform keyboard shortcut to switch to assistant mode
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+    await page.keyboard.press(`${modifier}+2`)
     await page.waitForTimeout(500)
     
     const mode = await getCurrentMode(page)
@@ -195,12 +197,13 @@ test.describe.serial('E2E-ASSISTANT-001: Mode Switching Tests', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(2000)
 
-    // Verify mode is still assistant
+    // Assert mode switcher is visible first (don't skip silently)
     const modeSwitcher = page.locator('[data-testid="mode-switcher"]')
-    if (await modeSwitcher.isVisible()) {
-      const mode = await getCurrentMode(page)
-      expect(mode).toBe('assistant')
-    }
+    await expect(modeSwitcher).toBeVisible({ timeout: 5000 })
+    
+    // Verify mode is still assistant
+    const mode = await getCurrentMode(page)
+    expect(mode).toBe('assistant')
   })
 
   test('correct panels should render per mode', async () => {

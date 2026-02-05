@@ -124,23 +124,27 @@ test.describe.serial('E2E-ASSISTANT-005: File Detail Panel Tests', () => {
 
     const fileCount = await getFileCount(page)
     
-    if (fileCount > 0) {
-      // Get the first file's name
-      const fileItem = page.locator('[data-testid="file-item"]').first()
-      const fileName = await fileItem.getAttribute('data-file-name')
-      
-      // Select the file
-      await fileItem.click()
-      await page.waitForTimeout(500)
-
-      // Detail panel should no longer show empty state
-      const emptyState = page.locator('[data-testid="file-detail-empty-state"]')
-      await expect(emptyState).not.toBeVisible()
-
-      // Should show file name
-      const fileNameInDetail = page.locator(`[data-testid="file-detail-panel"] >> text=${fileName}`)
-      await expect(fileNameInDetail).toBeVisible({ timeout: 5000 })
+    // Explicitly skip if no files are available to test
+    if (fileCount === 0) {
+      test.skip(true, 'No files available to test file selection - upload a file first')
+      return
     }
+    
+    // Get the first file's name
+    const fileItem = page.locator('[data-testid="file-item"]').first()
+    const fileName = await fileItem.getAttribute('data-file-name')
+    
+    // Select the file
+    await fileItem.click()
+    await page.waitForTimeout(500)
+
+    // Detail panel should no longer show empty state
+    const emptyState = page.locator('[data-testid="file-detail-empty-state"]')
+    await expect(emptyState).not.toBeVisible()
+
+    // Should show file name
+    const fileNameInDetail = page.locator(`[data-testid="file-detail-panel"] >> text=${fileName}`)
+    await expect(fileNameInDetail).toBeVisible({ timeout: 5000 })
   })
 
   test('file detail should show status badge', async () => {
@@ -285,24 +289,31 @@ test.describe.serial('E2E-ASSISTANT-005: File Detail Panel Tests', () => {
 
     const fileCount = await getFileCount(page)
     
-    if (fileCount > 0) {
-      // Select first file
-      const fileItem = page.locator('[data-testid="file-item"]').first()
-      const fileId = await fileItem.getAttribute('data-file-id')
-      await fileItem.click()
-      await page.waitForTimeout(500)
-
-      // Click delete button
-      const deleteButton = page.locator('[data-testid="file-delete-button"]')
-      await deleteButton.click()
-
-      // Wait for deletion to complete
-      await page.waitForTimeout(5000)
-
-      // File should be removed or in deleting state
-      // The detail panel might show "Deleting..." status
-      // Eventually the file should no longer be in the list
+    // Explicitly skip if no files are available to test deletion
+    if (fileCount === 0) {
+      test.skip(true, 'No files available to test deletion - upload a file first')
+      return
     }
+    
+    // Select first file
+    const fileItem = page.locator('[data-testid="file-item"]').first()
+    const fileId = await fileItem.getAttribute('data-file-id')
+    await fileItem.click()
+    await page.waitForTimeout(500)
+
+    // Click delete button
+    const deleteButton = page.locator('[data-testid="file-delete-button"]')
+    await deleteButton.click()
+
+    // Verify deletion outcome: file should either show "Deleting" status or disappear
+    const fileItemLocator = page.locator(`[data-testid="file-item"][data-file-id="${fileId}"]`)
+    
+    // Wait for the file to be removed from the list (or show Deleting status)
+    await expect(fileItemLocator).toBeHidden({ timeout: 30000 })
+    
+    // Verify file count decreased
+    const newFileCount = await getFileCount(page)
+    expect(newFileCount).toBeLessThan(fileCount)
   })
 
   test('file detail should show metadata if present', async () => {

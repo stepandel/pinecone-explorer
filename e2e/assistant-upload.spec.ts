@@ -145,58 +145,17 @@ test.describe.serial('E2E-ASSISTANT-004: File Upload Tests', () => {
   })
 
   test('should upload a file via API', async () => {
-    const { page } = electronContext
-
-    const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
-                         process.env.PINECONE_API_KEY !== 'dummy-key-for-local-testing'
-
-    if (!hasRealApiKey) {
-      test.skip()
-      return
-    }
-
-    const initialFileCount = await getFileCount(page)
-
-    // Upload a test file via the API (simulating what the UI does)
-    const uploadResult = await page.evaluate(async (name) => {
-      const profiles = await (window as any).electronAPI.profiles.getAll()
-      const profile = profiles.find((p: any) => p.id.startsWith('test-'))
-      if (!profile) {
-        throw new Error('No test profile found')
-      }
-
-      try {
-        // Note: In a real test, we'd need to provide an actual file path
-        // This test demonstrates the API structure
-        // The actual file upload would require a file on the test system
-        return { success: false, reason: 'Would need actual file path' }
-      } catch (err) {
-        return { success: false, error: String(err) }
-      }
-    }, testAssistantName)
-
-    // Since we can't actually upload without a real file, just verify the structure
-    expect(uploadResult).toBeDefined()
+    // TODO: Implement actual file upload test once test fixtures are set up
+    // This test requires a real file path and proper upload infrastructure
+    // Skip until we have a reliable way to upload test files in CI
+    test.skip(true, 'File upload via API requires real file fixture - skipping until test infrastructure is ready')
   })
 
   test('upload dialog should show metadata input', async () => {
-    const { page } = electronContext
-
-    const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
-                         process.env.PINECONE_API_KEY !== 'dummy-key-for-local-testing'
-
-    if (!hasRealApiKey) {
-      test.skip()
-      return
-    }
-
-    // The upload dialog includes metadata input
-    // Since we can't open the dialog without file selection,
-    // we verify the component structure exists in the codebase
-    // This is verified by the build passing with the data-testid attributes
-    
-    // We can check that the upload flow elements exist by their data-testid
-    // The actual dialog testing would require mocking the file selection
+    // TODO: Implement metadata input test once file dialog mocking is available
+    // The upload dialog opens via native file picker which cannot be intercepted
+    // in Playwright without proper file dialog mocking infrastructure
+    test.skip(true, 'Upload dialog metadata test requires file dialog mocking - not yet implemented')
   })
 
   test('should show file after upload', async () => {
@@ -244,32 +203,23 @@ test.describe.serial('E2E-ASSISTANT-004: File Upload Tests', () => {
     
     const fileCount = await getFileCount(page)
     
-    if (fileCount > 0) {
-      const fileItem = page.locator('[data-testid="file-item"]').first()
-      
-      // Status could be Processing or Ready depending on timing
-      const statusText = fileItem.locator('text=/Ready|Processing/')
-      await expect(statusText).toBeVisible({ timeout: 5000 })
+    // Explicitly skip if no files are available to test status
+    if (fileCount === 0) {
+      test.skip(true, 'No files available to test status indicator - upload a file first')
+      return
     }
+    
+    const fileItem = page.locator('[data-testid="file-item"]').first()
+    
+    // Status could be Processing or Ready depending on timing
+    const statusText = fileItem.locator('text=/Ready|Processing/')
+    await expect(statusText).toBeVisible({ timeout: 5000 })
   })
 
   test('upload progress should be shown during upload', async () => {
-    const { page } = electronContext
-
-    const hasRealApiKey = !!process.env.PINECONE_API_KEY &&
-                         process.env.PINECONE_API_KEY !== 'dummy-key-for-local-testing'
-
-    if (!hasRealApiKey) {
-      test.skip()
-      return
-    }
-
-    // The upload dialog shows progress during upload
-    // This is handled by the UploadFileDialog component with the Loader2 animation
-    // Testing requires actually triggering an upload
-    
-    // For now, verify the dialog structure exists
-    // The presence of data-testid="upload-file-dialog" in the component
-    // confirms the dialog will show progress when active
+    // TODO: Implement upload progress test once real upload flow is available
+    // This test requires triggering an actual upload to observe the progress UI
+    // Skip until upload infrastructure is ready
+    test.skip(true, 'Upload progress test requires real upload flow - not yet implemented')
   })
 })

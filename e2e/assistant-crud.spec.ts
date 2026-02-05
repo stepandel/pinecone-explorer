@@ -192,12 +192,15 @@ test.describe.serial('E2E-ASSISTANT-002: Assistant CRUD Tests', () => {
     await nameInput.fill('Invalid Name!')
     
     // Input should auto-convert to lowercase
-    const value = await nameInput.inputValue()
-    expect(value).toBe('invalid name!')
+    const inputValue = await nameInput.inputValue()
+    expect(inputValue).toBe('invalid name!')
     
     // There should be a validation error for invalid characters
     // The form should show an error message
-    const errorMessage = page.locator('text=/lowercase letters|characters/')
+    const errorMessage = page.locator('text=/lowercase letters|characters|invalid/')
+    
+    // Assert the validation error is visible
+    await expect(errorMessage).toBeVisible({ timeout: 3000 })
     
     // Cancel
     await page.locator('[data-testid="assistant-cancel-button"]').click()
@@ -301,15 +304,11 @@ test.describe.serial('E2E-ASSISTANT-002: Assistant CRUD Tests', () => {
       return
     }
 
-    // Edit via IPC (simulating context menu action)
-    await page.evaluate(async (name) => {
-      // Trigger the edit action
-      const event = new CustomEvent('assistant-edit', { detail: { assistantName: name } })
-      window.dispatchEvent(event)
-    }, testAssistantName)
-
-    // The config view may open for editing
-    // This test verifies the IPC mechanism exists even if we can't test the native menu
+    // Note: Native context menus are handled by Electron and cannot be tested via Playwright.
+    // The context menu triggers IPC calls that open the edit dialog.
+    // We skip this test as the native menu cannot be intercepted in E2E tests.
+    // The edit functionality is tested indirectly through the API calls in other tests.
+    test.skip(true, 'Native context menu cannot be tested via Playwright - edit functionality verified via API')
   })
 
   test('should delete assistant', async () => {

@@ -396,12 +396,30 @@ test.describe.serial('E2E-ASSISTANT-008: Integration Flow Tests', () => {
         return
       }
 
-      // This tests the error handling UI elements exist
-      // Actually triggering network errors is complex in E2E tests
-      
-      // Verify the chat error area exists
-      const chatView = page.locator('[data-testid="chat-view"]')
-      expect(await chatView.isVisible()).toBe(true)
+      // Intercept Pinecone API requests and simulate network failure
+      await page.route('**/assistant/**', route => {
+        route.abort('failed')
+      })
+
+      try {
+        // Try to send a message which should trigger an API call
+        const chatInput = page.locator('[data-testid="chat-input"]')
+        if (await chatInput.isVisible()) {
+          await chatInput.fill('Test message to trigger error')
+          await page.keyboard.press('Enter')
+
+          // Wait for error to appear (the chat should show an error state)
+          const chatError = page.locator('[data-testid="chat-error"], text=/error|failed|unable/i')
+          await expect(chatError).toBeVisible({ timeout: 10000 })
+        } else {
+          // Chat input not visible, verify chat view exists at minimum
+          const chatView = page.locator('[data-testid="chat-view"]')
+          await expect(chatView).toBeVisible()
+        }
+      } finally {
+        // Remove the route to not affect other tests
+        await page.unroute('**/assistant/**')
+      }
     })
   })
 })
