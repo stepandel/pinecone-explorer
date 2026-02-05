@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
-import { Send, Trash2, StopCircle, Bot, User } from 'lucide-react'
+import { Send, Trash2, StopCircle, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useChatStream, ChatMessageWithMeta, DEFAULT_MODELS } from '@/hooks/useChatStream'
+import { useChatStream, DEFAULT_MODELS } from '@/hooks/useChatStream'
 import { useAssistantSelection } from '@/context/AssistantSelectionContext'
+import { ChatMessage } from './ChatMessage'
 import {
   Select,
   SelectContent,
@@ -13,62 +14,6 @@ import {
 
 interface ChatViewProps {
   assistantName: string
-}
-
-function MessageBubble({ message }: { message: ChatMessageWithMeta }) {
-  const isUser = message.role === 'user'
-  
-  return (
-    <div
-      className={cn(
-        'flex gap-3 px-4 py-3',
-        isUser ? 'bg-transparent' : 'bg-black/[0.02] dark:bg-white/[0.02]'
-      )}
-    >
-      {/* Avatar */}
-      <div
-        className={cn(
-          'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center',
-          isUser
-            ? 'bg-primary/10 text-primary'
-            : 'bg-secondary text-secondary-foreground'
-        )}
-      >
-        {isUser ? (
-          <User className="w-4 h-4" />
-        ) : (
-          <Bot className="w-4 h-4" />
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium text-muted-foreground mb-1">
-          {isUser ? 'You' : 'Assistant'}
-        </div>
-        <div className="text-sm text-foreground whitespace-pre-wrap break-words">
-          {message.content}
-          {message.isStreaming && (
-            <span className="inline-block w-2 h-4 ml-1 bg-foreground/50 animate-pulse" />
-          )}
-        </div>
-        
-        {/* Citations */}
-        {message.citations && message.citations.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {message.citations.map((citation, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-primary/10 text-primary"
-              >
-                {citation.references.map(ref => ref.file.name).join(', ')}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 function EmptyState({ assistantName }: { assistantName: string }) {
@@ -208,7 +153,13 @@ export function ChatView({ assistantName }: ChatViewProps) {
         ) : (
           <div className="py-4">
             {messages.map((message, idx) => (
-              <MessageBubble key={idx} message={message} />
+              <ChatMessage 
+                key={idx} 
+                role={message.role}
+                content={message.content}
+                citations={message.citations}
+                isStreaming={message.isStreaming}
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>

@@ -67,6 +67,7 @@
     "openai": "^4.77.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.3.2",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.0",
