@@ -248,8 +248,10 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
               const isActive = assistant.name === activeAssistant
 
               return (
-                <div
+                <button
                   key={assistant.name}
+                  type="button"
+                  aria-pressed={isActive}
                   className={`w-full px-2 py-1.5 text-left transition-colors duration-100 cursor-pointer ${
                     isActive
                       ? 'bg-black/[0.08] dark:bg-white/[0.10]'
@@ -280,7 +282,7 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
                       {assistant.instructions}
                     </div>
                   )}
-                </div>
+                </button>
               )
             })}
           </div>
