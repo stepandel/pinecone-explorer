@@ -56,9 +56,8 @@ export function useChatStream({
     }
   }, [])
 
-  // Clear messages when assistant changes
+  // Reset state when assistant changes
   useEffect(() => {
-    // Cancel any active stream
     if (currentStreamIdRef.current) {
       window.electronAPI.assistant.chatStream.cancel(currentStreamIdRef.current).catch(console.error)
       currentStreamIdRef.current = null
@@ -67,7 +66,6 @@ export function useChatStream({
       unsubscribeRef.current()
       unsubscribeRef.current = null
     }
-    // Reset state for new assistant
     setMessages([])
     setIsStreaming(false)
     setError(null)
@@ -258,14 +256,19 @@ export function useChatStream({
       unsubscribeRef.current = null
     }
     setIsStreaming(false)
-    // Mark the last message as no longer streaming
+    // Mark the last message as no longer streaming, or remove if empty
     setMessages(prev => {
       const updated = [...prev]
       const lastIdx = updated.length - 1
       if (updated[lastIdx]?.role === 'assistant' && updated[lastIdx].isStreaming) {
-        updated[lastIdx] = {
-          ...updated[lastIdx],
-          isStreaming: false,
+        // Remove empty placeholder if no content was received
+        if (!updated[lastIdx].content) {
+          updated.pop()
+        } else {
+          updated[lastIdx] = {
+            ...updated[lastIdx],
+            isStreaming: false,
+          }
         }
       }
       return updated

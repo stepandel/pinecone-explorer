@@ -180,7 +180,7 @@ export function UploadFileDialog({
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Failed to upload file')
     }
-  }, [selectedFile, metadataJson, validateMetadata, uploadMutation, onOpenChange])
+  }, [selectedFile, metadataJson, validateMetadata, uploadMutation, onOpenChange, multimodal])
 
   // Format file size
   const formatFileSize = (bytes: number): string => {
