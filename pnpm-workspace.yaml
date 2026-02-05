@@ -1,0 +1,9 @@
+ignoredBuiltDependencies:
+  - bufferutil
+  - electron-winstaller
+  - esbuild
+  - sharp
+  - utf-8-validate
+
+onlyBuiltDependencies:
+  - electron

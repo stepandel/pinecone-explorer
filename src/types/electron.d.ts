@@ -36,6 +36,8 @@ declare global {
     defaultAlpha?: number           // Default alpha for queries (0.5 if not set)
   }
 
+  type ExplorerMode = 'index' | 'assistant'
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -48,6 +50,8 @@ declare global {
     hybridEmbeddingOverrides?: Record<string, HybridEmbeddingConfig>
     // Per-index text field overrides (metadata field containing text for embedding)
     textFieldOverrides?: Record<string, string>
+    // Preferred explorer mode (index or assistant)
+    preferredMode?: ExplorerMode
   }
 
   interface IndexInfo {
@@ -307,6 +311,8 @@ declare global {
       getTextFieldOverride: (profileId: string, indexName: string) => Promise<string | null>
       setTextFieldOverride: (profileId: string, indexName: string, textField: string) => Promise<void>
       clearTextFieldOverride: (profileId: string, indexName: string) => Promise<void>
+      getPreferredMode: (profileId: string) => Promise<ExplorerMode | null>
+      setPreferredMode: (profileId: string, mode: ExplorerMode) => Promise<void>
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>

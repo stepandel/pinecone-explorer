@@ -1,6 +1,7 @@
 import { usePinecone } from '../../providers/PineconeProvider'
 import { usePanel } from '../../context/PanelContext'
 import { PanelLeft, PanelRight, PanelLeftDashed, PanelRightDashed, Power } from 'lucide-react'
+import { ModeSwitcher } from '../mode/ModeSwitcher'
 
 export function TopBar() {
   const { currentProfile } = usePinecone()
@@ -34,12 +35,19 @@ export function TopBar() {
       {/* Left side - spacing for traffic lights */}
       <div className="w-[76px]" />
 
-      {/* Center - Connection info */}
-      <div className="flex-1 flex items-center justify-center gap-2" data-testid="connection-status">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" data-testid="connection-indicator" />
-        <span className="text-[12px] font-medium text-foreground/80" data-testid="connection-profile">
-          {currentProfile?.name || 'Connected'}
-        </span>
+      {/* Center - Mode switcher and Connection info */}
+      <div 
+        className="flex-1 flex items-center justify-center gap-4" 
+        data-testid="connection-status"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <ModeSwitcher />
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Connected" data-testid="connection-indicator" />
+          <span className="text-[12px] font-medium text-foreground/80" data-testid="connection-profile">
+            {currentProfile?.name || 'Connected'}
+          </span>
+        </div>
       </div>
 
       {/* Right side - Panel toggles + Disconnect */}

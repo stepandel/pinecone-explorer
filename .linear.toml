@@ -1,0 +1,6 @@
+# Linear CLI configuration for Pinecone Explorer
+# https://github.com/schpet/linear-cli
+
+workspace = "chroma-explorer"
+team_id = "PINE"
+issue_sort = "priority"
