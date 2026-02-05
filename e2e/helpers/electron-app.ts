@@ -49,9 +49,15 @@ export async function launchApp(): Promise<{ app: ElectronApplication; page: Pag
   // Clear encrypted stores to avoid encryption key mismatch
   clearEncryptedStores(testUserDataDir);
 
+  // Build args - add --no-sandbox for CI environments (GitHub Actions, etc.)
+  const args = [appPath];
+  if (process.env.CI) {
+    args.unshift('--no-sandbox');
+  }
+
   // Launch Electron app
   const app = await electron.launch({
-    args: [appPath],
+    args,
     env: {
       ...process.env,
       NODE_ENV: 'test',
