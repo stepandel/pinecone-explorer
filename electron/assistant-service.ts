@@ -218,11 +218,10 @@ export class AssistantService {
     const assistant = this.client.assistant(assistantName)
 
     try {
-      const stream = await assistant.chat({
+      const stream = await assistant.chatStream({
         messages: params.messages.map(m => ({ role: m.role, content: m.content })),
         model: params.model,
         filter: params.filter,
-        stream: true,
       })
 
       // Process the stream
@@ -239,10 +238,10 @@ export class AssistantService {
             model: chunk.model,
             role: 'assistant',
           })
-        } else if (chunk.type === 'content_chunk' || chunk.contentDelta) {
+        } else if (chunk.type === 'content_chunk') {
           onChunk({
             type: 'content',
-            content: chunk.contentDelta || chunk.delta?.content || '',
+            content: chunk.delta?.content || '',
           })
         } else if (chunk.type === 'citation') {
           onChunk({
