@@ -604,6 +604,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:show-shortcuts', handler)
       return () => ipcRenderer.removeListener('menu:show-shortcuts', handler)
     },
+    // Assistant menu events
+    onNewAssistant: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:new-assistant', handler)
+      return () => ipcRenderer.removeListener('menu:new-assistant', handler)
+    },
+    onEditAssistant: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:edit-assistant', handler)
+      return () => ipcRenderer.removeListener('menu:edit-assistant', handler)
+    },
+    onDeleteAssistant: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:delete-assistant', handler)
+      return () => ipcRenderer.removeListener('menu:delete-assistant', handler)
+    },
+    // Chat menu events
+    onSendMessage: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:send-message', handler)
+      return () => ipcRenderer.removeListener('menu:send-message', handler)
+    },
+    onFocusChatInput: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:focus-chat-input', handler)
+      return () => ipcRenderer.removeListener('menu:focus-chat-input', handler)
+    },
+    onClearConversation: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:clear-conversation', handler)
+      return () => ipcRenderer.removeListener('menu:clear-conversation', handler)
+    },
   },
   onRefresh: (callback: () => void): (() => void) => {
     const handler = () => {

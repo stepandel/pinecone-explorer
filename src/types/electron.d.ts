@@ -431,6 +431,14 @@ declare global {
       onDisconnect: (callback: () => void) => () => void
       // Help menu events
       onShowShortcuts: (callback: () => void) => () => void
+      // Assistant menu events
+      onNewAssistant: (callback: () => void) => () => void
+      onEditAssistant: (callback: () => void) => () => void
+      onDeleteAssistant: (callback: () => void) => () => void
+      // Chat menu events
+      onSendMessage: (callback: () => void) => () => void
+      onFocusChatInput: (callback: () => void) => () => void
+      onClearConversation: (callback: () => void) => () => void
     }
     onRefresh: (callback: () => void) => () => void
   }

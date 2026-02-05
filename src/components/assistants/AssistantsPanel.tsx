@@ -110,6 +110,9 @@ export function AssistantsPanel({ onToggleCollapse, onCreateNew, onEditAssistant
 
   const handleConfirmDelete = useCallback(async () => {
     if (!assistantToDelete || !currentProfile?.id) return
+    
+    // Prevent duplicate delete calls while mutation is in flight
+    if (deleteMutation.isPending) return
 
     // Verify the confirmation input matches the assistant name
     if (confirmationInput !== assistantToDelete) {

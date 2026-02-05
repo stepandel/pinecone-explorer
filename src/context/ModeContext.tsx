@@ -21,6 +21,10 @@ export function ModeProvider({ children }: { children: ReactNode }) {
       setIsInitialized(true)
       return
     }
+    
+    // Reset initialization state when profile changes
+    setIsInitialized(false)
+    
     let cancelled = false
     const profileId = currentProfile.id
 
@@ -74,7 +78,22 @@ export function ModeProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [setMode])
 
-  // Don't render children until we've loaded the initial mode
+  // Listen for menu IPC events
+  useEffect(() => {
+    const unsubIndex = window.electronAPI.menu.onIndexMode?.(() => {
+      setMode('index')
+    })
+    const unsubAssistant = window.electronAPI.menu.onAssistantMode?.(() => {
+      setMode('assistant')
+    })
+
+    return () => {
+      unsubIndex?.()
+      unsubAssistant?.()
+    }
+  }, [setMode])
+
+  // Don't render children until mode is initialized (to prevent flash)
   if (!isInitialized) {
     return null
   }

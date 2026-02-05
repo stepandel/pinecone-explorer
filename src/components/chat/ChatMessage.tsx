@@ -1,9 +1,49 @@
-import { memo, Fragment } from 'react'
+import { memo, Fragment, ComponentPropsWithoutRef } from 'react'
 import Markdown from 'react-markdown'
 import { Bot, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFileSelection } from '@/context/FileSelectionContext'
 import { CitationPopover } from './CitationPopover'
+
+// Shared Markdown component styling
+const sharedMarkdownComponents = {
+  pre: ({ children, ...props }: ComponentPropsWithoutRef<'pre'>) => (
+    <pre
+      className="bg-muted/50 rounded-md p-3 overflow-x-auto text-xs"
+      {...props}
+    >
+      {children}
+    </pre>
+  ),
+  code: ({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { className?: string }) => {
+    const isInline = !className
+    if (isInline) {
+      return (
+        <code
+          className="bg-muted/50 rounded px-1 py-0.5 text-xs font-mono"
+          {...props}
+        >
+          {children}
+        </code>
+      )
+    }
+    return (
+      <code className={cn('text-xs font-mono', className)} {...props}>
+        {children}
+      </code>
+    )
+  },
+  a: ({ children, ...props }: ComponentPropsWithoutRef<'a'>) => (
+    <a
+      className="text-primary hover:underline"
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+    >
+      {children}
+    </a>
+  ),
+}
 
 interface CitationReference {
   file: { name: string; id: string }
@@ -137,49 +177,7 @@ function AssistantMessage({
   if (typeof segments === 'string') {
     return (
       <div className="prose prose-sm dark:prose-invert max-w-none">
-        <Markdown
-          components={{
-            // Style code blocks
-            pre: ({ children, ...props }) => (
-              <pre
-                className="bg-muted/50 rounded-md p-3 overflow-x-auto text-xs"
-                {...props}
-              >
-                {children}
-              </pre>
-            ),
-            code: ({ className, children, ...props }) => {
-              // Check if it's inline code (no className usually means inline)
-              const isInline = !className
-              if (isInline) {
-                return (
-                  <code
-                    className="bg-muted/50 rounded px-1 py-0.5 text-xs font-mono"
-                    {...props}
-                  >
-                    {children}
-                  </code>
-                )
-              }
-              return (
-                <code className={cn('text-xs font-mono', className)} {...props}>
-                  {children}
-                </code>
-              )
-            },
-            // Style links
-            a: ({ children, ...props }) => (
-              <a
-                className="text-primary hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-                {...props}
-              >
-                {children}
-              </a>
-            ),
-          }}
-        >
+        <Markdown components={sharedMarkdownComponents}>
           {content}
         </Markdown>
         {isStreaming && (
@@ -197,44 +195,9 @@ function AssistantMessage({
           {segment.text && (
             <Markdown
               components={{
+                ...sharedMarkdownComponents,
                 // Render inline to avoid extra paragraphs
                 p: ({ children }) => <span>{children}</span>,
-                pre: ({ children, ...props }) => (
-                  <pre
-                    className="bg-muted/50 rounded-md p-3 overflow-x-auto text-xs"
-                    {...props}
-                  >
-                    {children}
-                  </pre>
-                ),
-                code: ({ className, children, ...props }) => {
-                  const isInline = !className
-                  if (isInline) {
-                    return (
-                      <code
-                        className="bg-muted/50 rounded px-1 py-0.5 text-xs font-mono"
-                        {...props}
-                      >
-                        {children}
-                      </code>
-                    )
-                  }
-                  return (
-                    <code className={cn('text-xs font-mono', className)} {...props}>
-                      {children}
-                    </code>
-                  )
-                },
-                a: ({ children, ...props }) => (
-                  <a
-                    className="text-primary hover:underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    {...props}
-                  >
-                    {children}
-                  </a>
-                ),
               }}
             >
               {segment.text}
