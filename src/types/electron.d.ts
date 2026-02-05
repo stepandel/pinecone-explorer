@@ -85,6 +85,7 @@ declare global {
   interface UploadAssistantFileParams {
     filePath: string
     metadata?: Record<string, string | number>
+    multimodal?: boolean
   }
 
   // Chat types for assistant streaming

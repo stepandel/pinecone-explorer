@@ -142,6 +142,22 @@ export function useDeleteAssistantMutation(profileId: string) {
   })
 }
 
+// Upload File Mutation
+export function useUploadFileMutation(profileId: string, assistantName: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: { filePath: string; metadata?: Record<string, string | number>; multimodal?: boolean }) => {
+      return await window.electronAPI.assistant.files.upload(profileId, assistantName, params)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: assistantQueryKeys.files(profileId, assistantName),
+      })
+    },
+  })
+}
+
 // Describe a Single File Query
 export function useFileQuery(
   profileId: string | null,

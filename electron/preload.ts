@@ -501,7 +501,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
       filters?: Array<{ name: string; extensions: string[] }>
     }): Promise<{ canceled: boolean; filePaths: string[] }> => {
-      return await ipcRenderer.invoke('dialog:showOpenDialog', options)
+      const result = await ipcRenderer.invoke('dialog:showOpenDialog', options)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
     },
   },
   updater: {
