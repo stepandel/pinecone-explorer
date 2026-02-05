@@ -63,6 +63,8 @@ interface QueryToolbarProps {
   onRerankTopNChange?: (topN: number | undefined) => void
   // Text fields for reranking (string-type metadata fields)
   textFields?: string[]
+  // Local mode - reranking not available
+  isLocalMode?: boolean
 }
 
 const inputClassName = formStyles.input
@@ -99,6 +101,7 @@ export function QueryToolbar({
   onRerankFieldChange,
   onRerankTopNChange,
   textFields = [],
+  isLocalMode = false,
 }: QueryToolbarProps) {
   // Create debounced search function (300ms delay)
   const debouncedSearchRef = useRef<ReturnType<typeof debounce> | null>(null)
@@ -229,8 +232,8 @@ export function QueryToolbar({
           </select>
         </div>
 
-        {/* Rerank toggle - inline on main row for namespace scope */}
-        {scope === 'namespace' && (
+        {/* Rerank toggle - inline on main row for namespace scope (hidden in local mode) */}
+        {scope === 'namespace' && !isLocalMode && (
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -275,8 +278,8 @@ export function QueryToolbar({
         </div>
       )}
 
-      {/* Reranking options row - shown when rerank is enabled */}
-      {scope === 'namespace' && rerankEnabled && (
+      {/* Reranking options row - shown when rerank is enabled (hidden in local mode) */}
+      {scope === 'namespace' && rerankEnabled && !isLocalMode && (
         <div className="flex items-center gap-3 px-1">
           {/* Model selector */}
           <select

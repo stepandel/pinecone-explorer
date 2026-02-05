@@ -60,6 +60,9 @@ export interface ConnectionProfile {
   // Pinecone authentication
   apiKey: string // Pinecone API key
 
+  // Optional: Custom host for Pinecone Local (e.g., 'http://localhost:5080')
+  controllerHostUrl?: string
+
   createdAt: number // Timestamp
   lastUsed?: number // Timestamp
 

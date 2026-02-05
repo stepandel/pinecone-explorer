@@ -21,6 +21,8 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
   const [selectedProfileId, setSelectedProfileId] = useState<string>('')
   const [profileName, setProfileName] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [isLocalInstance, setIsLocalInstance] = useState(false)
+  const [hostUrl, setHostUrl] = useState('')
   const [error, setError] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => getSystemTheme())
@@ -104,12 +106,16 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
     if (profile) {
       setProfileName(profile.name)
       setApiKey(profile.apiKey || '')
+      setIsLocalInstance(!!profile.controllerHostUrl)
+      setHostUrl(profile.controllerHostUrl || '')
     }
   }
 
   const resetForm = () => {
     setProfileName('')
     setApiKey('')
+    setIsLocalInstance(false)
+    setHostUrl('')
   }
 
   const handleDeleteProfile = async (profileId: string) => {
@@ -154,13 +160,23 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
       return 'Profile name is required'
     }
 
-    if (!apiKey.trim()) {
+    // For local instances, API key is optional (any value works)
+    // For hosted Pinecone, API key is required
+    if (!isLocalInstance && !apiKey.trim()) {
       return 'API Key is required'
     }
 
-    // Basic API key format validation (Pinecone keys start with pcsk_ or are UUIDs)
-    if (!apiKey.startsWith('pcsk_') && !/^[a-f0-9-]{36}$/i.test(apiKey)) {
-      // Allow any key format for flexibility
+    // For local instances, validate the host URL
+    if (isLocalInstance) {
+      if (!hostUrl.trim()) {
+        return 'Host URL is required for local instances'
+      }
+      // Basic URL validation
+      try {
+        new URL(hostUrl.trim())
+      } catch {
+        return 'Invalid host URL format'
+      }
     }
 
     return null
@@ -182,8 +198,10 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
       const profile: ConnectionProfile = {
         id: selectedProfileId || crypto.randomUUID(),
         name: profileName || `Connection-${Date.now()}`,
-        apiKey: apiKey.trim(),
+        // For local instances, use 'pclocal' as default if no API key provided
+        apiKey: apiKey.trim() || (isLocalInstance ? 'pclocal' : ''),
         createdAt: Date.now(),
+        ...(isLocalInstance && hostUrl.trim() && { controllerHostUrl: hostUrl.trim() }),
       }
 
       // Test connection first before saving or proceeding
@@ -263,42 +281,91 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
                     id="apiKey"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="pcsk_..."
-                    required
+                    placeholder={isLocalInstance ? "optional (defaults to 'pclocal')" : "pcsk_..."}
+                    required={!isLocalInstance}
                     className={inputClassName}
                   />
                 </div>
+
+                {/* Local instance toggle */}
+                <div className="flex items-center gap-3">
+                  <div className="w-16" />
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isLocalInstance}
+                      onChange={(e) => {
+                        setIsLocalInstance(e.target.checked)
+                        if (!e.target.checked) setHostUrl('')
+                      }}
+                      className="w-3.5 h-3.5 rounded border-foreground/20 bg-black/[0.06] dark:bg-white/[0.08] checked:bg-primary"
+                    />
+                    <span className="text-[12px] text-foreground/60">Local Server</span>
+                  </label>
+                </div>
+
+                {/* Host URL (shown when local instance is checked) */}
+                {isLocalInstance && (
+                  <div className="flex items-center gap-3">
+                    <label htmlFor="hostUrl" className="text-[12px] text-foreground/50 w-16 text-right">Host URL</label>
+                    <input
+                      type="text"
+                      id="hostUrl"
+                      value={hostUrl}
+                      onChange={(e) => setHostUrl(e.target.value)}
+                      placeholder="http://localhost:5080"
+                      className={inputClassName}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Help text */}
               <div className="pt-2">
                 <p className="text-[11px] text-foreground/40 leading-relaxed">
-                  Get your API key from the{' '}
-                  <button
-                    type="button"
-                    onClick={() => window.electronAPI.shell.openExternal('https://app.pinecone.io/organizations/-/projects/-/keys')}
-                    className="text-primary hover:underline"
-                  >
-                    Pinecone Console
-                  </button>
+                  {isLocalInstance ? (
+                    <>
+                      Run Pinecone Local with Docker.{' '}
+                      <button
+                        type="button"
+                        onClick={() => window.electronAPI.shell.openExternal('https://docs.pinecone.io/guides/operations/local-development')}
+                        className="text-primary hover:underline"
+                      >
+                        Learn more
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Get your API key from the{' '}
+                      <button
+                        type="button"
+                        onClick={() => window.electronAPI.shell.openExternal('https://app.pinecone.io/organizations/-/projects/-/keys')}
+                        className="text-primary hover:underline"
+                      >
+                        Pinecone Console
+                      </button>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
 
             {/* Error + Action anchored to bottom */}
-            <div className="pt-4 flex items-center justify-end gap-3">
+            <div className="pt-4 flex flex-col gap-2">
               {error && (
-                <div className="flex-1 text-[11px] text-destructive truncate">
+                <div className="text-[11px] text-destructive leading-relaxed">
                   {error}
                 </div>
               )}
-              <button
-                type="submit"
-                disabled={isConnecting}
-                className="h-7 px-5 text-[12px] font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isConnecting ? 'Connecting...' : 'Connect'}
-              </button>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isConnecting}
+                  className="h-7 px-5 text-[12px] font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isConnecting ? 'Connecting...' : 'Connect'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -344,7 +411,7 @@ export default function ConnectionModal({ isOpen, onConnect }: ConnectionModalPr
                       {profile.name}
                     </div>
                     <div className="text-[10px] text-foreground/30 truncate">
-                      {profile.apiKey ? `${profile.apiKey.substring(0, 8)}...` : 'No API key'}
+                      {profile.controllerHostUrl ? 'Local' : (profile.apiKey ? `${profile.apiKey.substring(0, 8)}...` : 'No API key')}
                     </div>
                   </button>
                 )

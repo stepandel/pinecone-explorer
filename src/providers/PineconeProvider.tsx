@@ -15,6 +15,7 @@ interface PineconeContextValue {
   // Connection state
   currentProfile: ConnectionProfile | null
   isConnected: boolean
+  isLocalMode: boolean  // True when connected to Pinecone Local (controllerHostUrl is set)
   connect: (profile: ConnectionProfile) => Promise<void>
   disconnect: () => void
 
@@ -124,6 +125,7 @@ export function PineconeProvider({ profile, windowId, children }: PineconeProvid
   const value: PineconeContextValue = {
     currentProfile,
     isConnected,
+    isLocalMode: !!currentProfile?.controllerHostUrl,
     connect,
     disconnect,
     indexes,
