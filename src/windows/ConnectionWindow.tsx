@@ -4,7 +4,11 @@ import { QueryStateProvider } from '../context/QueryStateContext'
 import { EmbeddingProvider } from '../context/EmbeddingContext'
 import { DraftIndexProvider } from '../context/DraftIndexContext'
 import { DraftNamespaceProvider } from '../context/DraftNamespaceContext'
+import { DraftAssistantProvider } from '../context/DraftAssistantContext'
 import { ClipboardProvider } from '../context/ClipboardContext'
+import { ModeProvider } from '../context/ModeContext'
+import { AssistantSelectionProvider } from '../context/AssistantSelectionContext'
+import { FileSelectionProvider } from '../context/FileSelectionContext'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { AppLayout } from '../components/layout/AppLayout'
 import { useProfileQuery } from '../hooks/usePineconeQueries'
@@ -37,21 +41,29 @@ export function ConnectionWindow({ windowId, profileId }: ConnectionWindowProps)
 
   return (
     <PineconeProvider profile={profile} windowId={windowId}>
-      <ClipboardProvider>
-        <SelectionProvider>
-          <QueryStateProvider>
-            <EmbeddingProvider>
-              <DraftIndexProvider>
-                <DraftNamespaceProvider>
-                  <ErrorBoundary>
-                    <AppLayout />
-                  </ErrorBoundary>
-                </DraftNamespaceProvider>
-              </DraftIndexProvider>
-            </EmbeddingProvider>
-          </QueryStateProvider>
-        </SelectionProvider>
-      </ClipboardProvider>
+      <ModeProvider>
+        <ClipboardProvider>
+          <SelectionProvider>
+            <AssistantSelectionProvider>
+              <FileSelectionProvider>
+                <QueryStateProvider>
+                  <EmbeddingProvider>
+                    <DraftIndexProvider>
+                      <DraftNamespaceProvider>
+                        <DraftAssistantProvider>
+                          <ErrorBoundary>
+                            <AppLayout />
+                          </ErrorBoundary>
+                        </DraftAssistantProvider>
+                      </DraftNamespaceProvider>
+                    </DraftIndexProvider>
+                  </EmbeddingProvider>
+                </QueryStateProvider>
+              </FileSelectionProvider>
+            </AssistantSelectionProvider>
+          </SelectionProvider>
+        </ClipboardProvider>
+      </ModeProvider>
     </PineconeProvider>
   )
 }

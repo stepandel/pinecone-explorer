@@ -75,6 +75,9 @@ export interface ConnectionProfile {
   // Per-index text field overrides (metadata field containing text for embedding)
   // Default is '_text' if not specified
   textFieldOverrides?: Record<string, string>
+
+  // Preferred explorer mode (index or assistant)
+  preferredMode?: 'index' | 'assistant'
 }
 
 /**
@@ -389,4 +392,182 @@ export interface GetVectorsPaginatedParams {
   pageSize?: number
   cursor?: string
 }
+
+// ============================================================================
+// Assistant API Types
+// ============================================================================
+
+/**
+ * Assistant status
+ */
+export type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating' | 'InitializationFailed'
+
+/**
+ * Assistant model representing a Pinecone Assistant
+ */
+export interface AssistantModel {
+  name: string
+  status: AssistantStatus
+  instructions?: string
+  metadata?: Record<string, string>
+  host?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+/**
+ * Parameters for creating a new assistant
+ */
+export interface CreateAssistantParams {
+  name: string
+  instructions?: string
+  metadata?: Record<string, string>
+  region?: 'us' | 'eu'
+}
+
+/**
+ * Parameters for updating an assistant
+ */
+export interface UpdateAssistantParams {
+  instructions?: string
+  metadata?: Record<string, string>
+}
+
+// ============================================================================
+// Assistant File Types
+// ============================================================================
+
+/**
+ * File status enum for assistant files
+ */
+export type AssistantFileStatus = 'Processing' | 'Available' | 'Deleting' | 'ProcessingFailed'
+
+/**
+ * Represents a file associated with an assistant
+ */
+export interface AssistantFile {
+  /** Unique identifier for the file */
+  id: string
+  /** The name of the file */
+  name: string
+  /** Current processing status */
+  status: AssistantFileStatus
+  /** Processing progress (0-1) */
+  percentDone?: number | null
+  /** Optional metadata attached to the file */
+  metadata?: Record<string, string | number> | null
+  /** Signed URL for accessing the file content */
+  signedUrl?: string | null
+  /** Error message if processing failed */
+  errorMessage?: string | null
+  /** Creation timestamp */
+  createdOn?: string
+  /** Last update timestamp */
+  updatedOn?: string
+}
+
+/**
+ * Filter options for listing assistant files
+ */
+export interface ListAssistantFilesFilter {
+  /** Filter by metadata key-value pairs */
+  [key: string]: unknown
+}
+
+/**
+ * Parameters for uploading a file to an assistant
+ */
+export interface UploadAssistantFileParams {
+  /** Path to the file on disk */
+  filePath: string
+  /** Optional metadata to attach to the file */
+  metadata?: Record<string, string | number>
+  /** Enable multimodal processing for PDFs (extracts images and charts) */
+  multimodal?: boolean
+}
+
+// ============================================================================
+// Assistant Chat Types
+// ============================================================================
+
+/**
+ * Chat message structure
+ */
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
+ * A single reference within a citation
+ */
+export interface CitationReference {
+  file: {
+    name: string
+    id: string
+    status?: string
+    signedUrl?: string | null
+  }
+  pages?: number[]
+}
+
+/**
+ * Citation reference in assistant responses
+ */
+export interface Citation {
+  position: number
+  references: CitationReference[]
+}
+
+/**
+ * Token usage statistics for chat
+ */
+export interface ChatUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+/**
+ * Context options for chat requests
+ */
+export interface ChatContextOptions {
+  topK?: number
+  snippetSize?: number
+}
+
+/**
+ * Parameters for chat requests
+ */
+export interface ChatParams {
+  messages: ChatMessage[]
+  model?: string
+  filter?: Record<string, unknown>
+  jsonResponse?: boolean
+  includeHighlights?: boolean
+  temperature?: number
+  contextOptions?: ChatContextOptions
+}
+
+/**
+ * Response from non-streaming chat
+ */
+export interface ChatResponse {
+  id: string
+  message: ChatMessage
+  citations?: Citation[]
+  usage?: ChatUsage
+  finishReason?: string
+  model?: string
+}
+
+/**
+ * Stream chunk types for streaming chat responses
+ */
+export type ChatStreamChunk =
+  | { type: 'message_start'; id: string; model: string; role: 'assistant' }
+  | { type: 'content'; content: string }
+  | { type: 'citation'; citation: Citation | undefined }
+  | { type: 'message_end'; usage?: ChatUsage; finishReason?: string }
+  | { type: 'error'; error: string }
 

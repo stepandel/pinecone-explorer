@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, shell } from 'electron'
 
 // Redirect userData to test directory if running in test mode
 // This MUST happen before any store initialization
@@ -9,6 +9,7 @@ if (process.env.NODE_ENV === 'test' && process.env.E2E_USER_DATA_DIR) {
 // Set app name before anything else (affects menu bar, about dialog, etc.)
 app.name = 'Pinecone Explorer'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { pineconeConnectionPool } from './pinecone-service'
 import { connectionStore } from './connection-store'
@@ -633,6 +634,46 @@ ipcMain.on('context-menu:show-namespace', (event, namespace: string) => {
   }
 })
 
+// Assistant context menu handler
+ipcMain.on('context-menu:show-assistant', (event, assistantName: string) => {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Edit',
+      click: () => event.sender.send('context-menu:assistant-action', { action: 'edit', assistantName })
+    },
+    { type: 'separator' },
+    {
+      label: 'Delete',
+      click: () => event.sender.send('context-menu:assistant-action', { action: 'delete', assistantName })
+    }
+  ]
+  const menu = Menu.buildFromTemplate(template)
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) {
+    menu.popup({ window: win })
+  }
+})
+
+// File context menu handler
+ipcMain.on('context-menu:show-file', (event, assistantName: string, fileId: string, fileName: string) => {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Download',
+      click: () => event.sender.send('context-menu:file-action', { action: 'download', assistantName, fileId, fileName })
+    },
+    { type: 'separator' },
+    {
+      label: 'Delete',
+      click: () => event.sender.send('context-menu:file-action', { action: 'delete', assistantName, fileId, fileName })
+    }
+  ]
+  const menu = Menu.buildFromTemplate(template)
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) {
+    menu.popup({ window: win })
+  }
+})
+
 // ============================================================================
 // Profile Management IPC Handlers
 // ============================================================================
@@ -773,6 +814,295 @@ ipcMain.handle('profiles:clearHybridEmbeddingOverride', async (_event, profileId
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to clear hybrid embedding override'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:getPreferredMode', async (_event, profileId: string) => {
+  try {
+    const mode = connectionStore.getPreferredMode(profileId)
+    return { success: true, data: mode }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get preferred mode'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('profiles:setPreferredMode', async (_event, profileId: string, mode: 'index' | 'assistant') => {
+  try {
+    connectionStore.setPreferredMode(profileId, mode)
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to set preferred mode'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
+// Assistant IPC Handlers
+// ============================================================================
+
+ipcMain.handle('assistant:list', async (_event, profileId: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistants = await assistantService.listAssistants()
+    return { success: true, data: assistants }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to list assistants'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:create', async (_event, profileId: string, params: { name: string; instructions?: string; metadata?: Record<string, string>; region?: 'us' | 'eu' }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistant = await assistantService.createAssistant(params)
+    track('assistant_created', { region: params.region || 'us' })
+    return { success: true, data: assistant }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create assistant'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:describe', async (_event, profileId: string, name: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistant = await assistantService.describeAssistant(name)
+    return { success: true, data: assistant }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to describe assistant'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:update', async (_event, profileId: string, name: string, params: { instructions?: string; metadata?: Record<string, string> }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const assistant = await assistantService.updateAssistant(name, params)
+    return { success: true, data: assistant }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update assistant'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:delete', async (_event, profileId: string, name: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    await assistantService.deleteAssistant(name)
+    track('assistant_deleted')
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete assistant'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
+// Assistant File IPC Handlers
+// ============================================================================
+
+ipcMain.handle('assistant:files:list', async (_event, profileId: string, assistantName: string, filter?: Record<string, unknown>) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const files = await assistantService.listFiles(assistantName, filter)
+    return { success: true, data: files }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to list files'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:files:describe', async (_event, profileId: string, assistantName: string, fileId: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const file = await assistantService.describeFile(assistantName, fileId)
+    return { success: true, data: file }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to describe file'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:files:upload', async (_event, profileId: string, assistantName: string, params: { filePath: string; metadata?: Record<string, string | number>; multimodal?: boolean }) => {
+  try {
+    // Validate file path
+    const filePath = params.filePath
+    if (!filePath || typeof filePath !== 'string') {
+      return { success: false, error: 'File path is required' }
+    }
+    const fs = await import('node:fs')
+    const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath)
+    if (!fs.existsSync(resolvedPath)) {
+      return { success: false, error: `File not found: ${resolvedPath}` }
+    }
+
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const file = await assistantService.uploadFile(assistantName, { ...params, filePath: resolvedPath })
+    track('file_uploaded', { multimodal: params.multimodal || false })
+    return { success: true, data: file }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to upload file'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:files:delete', async (_event, profileId: string, assistantName: string, fileId: string) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    await assistantService.deleteFile(assistantName, fileId)
+    track('file_deleted')
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete file'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
+// Assistant Chat IPC Handlers
+// ============================================================================
+
+// Track active chat streams for cancellation
+const activeChatStreams: Map<string, AbortController> = new Map()
+// Track which webContents owns which streams (for cleanup on window close)
+const streamOwners: Map<number, Set<string>> = new Map()
+
+ipcMain.handle('assistant:chat', async (_event, profileId: string, assistantName: string, params: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; model?: string; filter?: Record<string, unknown> }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    const assistantService = service.getAssistantService()
+    const response = await assistantService.chat(assistantName, params)
+    track('chat_message_sent', { model: params.model, messageCount: params.messages.length })
+    return { success: true, data: response }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to send chat message'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:chat:stream:start', async (event, profileId: string, assistantName: string, params: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; model?: string; filter?: Record<string, unknown> }) => {
+  try {
+    const service = pineconeConnectionPool.getConnection(profileId)
+    if (!service) {
+      return { success: false, error: 'Not connected to Pinecone' }
+    }
+    
+    const streamId = crypto.randomUUID()
+    const abortController = new AbortController()
+    activeChatStreams.set(streamId, abortController)
+
+    // Track stream ownership for cleanup on window close
+    const senderId = event.sender.id
+    if (!streamOwners.has(senderId)) {
+      streamOwners.set(senderId, new Set())
+      // Register cleanup when this webContents is destroyed
+      event.sender.once('destroyed', () => {
+        const streams = streamOwners.get(senderId)
+        if (streams) {
+          for (const sid of streams) {
+            const controller = activeChatStreams.get(sid)
+            if (controller) {
+              controller.abort()
+              activeChatStreams.delete(sid)
+            }
+          }
+          streamOwners.delete(senderId)
+        }
+      })
+    }
+    streamOwners.get(senderId)!.add(streamId)
+
+    const assistantService = service.getAssistantService()
+
+    // Start streaming in background
+    assistantService.chatStream(
+      assistantName,
+      params,
+      (chunk) => {
+        // Send chunk to renderer if still connected
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('assistant:chat:chunk', streamId, chunk)
+        }
+      },
+      abortController.signal
+    ).catch((error) => {
+      // Send error chunk to renderer if still connected
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('assistant:chat:chunk', streamId, {
+          type: 'error',
+          error: error instanceof Error ? error.message : 'Stream error'
+        })
+      }
+    }).finally(() => {
+      activeChatStreams.delete(streamId)
+      const ownerStreams = streamOwners.get(senderId)
+      if (ownerStreams) {
+        ownerStreams.delete(streamId)
+        if (ownerStreams.size === 0) {
+          streamOwners.delete(senderId)
+        }
+      }
+    })
+
+    track('chat_stream_started', { model: params.model })
+    return { success: true, data: { streamId } }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to start chat stream'
+    return { success: false, error: message }
+  }
+})
+
+ipcMain.handle('assistant:chat:stream:cancel', async (_event, streamId: string) => {
+  try {
+    const controller = activeChatStreams.get(streamId)
+    if (controller) {
+      controller.abort()
+      activeChatStreams.delete(streamId)
+    }
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to cancel chat stream'
     return { success: false, error: message }
   }
 })
@@ -941,10 +1271,38 @@ ipcMain.handle('settings:openWindow', async () => {
 
 ipcMain.handle('shell:openExternal', async (_event, url: string) => {
   try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { success: false, error: `Blocked URL with disallowed protocol: ${parsed.protocol}` }
+    }
     await shell.openExternal(url)
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to open URL'
+    return { success: false, error: message }
+  }
+})
+
+// ============================================================================
+// Dialog IPC Handlers
+// ============================================================================
+
+ipcMain.handle('dialog:showOpenDialog', async (_event, options: {
+  properties?: Array<'openFile' | 'openDirectory' | 'multiSelections' | 'showHiddenFiles'>
+  filters?: Array<{ name: string; extensions: string[] }>
+  title?: string
+  defaultPath?: string
+}) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: options.properties || ['openFile'],
+      filters: options.filters,
+      title: options.title,
+      defaultPath: options.defaultPath,
+    })
+    return { success: true, data: result }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to show dialog'
     return { success: false, error: message }
   }
 })

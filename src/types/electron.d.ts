@@ -36,6 +36,92 @@ declare global {
     defaultAlpha?: number           // Default alpha for queries (0.5 if not set)
   }
 
+  type ExplorerMode = 'index' | 'assistant'
+
+  // Assistant API Types
+  type AssistantStatus = 'Initializing' | 'Ready' | 'Failed' | 'Terminating' | 'InitializationFailed'
+
+  interface AssistantModel {
+    name: string
+    status: AssistantStatus
+    instructions?: string
+    metadata?: Record<string, string>
+    host?: string
+    createdAt?: string
+    updatedAt?: string
+  }
+
+  interface CreateAssistantParams {
+    name: string
+    instructions?: string
+    metadata?: Record<string, string>
+    region?: 'us' | 'eu'
+  }
+
+  interface UpdateAssistantParams {
+    instructions?: string
+    metadata?: Record<string, string>
+  }
+
+  // Assistant File types
+  type AssistantFileStatus = 'Processing' | 'Available' | 'Deleting' | 'ProcessingFailed'
+
+  interface AssistantFile {
+    id: string
+    name: string
+    status: AssistantFileStatus
+    percentDone?: number | null
+    metadata?: Record<string, string | number> | null
+    signedUrl?: string | null
+    errorMessage?: string | null
+    createdOn?: string
+    updatedOn?: string
+  }
+
+  interface ListAssistantFilesFilter {
+    [key: string]: unknown
+  }
+
+  interface UploadAssistantFileParams {
+    filePath: string
+    metadata?: Record<string, string | number>
+    multimodal?: boolean
+  }
+
+  // Chat types for assistant streaming
+  interface ChatMessage {
+    role: 'user' | 'assistant'
+    content: string
+  }
+
+  interface CitationReference {
+    file: {
+      name: string
+      id: string
+      status?: string
+      signedUrl?: string | null
+    }
+    pages?: number[]
+  }
+
+  interface Citation {
+    position: number
+    references: CitationReference[]
+  }
+
+  interface ChatUsage {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
+
+  type ChatStreamChunk =
+    | { type: 'message_start'; id: string; model: string; role: 'assistant' }
+    | { type: 'content'; content: string }
+    | { type: 'citation'; citation: Citation | undefined }
+    | { type: 'message_end'; usage?: ChatUsage; finishReason?: string }
+    | { type: 'error'; error: string }
+
   interface ConnectionProfile {
     id: string
     name: string
@@ -48,6 +134,8 @@ declare global {
     hybridEmbeddingOverrides?: Record<string, HybridEmbeddingConfig>
     // Per-index text field overrides (metadata field containing text for embedding)
     textFieldOverrides?: Record<string, string>
+    // Preferred explorer mode (index or assistant)
+    preferredMode?: ExplorerMode
   }
 
   interface IndexInfo {
@@ -291,6 +379,10 @@ declare global {
       onProfileAction: (callback: (action: { action: string; profileId: string }) => void) => () => void
       showNamespaceMenu: (namespace: string) => void
       onNamespaceAction: (callback: (action: { action: string; namespace: string }) => void) => () => void
+      showAssistantMenu: (assistantName: string) => void
+      onAssistantAction: (callback: (action: { action: string; assistantName: string }) => void) => () => void
+      showFileMenu: (assistantName: string, fileId: string, fileName: string) => void
+      onFileAction: (callback: (action: { action: string; assistantName: string; fileId: string; fileName: string }) => void) => () => void
     }
     profiles: {
       getAll: () => Promise<ConnectionProfile[]>
@@ -307,6 +399,30 @@ declare global {
       getTextFieldOverride: (profileId: string, indexName: string) => Promise<string | null>
       setTextFieldOverride: (profileId: string, indexName: string, textField: string) => Promise<void>
       clearTextFieldOverride: (profileId: string, indexName: string) => Promise<void>
+      getPreferredMode: (profileId: string) => Promise<ExplorerMode | null>
+      setPreferredMode: (profileId: string, mode: ExplorerMode) => Promise<void>
+    }
+    assistant: {
+      list: (profileId: string) => Promise<AssistantModel[]>
+      create: (profileId: string, params: CreateAssistantParams) => Promise<AssistantModel>
+      describe: (profileId: string, name: string) => Promise<AssistantModel>
+      update: (profileId: string, name: string, params: UpdateAssistantParams) => Promise<AssistantModel>
+      delete: (profileId: string, name: string) => Promise<void>
+      files: {
+        list: (profileId: string, assistantName: string, filter?: ListAssistantFilesFilter) => Promise<AssistantFile[]>
+        describe: (profileId: string, assistantName: string, fileId: string) => Promise<AssistantFile>
+        upload: (profileId: string, assistantName: string, params: UploadAssistantFileParams) => Promise<AssistantFile>
+        delete: (profileId: string, assistantName: string, fileId: string) => Promise<void>
+      }
+      chatStream: {
+        start: (profileId: string, assistantName: string, params: {
+          messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+          model?: string;
+          filter?: Record<string, unknown>;
+        }) => Promise<string>
+        cancel: (streamId: string) => Promise<void>
+        onChunk: (callback: (streamId: string, chunk: ChatStreamChunk) => void) => () => void
+      }
     }
     window: {
       createConnection: (profile: ConnectionProfile) => Promise<{ windowId: string }>
@@ -325,6 +441,12 @@ declare global {
     }
     shell: {
       openExternal: (url: string) => Promise<void>
+    }
+    dialog: {
+      showOpenDialog: (options: {
+        properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+        filters?: Array<{ name: string; extensions: string[] }>
+      }) => Promise<{ canceled: boolean; filePaths: string[] }>
     }
     updater: {
       checkForUpdates: () => Promise<UpdateInfo | undefined>
@@ -363,6 +485,17 @@ declare global {
       onDisconnect: (callback: () => void) => () => void
       // Help menu events
       onShowShortcuts: (callback: () => void) => () => void
+      // Assistant menu events
+      onNewAssistant: (callback: () => void) => () => void
+      onEditAssistant: (callback: () => void) => () => void
+      onDeleteAssistant: (callback: () => void) => () => void
+      // Mode switching events
+      onIndexMode: (callback: () => void) => () => void
+      onAssistantMode: (callback: () => void) => () => void
+      // Chat menu events
+      onSendMessage: (callback: () => void) => () => void
+      onFocusChatInput: (callback: () => void) => () => void
+      onClearConversation: (callback: () => void) => () => void
     }
     onRefresh: (callback: () => void) => () => void
   }

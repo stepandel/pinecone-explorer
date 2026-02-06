@@ -8,6 +8,7 @@ interface NewButtonProps {
   title?: string
   className?: string
   iconOnly?: boolean
+  'data-testid'?: string
 }
 
 export function NewButton({
@@ -17,6 +18,7 @@ export function NewButton({
   label,
   className,
   iconOnly = false,
+  'data-testid': testId,
 }: NewButtonProps) {
   if (iconOnly) {
     return (
@@ -28,6 +30,7 @@ export function NewButton({
           className
         )}
         title={title || `Add ${label}`}
+        data-testid={testId}
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
@@ -43,6 +46,7 @@ export function NewButton({
         className
       )}
       title={title}
+      data-testid={testId}
     >
       <Plus className="h-3 w-3" />
       <span>{label}</span>

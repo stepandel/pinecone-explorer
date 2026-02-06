@@ -23,6 +23,14 @@ import {
   HybridEmbeddingConfig,
   GetVectorsPaginatedParams,
   PaginatedVectorsResult,
+  AssistantModel,
+  CreateAssistantParams,
+  UpdateAssistantParams,
+  AssistantFile,
+  ListAssistantFilesFilter,
+  UploadAssistantFileParams,
+  ChatStreamChunk,
+  ChatMessage,
 } from './types'
 
 console.log('Preload script is running!')
@@ -203,6 +211,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('context-menu:namespace-action', handler)
       return () => ipcRenderer.removeListener('context-menu:namespace-action', handler)
     },
+    showAssistantMenu: (assistantName: string): void => {
+      ipcRenderer.send('context-menu:show-assistant', assistantName)
+    },
+    onAssistantAction: (callback: (action: { action: string; assistantName: string }) => void): (() => void) => {
+      const handler = (_event: any, data: { action: string; assistantName: string }) => callback(data)
+      ipcRenderer.on('context-menu:assistant-action', handler)
+      return () => ipcRenderer.removeListener('context-menu:assistant-action', handler)
+    },
+    showFileMenu: (assistantName: string, fileId: string, fileName: string): void => {
+      ipcRenderer.send('context-menu:show-file', assistantName, fileId, fileName)
+    },
+    onFileAction: (callback: (action: { action: string; assistantName: string; fileId: string; fileName: string }) => void): (() => void) => {
+      const handler = (_event: any, data: { action: string; assistantName: string; fileId: string; fileName: string }) => callback(data)
+      ipcRenderer.on('context-menu:file-action', handler)
+      return () => ipcRenderer.removeListener('context-menu:file-action', handler)
+    },
   },
   profiles: {
     getAll: async (): Promise<ConnectionProfile[]> => {
@@ -294,6 +318,110 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw new Error(result.error)
       }
     },
+    getPreferredMode: async (profileId: string): Promise<'index' | 'assistant' | null> => {
+      const result = await ipcRenderer.invoke('profiles:getPreferredMode', profileId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    setPreferredMode: async (profileId: string, mode: 'index' | 'assistant'): Promise<void> => {
+      const result = await ipcRenderer.invoke('profiles:setPreferredMode', profileId, mode)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+  },
+  assistant: {
+    list: async (profileId: string): Promise<AssistantModel[]> => {
+      const result = await ipcRenderer.invoke('assistant:list', profileId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    create: async (profileId: string, params: CreateAssistantParams): Promise<AssistantModel> => {
+      const result = await ipcRenderer.invoke('assistant:create', profileId, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    describe: async (profileId: string, name: string): Promise<AssistantModel> => {
+      const result = await ipcRenderer.invoke('assistant:describe', profileId, name)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    update: async (profileId: string, name: string, params: UpdateAssistantParams): Promise<AssistantModel> => {
+      const result = await ipcRenderer.invoke('assistant:update', profileId, name, params)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
+    },
+    delete: async (profileId: string, name: string): Promise<void> => {
+      const result = await ipcRenderer.invoke('assistant:delete', profileId, name)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    },
+    // File operations
+    files: {
+      list: async (profileId: string, assistantName: string, filter?: ListAssistantFilesFilter): Promise<AssistantFile[]> => {
+        const result = await ipcRenderer.invoke('assistant:files:list', profileId, assistantName, filter)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data
+      },
+      describe: async (profileId: string, assistantName: string, fileId: string): Promise<AssistantFile> => {
+        const result = await ipcRenderer.invoke('assistant:files:describe', profileId, assistantName, fileId)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data
+      },
+      upload: async (profileId: string, assistantName: string, params: UploadAssistantFileParams): Promise<AssistantFile> => {
+        const result = await ipcRenderer.invoke('assistant:files:upload', profileId, assistantName, params)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data
+      },
+      delete: async (profileId: string, assistantName: string, fileId: string): Promise<void> => {
+        const result = await ipcRenderer.invoke('assistant:files:delete', profileId, assistantName, fileId)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+      },
+    },
+    // Chat streaming operations
+    chatStream: {
+      start: async (
+        profileId: string,
+        assistantName: string,
+        params: { messages: ChatMessage[]; model?: string; filter?: Record<string, unknown> }
+      ): Promise<string> => {
+        const result = await ipcRenderer.invoke('assistant:chat:stream:start', profileId, assistantName, params)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+        return result.data.streamId
+      },
+      cancel: async (streamId: string): Promise<void> => {
+        const result = await ipcRenderer.invoke('assistant:chat:stream:cancel', streamId)
+        if (!result.success) {
+          throw new Error(result.error)
+        }
+      },
+      onChunk: (callback: (streamId: string, chunk: ChatStreamChunk) => void): (() => void) => {
+        const handler = (_event: Electron.IpcRendererEvent, streamId: string, chunk: ChatStreamChunk) => callback(streamId, chunk)
+        ipcRenderer.on('assistant:chat:chunk', handler)
+        return () => ipcRenderer.removeListener('assistant:chat:chunk', handler)
+      },
+    },
   },
   window: {
     createConnection: async (profile: ConnectionProfile): Promise<{ windowId: string }> => {
@@ -374,6 +502,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       if (!result.success) {
         throw new Error(result.error)
       }
+    },
+  },
+  dialog: {
+    showOpenDialog: async (options: {
+      properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+      filters?: Array<{ name: string; extensions: string[] }>
+    }): Promise<{ canceled: boolean; filePaths: string[] }> => {
+      const result = await ipcRenderer.invoke('dialog:showOpenDialog', options)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
     },
   },
   updater: {
@@ -518,6 +658,49 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = () => callback()
       ipcRenderer.on('menu:show-shortcuts', handler)
       return () => ipcRenderer.removeListener('menu:show-shortcuts', handler)
+    },
+    // Assistant menu events
+    onNewAssistant: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:new-assistant', handler)
+      return () => ipcRenderer.removeListener('menu:new-assistant', handler)
+    },
+    onEditAssistant: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:edit-assistant', handler)
+      return () => ipcRenderer.removeListener('menu:edit-assistant', handler)
+    },
+    onDeleteAssistant: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:delete-assistant', handler)
+      return () => ipcRenderer.removeListener('menu:delete-assistant', handler)
+    },
+    // Mode switching events
+    onIndexMode: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:switch-to-index-mode', handler)
+      return () => ipcRenderer.removeListener('menu:switch-to-index-mode', handler)
+    },
+    onAssistantMode: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:switch-to-assistant-mode', handler)
+      return () => ipcRenderer.removeListener('menu:switch-to-assistant-mode', handler)
+    },
+    // Chat menu events
+    onSendMessage: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:send-message', handler)
+      return () => ipcRenderer.removeListener('menu:send-message', handler)
+    },
+    onFocusChatInput: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:focus-chat-input', handler)
+      return () => ipcRenderer.removeListener('menu:focus-chat-input', handler)
+    },
+    onClearConversation: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:clear-conversation', handler)
+      return () => ipcRenderer.removeListener('menu:clear-conversation', handler)
     },
   },
   onRefresh: (callback: () => void): (() => void) => {

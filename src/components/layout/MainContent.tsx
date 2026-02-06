@@ -2,15 +2,23 @@ import { useState, useCallback, useEffect } from 'react'
 import { useSelection } from '../../context/SelectionContext'
 import { useDraftIndex } from '../../context/DraftIndexContext'
 import { useDraftNamespace } from '../../context/DraftNamespaceContext'
+import { useDraftAssistant } from '../../context/DraftAssistantContext'
 import { usePanel } from '../../context/PanelContext'
 import { useEmbedding } from '../../context/EmbeddingContext'
 import { usePinecone } from '../../providers/PineconeProvider'
+import { useMode } from '../../context/ModeContext'
+import { useAssistantSelection } from '../../context/AssistantSelectionContext'
 import { IndexesPanel } from '../indexes/IndexesPanel'
 import { NamespacesPanel } from '../namespaces/NamespacesPanel'
 import { IndexConfigView } from '../indexes/IndexConfigView'
 import { NamespaceConfigView } from '../namespaces/NamespaceConfigView'
+import { AssistantConfigView } from '../assistants/AssistantConfigView'
 import VectorsView from '../vectors/VectorsView'
 import VectorDetailPanel from '../vectors/VectorDetailPanel'
+import { AssistantsPanel } from '../assistants/AssistantsPanel'
+import { FilesPanel } from '../files/FilesPanel'
+import { FileDetailPanel } from '../files/FileDetailPanel'
+import ChatView from '../chat/ChatView'
 
 interface VectorRecord {
   id: string
@@ -22,7 +30,10 @@ export function MainContent() {
   const { activeIndex, activeNamespace } = useSelection()
   const { draftIndex } = useDraftIndex()
   const { draftNamespace } = useDraftNamespace()
+  const { draftAssistant, startCreation: startAssistantCreation, startEditing: startAssistantEditing } = useDraftAssistant()
   const { currentProfile } = usePinecone()
+  const { mode } = useMode()
+  const { activeAssistant } = useAssistantSelection()
   const { indexEmbedConfig, clientTextFieldOverride } = useEmbedding()
   const isEmbeddingFieldConfigured = !!indexEmbedConfig || !!clientTextFieldOverride
   const {
@@ -119,15 +130,23 @@ export function MainContent() {
 
   return (
     <main className="flex-1 relative overflow-hidden bg-content" data-testid="main-content">
-      {/* IndexesPanel - Collapsible */}
+      {/* Left-most Panel: IndexesPanel (index mode) or AssistantsPanel (assistant mode) - Collapsible */}
       <aside
         className={`absolute top-0 left-0 h-full z-30 transition-transform duration-200 ${
           indexesPanelOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ width: `${indexesPanelWidth}px` }}
-        data-testid="indexes-panel"
+        data-testid={mode === 'assistant' ? 'assistants-panel' : 'indexes-panel'}
       >
-        <IndexesPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
+        {mode === 'assistant' ? (
+          <AssistantsPanel
+            onToggleCollapse={() => setIndexesPanelOpen(false)}
+            onCreateNew={startAssistantCreation}
+            onEditAssistant={startAssistantEditing}
+          />
+        ) : (
+          <IndexesPanel onToggleCollapse={() => setIndexesPanelOpen(false)} />
+        )}
         {/* Resize handle */}
         {indexesPanelOpen && (
           <div
@@ -146,7 +165,25 @@ export function MainContent() {
         className="h-full transition-[padding] duration-200"
         style={{ paddingLeft: `${leftPadding}px`, paddingRight: `${rightPadding}px` }}
       >
-        {draftIndex ? (
+        {/* Assistant mode - Config View or Chat View */}
+        {mode === 'assistant' && draftAssistant ? (
+          <AssistantConfigView />
+        ) : mode === 'assistant' && activeAssistant ? (
+          <ChatView
+            key={activeAssistant}
+            assistantName={activeAssistant}
+          />
+        ) : mode === 'assistant' ? (
+          <div
+            className="flex items-center justify-center h-full"
+            style={{ background: 'var(--canvas-background)' }}
+          >
+            <div className="text-center text-muted-foreground">
+              <p className="text-lg mb-2">No assistant selected</p>
+              <p className="text-sm">Select an assistant from the sidebar to start chatting</p>
+            </div>
+          </div>
+        ) : draftIndex ? (
           <IndexConfigView />
         ) : draftNamespace ? (
           <NamespaceConfigView />
@@ -190,7 +227,7 @@ export function MainContent() {
         )}
       </div>
 
-      {/* Namespaces Panel - Collapsible, positioned after IndexesPanel */}
+      {/* Secondary Left Panel: NamespacesPanel (index mode) or FilesPanel (assistant mode) - Collapsible */}
       <aside
         className={`absolute top-0 h-full transition-transform duration-200 ${
           leftPanelOpen ? 'translate-x-0' : '-translate-x-full'
@@ -199,12 +236,16 @@ export function MainContent() {
           left: `${effectiveIndexesWidth}px`,
           width: `${leftPanelWidth}px`,
         }}
-        data-testid="namespaces-panel"
+        data-testid={mode === 'assistant' ? 'files-panel' : 'namespaces-panel'}
       >
-        <NamespacesPanel
-          showIndexesToggle={!indexesPanelOpen}
-          onToggleIndexesPanel={() => setIndexesPanelOpen(true)}
-        />
+        {mode === 'assistant' ? (
+          <FilesPanel />
+        ) : (
+          <NamespacesPanel
+            showIndexesToggle={!indexesPanelOpen}
+            onToggleIndexesPanel={() => setIndexesPanelOpen(true)}
+          />
+        )}
         {/* Resize handle */}
         {leftPanelOpen && (
           <div
@@ -218,7 +259,7 @@ export function MainContent() {
         )}
       </aside>
 
-      {/* Right Panel: Vector Detail - Floating glass overlay */}
+      {/* Right Panel: VectorDetailPanel (index mode) or FileDetailPanel (assistant mode) - Floating glass overlay */}
       <aside
         className={`absolute top-0 right-0 h-full transition-transform duration-200 ${
           rightPanelOpen ? 'translate-x-0' : 'translate-x-full'
@@ -226,7 +267,9 @@ export function MainContent() {
         style={{ width: `${rightPanelWidth}px` }}
         data-testid="detail-panel"
       >
-        {selectedVector && activeIndex && currentProfile ? (
+        {mode === 'assistant' ? (
+          <FileDetailPanel />
+        ) : selectedVector && activeIndex && currentProfile ? (
           <VectorDetailPanel
             vector={selectedVector}
             indexName={activeIndex}

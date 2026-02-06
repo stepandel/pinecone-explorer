@@ -10,14 +10,13 @@
     "build:release": "vite build && electron-builder",
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps",
-    "test:docker:up": "docker compose -f docker-compose.test.yml up -d && docker compose -f docker-compose.test.yml ps",
-    "test:docker:down": "docker compose -f docker-compose.test.yml down -v",
-    "test:docker:logs": "docker compose -f docker-compose.test.yml logs -f",
     "test:build": "vite build",
     "test:e2e": "pnpm test:build && playwright test",
     "test:e2e:ui": "pnpm test:build && playwright test --ui",
     "test:e2e:debug": "pnpm test:build && playwright test --debug",
-    "test:e2e:full": "pnpm test:docker:up && pnpm test:e2e && pnpm test:docker:down"
+    "test:e2e:full": "pnpm test:e2e && pnpm test:unit",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
   },
   "keywords": [
     "electron",
@@ -42,7 +41,8 @@
     "typescript": "^5.9.3",
     "vite": "^7.3.0",
     "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6"
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@aptabase/electron": "^0.3.1",
@@ -56,10 +56,8 @@
     "@tanstack/react-query": "^5.90.16",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.18",
-    "bufferutil": "^4.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "dotenv": "^17.2.3",
     "electron-log": "^5.4.3",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.7.3",
@@ -67,9 +65,8 @@
     "openai": "^4.77.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.3.2",
-    "sharp": "^0.34.5",
-    "tailwind-merge": "^3.4.0",
-    "utf-8-validate": "^6.0.6"
+    "tailwind-merge": "^3.4.0"
   }
 }
