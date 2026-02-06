@@ -219,8 +219,10 @@ export function useFilesQuery(
     refetchInterval: (query) => {
       const files = query.state.data
       if (!files || !Array.isArray(files)) return false
-      const hasProcessingFiles = files.some((file: AssistantFile) => file.status === 'Processing')
-      return hasProcessingFiles ? FILES_POLL_INTERVAL : false
+      const hasPendingFiles = files.some(
+        (file: AssistantFile) => file.status === 'Processing' || file.status === 'Deleting'
+      )
+      return hasPendingFiles ? FILES_POLL_INTERVAL : false
     },
   })
 }
