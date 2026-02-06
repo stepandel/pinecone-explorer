@@ -865,6 +865,7 @@ ipcMain.handle('assistant:create', async (_event, profileId: string, params: { n
     }
     const assistantService = service.getAssistantService()
     const assistant = await assistantService.createAssistant(params)
+    track('assistant_created', { region: params.region || 'us' })
     return { success: true, data: assistant }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create assistant'
@@ -910,6 +911,7 @@ ipcMain.handle('assistant:delete', async (_event, profileId: string, name: strin
     }
     const assistantService = service.getAssistantService()
     await assistantService.deleteAssistant(name)
+    track('assistant_deleted')
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete assistant'
@@ -959,6 +961,7 @@ ipcMain.handle('assistant:files:upload', async (_event, profileId: string, assis
     }
     const assistantService = service.getAssistantService()
     const file = await assistantService.uploadFile(assistantName, params)
+    track('file_uploaded', { multimodal: params.multimodal || false })
     return { success: true, data: file }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to upload file'
@@ -974,6 +977,7 @@ ipcMain.handle('assistant:files:delete', async (_event, profileId: string, assis
     }
     const assistantService = service.getAssistantService()
     await assistantService.deleteFile(assistantName, fileId)
+    track('file_deleted')
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete file'
@@ -996,6 +1000,7 @@ ipcMain.handle('assistant:chat', async (_event, profileId: string, assistantName
     }
     const assistantService = service.getAssistantService()
     const response = await assistantService.chat(assistantName, params)
+    track('chat_message_sent', { model: params.model, messageCount: params.messages.length })
     return { success: true, data: response }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to send chat message'
@@ -1039,6 +1044,7 @@ ipcMain.handle('assistant:chat:stream:start', async (event, profileId: string, a
       activeChatStreams.delete(streamId)
     })
 
+    track('chat_stream_started', { model: params.model })
     return { success: true, data: { streamId } }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to start chat stream'
