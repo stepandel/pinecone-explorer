@@ -1,6 +1,5 @@
 import { memo, Fragment, ComponentPropsWithoutRef } from 'react'
 import Markdown from 'react-markdown'
-import { Bot, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFileSelection } from '@/context/FileSelectionContext'
 import { CitationPopover } from './CitationPopover'
@@ -64,17 +63,17 @@ export interface ChatMessageProps {
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1 py-1">
+    <div className="flex items-center gap-1 py-0.5">
       <span
-        className="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce"
+        className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
         style={{ animationDelay: '0ms' }}
       />
       <span
-        className="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce"
+        className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
         style={{ animationDelay: '150ms' }}
       />
       <span
-        className="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce"
+        className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
         style={{ animationDelay: '300ms' }}
       />
     </div>
@@ -233,40 +232,16 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     <div
       className={cn(
-        'flex gap-3 px-4 py-3',
-        isUser ? 'flex-row-reverse' : 'flex-row'
+        'px-3 py-1.5',
+        isUser ? 'flex justify-end' : 'flex justify-start'
       )}
+      aria-label={isUser ? 'Your message' : 'Assistant message'}
       data-testid={`chat-message-${role}`}
     >
-      {/* Avatar */}
-      <div
-        className={cn(
-          'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center',
-          isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-secondary text-secondary-foreground'
-        )}
-      >
-        {isUser ? (
-          <User className="w-4 h-4" />
-        ) : (
-          <Bot className="w-4 h-4" />
-        )}
-      </div>
-
-      {/* Message bubble */}
-      <div
-        className={cn(
-          'flex-1 min-w-0 max-w-[80%]',
-          isUser ? 'flex flex-col items-end' : ''
-        )}
-      >
-        <div className="text-xs font-medium text-muted-foreground mb-1">
-          {isUser ? 'You' : 'Assistant'}
-        </div>
+      <div className={cn('min-w-0 max-w-[80%]', isUser ? 'ml-auto' : 'mr-auto')}>
         <div
           className={cn(
-            'rounded-lg px-3 py-2',
+            'rounded-2xl px-2.5 py-1.5',
             isUser
               ? 'bg-primary text-primary-foreground'
               : 'bg-muted/50'
@@ -275,9 +250,9 @@ export const ChatMessage = memo(function ChatMessage({
           {isUser ? (
             <UserMessage content={content} />
           ) : (
-            <AssistantMessage 
-              content={content} 
-              citations={citations} 
+            <AssistantMessage
+              content={content}
+              citations={citations}
               isStreaming={isStreaming}
               onViewFile={setActiveFile}
             />
