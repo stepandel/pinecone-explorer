@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { FileText, Upload, Check, AlertCircle, Loader2, Trash2 } from 'lucide-react'
 import { usePinecone } from '../../providers/PineconeProvider'
 import { useAssistantSelection } from '../../context/AssistantSelectionContext'
@@ -118,6 +118,51 @@ export function FilesPanel({ className }: FilesPanelProps) {
   const handleFileClick = useCallback((fileId: string) => {
     setActiveFile(fileId)
   }, [setActiveFile])
+
+  // Handle right-click context menu on file items
+  const handleFileContextMenu = useCallback((e: React.MouseEvent, file: AssistantFile) => {
+    e.preventDefault()
+    if (!activeAssistant) return
+    window.electronAPI.contextMenu.showFileMenu(activeAssistant, file.id, file.name)
+  }, [activeAssistant])
+
+  // Listen for file context menu actions
+  useEffect(() => {
+    if (!currentProfile?.id || !activeAssistant) return
+
+    const cleanup = window.electronAPI.contextMenu.onFileAction(async (data) => {
+      if (data.assistantName !== activeAssistant) return
+
+      if (data.action === 'delete') {
+        // Confirm deletion
+        const confirmed = window.confirm(`Delete "${data.fileName}"?\n\nThis action cannot be undone.`)
+        if (!confirmed) return
+
+        try {
+          await window.electronAPI.assistant.files.delete(currentProfile.id, activeAssistant, data.fileId)
+          // Clear selection if deleted file was selected
+          if (activeFile === data.fileId) {
+            setActiveFile(null)
+          }
+          refetch()
+        } catch (err) {
+          console.error('Failed to delete file:', err)
+        }
+      } else if (data.action === 'download') {
+        // Get file details to get signed URL
+        try {
+          const file = await window.electronAPI.assistant.files.describe(currentProfile.id, activeAssistant, data.fileId)
+          if (file.signedUrl) {
+            await window.electronAPI.shell.openExternal(file.signedUrl)
+          }
+        } catch (err) {
+          console.error('Failed to download file:', err)
+        }
+      }
+    })
+
+    return cleanup
+  }, [currentProfile?.id, activeAssistant, activeFile, setActiveFile, refetch])
 
   // If no assistant is selected, show prompt
   if (!activeAssistant) {
@@ -254,6 +299,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
                 <button
                   key={file.id}
                   onClick={() => handleFileClick(file.id)}
+                  onContextMenu={(e) => handleFileContextMenu(e, file)}
                   className={`w-full px-3 py-1.5 text-left transition-colors duration-100 mx-1 rounded-md ${
                     isActive
                       ? 'bg-black/[0.08] dark:bg-white/[0.10]'
