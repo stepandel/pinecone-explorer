@@ -47,6 +47,7 @@ export function useChatStream({
   
   const currentStreamIdRef = useRef<string | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
+  const isStreamingRef = useRef(false)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -71,14 +72,16 @@ export function useChatStream({
       unsubscribeRef.current = null
     }
     setMessages([])
+    isStreamingRef.current = false
     setIsStreaming(false)
     setError(null)
   }, [assistantName])
 
   const sendMessage = useCallback(async (content: string) => {
     if (!currentProfile?.id || !assistantName || !content.trim()) return
-    if (isStreaming) return
+    if (isStreamingRef.current) return
 
+    isStreamingRef.current = true
     setError(null)
     setIsStreaming(true)
 
@@ -173,6 +176,7 @@ export function useChatStream({
                 }
                 return updated
               })
+              isStreamingRef.current = false
               setIsStreaming(false)
               currentStreamIdRef.current = null
               if (unsubscribeRef.current) {
@@ -199,6 +203,7 @@ export function useChatStream({
                 }
                 return updated
               })
+              isStreamingRef.current = false
               setIsStreaming(false)
               currentStreamIdRef.current = null
               if (unsubscribeRef.current) {
@@ -231,13 +236,14 @@ export function useChatStream({
         }
         return updated
       })
+      isStreamingRef.current = false
       setIsStreaming(false)
       if (unsubscribeRef.current) {
         unsubscribeRef.current()
         unsubscribeRef.current = null
       }
     }
-  }, [currentProfile?.id, assistantName, messages, currentModel, isStreaming])
+  }, [currentProfile?.id, assistantName, messages, currentModel])
 
   const clearMessages = useCallback(() => {
     // Cancel any active stream first
@@ -250,6 +256,7 @@ export function useChatStream({
       unsubscribeRef.current = null
     }
     setMessages([])
+    isStreamingRef.current = false
     setIsStreaming(false)
     setError(null)
   }, [])
@@ -263,6 +270,7 @@ export function useChatStream({
       unsubscribeRef.current()
       unsubscribeRef.current = null
     }
+    isStreamingRef.current = false
     setIsStreaming(false)
     // Mark the last message as no longer streaming, or remove if empty
     setMessages(prev => {

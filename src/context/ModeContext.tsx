@@ -80,16 +80,16 @@ export function ModeProvider({ children }: { children: ReactNode }) {
 
   // Listen for menu IPC events
   useEffect(() => {
-    const unsubIndex = window.electronAPI.menu.onIndexMode?.(() => {
+    const unsubIndex = window.electronAPI.menu.onIndexMode(() => {
       setMode('index')
     })
-    const unsubAssistant = window.electronAPI.menu.onAssistantMode?.(() => {
+    const unsubAssistant = window.electronAPI.menu.onAssistantMode(() => {
       setMode('assistant')
     })
 
     return () => {
-      unsubIndex?.()
-      unsubAssistant?.()
+      unsubIndex()
+      unsubAssistant()
     }
   }, [setMode])
 

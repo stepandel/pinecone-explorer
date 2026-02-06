@@ -58,6 +58,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
   const { activeAssistant } = useAssistantSelection()
   const { activeFile, setActiveFile } = useFileSelection()
   const [searchTerm, setSearchTerm] = useState('')
+  const [operationError, setOperationError] = useState<string | null>(null)
 
   // Fetch files for the selected assistant
   const { data: files = [], isLoading, error, refetch } = useFilesQuery(
@@ -69,6 +70,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
   // Handle upload button click - open file picker
   const handleUploadClick = useCallback(async () => {
     if (!currentProfile?.id || !activeAssistant) return
+    setOperationError(null)
 
     try {
       // Open native file picker dialog
@@ -92,7 +94,8 @@ export function FilesPanel({ className }: FilesPanelProps) {
       // Refetch to show new files
       refetch()
     } catch (err) {
-      console.error('Failed to upload file:', err)
+      const message = err instanceof Error ? err.message : 'Failed to upload file'
+      setOperationError(message)
     }
   }, [currentProfile?.id, activeAssistant, refetch])
 
@@ -132,6 +135,7 @@ export function FilesPanel({ className }: FilesPanelProps) {
 
     const cleanup = window.electronAPI.contextMenu.onFileAction(async (data) => {
       if (data.assistantName !== activeAssistant) return
+      setOperationError(null)
 
       if (data.action === 'delete') {
         // Confirm deletion
@@ -146,17 +150,24 @@ export function FilesPanel({ className }: FilesPanelProps) {
           }
           refetch()
         } catch (err) {
-          console.error('Failed to delete file:', err)
+          const message = err instanceof Error ? err.message : 'Failed to delete file'
+          setOperationError(message)
         }
       } else if (data.action === 'download') {
         // Get file details to get signed URL
         try {
           const file = await window.electronAPI.assistant.files.describe(currentProfile.id, activeAssistant, data.fileId)
           if (file.signedUrl) {
+            const url = new URL(file.signedUrl)
+            if (url.protocol !== 'https:') {
+              setOperationError('Invalid download URL protocol')
+              return
+            }
             await window.electronAPI.shell.openExternal(file.signedUrl)
           }
         } catch (err) {
-          console.error('Failed to download file:', err)
+          const message = err instanceof Error ? err.message : 'Failed to download file'
+          setOperationError(message)
         }
       }
     })
@@ -258,6 +269,22 @@ export function FilesPanel({ className }: FilesPanelProps) {
           Upload File
         </Button>
       </div>
+
+      {/* Operation Error Banner */}
+      {operationError && (
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 rounded-md px-2 py-1.5">
+            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="flex-1 min-w-0 truncate">{operationError}</span>
+            <button
+              onClick={() => setOperationError(null)}
+              className="text-destructive hover:text-destructive/80 flex-shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Files List */}
       <div className="flex-1 overflow-y-auto">

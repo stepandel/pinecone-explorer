@@ -955,12 +955,23 @@ ipcMain.handle('assistant:files:describe', async (_event, profileId: string, ass
 
 ipcMain.handle('assistant:files:upload', async (_event, profileId: string, assistantName: string, params: { filePath: string; metadata?: Record<string, string | number>; multimodal?: boolean }) => {
   try {
+    // Validate file path
+    const filePath = params.filePath
+    if (!filePath || typeof filePath !== 'string') {
+      return { success: false, error: 'File path is required' }
+    }
+    const fs = await import('node:fs')
+    const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath)
+    if (!fs.existsSync(resolvedPath)) {
+      return { success: false, error: `File not found: ${resolvedPath}` }
+    }
+
     const service = pineconeConnectionPool.getConnection(profileId)
     if (!service) {
       return { success: false, error: 'Not connected to Pinecone' }
     }
     const assistantService = service.getAssistantService()
-    const file = await assistantService.uploadFile(assistantName, params)
+    const file = await assistantService.uploadFile(assistantName, { ...params, filePath: resolvedPath })
     track('file_uploaded', { multimodal: params.multimodal || false })
     return { success: true, data: file }
   } catch (error) {
@@ -991,6 +1002,8 @@ ipcMain.handle('assistant:files:delete', async (_event, profileId: string, assis
 
 // Track active chat streams for cancellation
 const activeChatStreams: Map<string, AbortController> = new Map()
+// Track which webContents owns which streams (for cleanup on window close)
+const streamOwners: Map<number, Set<string>> = new Map()
 
 ipcMain.handle('assistant:chat', async (_event, profileId: string, assistantName: string, params: { messages: Array<{ role: 'user' | 'assistant'; content: string }>; model?: string; filter?: Record<string, unknown> }) => {
   try {
@@ -1019,8 +1032,29 @@ ipcMain.handle('assistant:chat:stream:start', async (event, profileId: string, a
     const abortController = new AbortController()
     activeChatStreams.set(streamId, abortController)
 
+    // Track stream ownership for cleanup on window close
+    const senderId = event.sender.id
+    if (!streamOwners.has(senderId)) {
+      streamOwners.set(senderId, new Set())
+      // Register cleanup when this webContents is destroyed
+      event.sender.once('destroyed', () => {
+        const streams = streamOwners.get(senderId)
+        if (streams) {
+          for (const sid of streams) {
+            const controller = activeChatStreams.get(sid)
+            if (controller) {
+              controller.abort()
+              activeChatStreams.delete(sid)
+            }
+          }
+          streamOwners.delete(senderId)
+        }
+      })
+    }
+    streamOwners.get(senderId)!.add(streamId)
+
     const assistantService = service.getAssistantService()
-    
+
     // Start streaming in background
     assistantService.chatStream(
       assistantName,
@@ -1042,6 +1076,13 @@ ipcMain.handle('assistant:chat:stream:start', async (event, profileId: string, a
       }
     }).finally(() => {
       activeChatStreams.delete(streamId)
+      const ownerStreams = streamOwners.get(senderId)
+      if (ownerStreams) {
+        ownerStreams.delete(streamId)
+        if (ownerStreams.size === 0) {
+          streamOwners.delete(senderId)
+        }
+      }
     })
 
     track('chat_stream_started', { model: params.model })
@@ -1230,6 +1271,10 @@ ipcMain.handle('settings:openWindow', async () => {
 
 ipcMain.handle('shell:openExternal', async (_event, url: string) => {
   try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { success: false, error: `Blocked URL with disallowed protocol: ${parsed.protocol}` }
+    }
     await shell.openExternal(url)
     return { success: true }
   } catch (error) {

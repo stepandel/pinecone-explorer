@@ -292,9 +292,7 @@ export function MainContent() {
             }}
           >
             <div className="text-center text-muted-foreground">
-              <p className="text-sm">
-                {mode === 'assistant' ? 'No file selected' : 'No vector selected'}
-              </p>
+              <p className="text-sm">No vector selected</p>
             </div>
           </div>
         )}

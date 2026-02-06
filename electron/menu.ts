@@ -279,7 +279,6 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
           click: () => {
             sendToFocusedWindow('menu:new-index')
           },
-          registerAccelerator: false, // Also used for New Assistant in assistant mode
         },
         { type: 'separator' },
         {
@@ -376,11 +375,10 @@ function buildMenuTemplate(): Electron.MenuItemConstructorOptions[] {
       submenu: [
         {
           label: 'New Assistant...',
-          accelerator: 'CmdOrCtrl+Shift+N',
+          accelerator: 'CmdOrCtrl+Shift+A',
           click: () => {
             sendToFocusedWindow('menu:new-assistant')
           },
-          registerAccelerator: false, // Also used for New Index in index mode
         },
         { type: 'separator' },
         {

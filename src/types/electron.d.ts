@@ -489,6 +489,9 @@ declare global {
       onNewAssistant: (callback: () => void) => () => void
       onEditAssistant: (callback: () => void) => () => void
       onDeleteAssistant: (callback: () => void) => () => void
+      // Mode switching events
+      onIndexMode: (callback: () => void) => () => void
+      onAssistantMode: (callback: () => void) => () => void
       // Chat menu events
       onSendMessage: (callback: () => void) => () => void
       onFocusChatInput: (callback: () => void) => () => void

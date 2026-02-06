@@ -38,7 +38,6 @@ export default defineConfig({
             rollupOptions: {
               external: [
                 'onnxruntime-node',
-                'sharp',
               ],
             },
           },

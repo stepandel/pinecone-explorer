@@ -57,6 +57,8 @@ export function FileDetailPanel() {
 
   const handleDelete = useCallback(async () => {
     if (!activeFile || !currentProfile?.id || !activeAssistant) return
+    const confirmed = window.confirm('Delete this file?\n\nThis action cannot be undone.')
+    if (!confirmed) return
     try {
       await deleteMutation.mutateAsync(activeFile)
       setActiveFile(null)

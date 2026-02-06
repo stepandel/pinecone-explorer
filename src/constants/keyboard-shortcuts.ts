@@ -235,8 +235,8 @@ export const SHORTCUTS: Record<string, KeyboardShortcut> = {
   // Assistant
   NEW_ASSISTANT: {
     id: 'new-assistant',
-    keys: '⌘⇧N',
-    accelerator: 'CmdOrCtrl+Shift+N',
+    keys: '⌘⇧A',
+    accelerator: 'CmdOrCtrl+Shift+A',
     action: 'New Assistant',
     category: 'assistant',
   },

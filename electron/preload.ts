@@ -675,6 +675,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:delete-assistant', handler)
       return () => ipcRenderer.removeListener('menu:delete-assistant', handler)
     },
+    // Mode switching events
+    onIndexMode: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:switch-to-index-mode', handler)
+      return () => ipcRenderer.removeListener('menu:switch-to-index-mode', handler)
+    },
+    onAssistantMode: (callback: () => void): (() => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('menu:switch-to-assistant-mode', handler)
+      return () => ipcRenderer.removeListener('menu:switch-to-assistant-mode', handler)
+    },
     // Chat menu events
     onSendMessage: (callback: () => void): (() => void) => {
       const handler = () => callback()
